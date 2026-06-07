@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { API_BASE_URL } from '../apiConfig';
-import { ShoppingCart, User } from 'lucide-react';
+import { ShoppingCart, User, BookOpen, Briefcase, LogOut } from 'lucide-react';
 import AvatarImage from './AvatarImage';
 
 const StudlyfLogo = ({ className = "h-8 sm:h-10" }: { className?: string }) => (
@@ -259,65 +259,84 @@ const Navigation: React.FC = () => {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 10, scale: 0.95 }}
                           transition={{ duration: 0.2 }}
-                          className="absolute right-0 mt-4 w-72 bg-white/95 backdrop-blur-2xl border border-slate-200 rounded-2xl shadow-2xl p-4 z-[150] text-left"
+                          className="absolute right-0 mt-4 w-[320px] bg-white/95 backdrop-blur-2xl border border-white/40 rounded-[1.5rem] shadow-[0_40px_80px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)] overflow-hidden z-[150] text-left"
                         >
-                          <div className="flex flex-col gap-2.5 pb-3.5 border-b border-slate-200">
-                            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#7C3AED]">
-                              AUTHENTICATED MEMBER
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#A78BFA] flex items-center justify-center text-white font-black text-sm shadow-md overflow-hidden">
-                                {profilePhoto ? (
-                                  <AvatarImage src={profilePhoto} alt="" className="w-full h-full" />
-                                ) : (
-                                  user?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'U'
-                                )}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-900 truncate">{user?.full_name || 'User'}</p>
-                                <p className="text-[10px] font-medium text-slate-500 truncate mt-0.5">{user?.email}</p>
-                              </div>
+                          {/* Top Profile Header */}
+                          <div className="p-5 flex items-center gap-4 bg-gradient-to-br from-[#F8F7FF] to-white border-b border-slate-100">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#A78BFA] flex items-center justify-center text-white font-black text-xl shadow-lg shadow-[#7C3AED]/20 ring-4 ring-white shrink-0 overflow-hidden">
+                              {profilePhoto ? (
+                                <AvatarImage src={profilePhoto} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                user?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'U'
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="text-sm font-bold text-slate-900 truncate leading-tight">{user?.full_name || 'User'}</h4>
+                              <p className="text-[11px] font-medium text-slate-500 truncate mt-1">{user?.email}</p>
                             </div>
                           </div>
-                          <div className="flex flex-col gap-1 pt-3.5">
-                            <Link
-                              to="/dashboard/profile"
-                              onClick={() => setIsUserDropdownOpen(false)}
-                              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all text-xs font-bold uppercase tracking-widest group"
-                            >
-                              <span className="text-sm group-hover:scale-110 transition-transform">👤</span>
-                              My Profile
-                            </Link>
-                            <Link
-                              to="/dashboard/my-courses"
-                              onClick={() => setIsUserDropdownOpen(false)}
-                              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all text-xs font-bold uppercase tracking-widest group"
-                            >
-                              <span className="text-sm group-hover:scale-110 transition-transform">📖</span>
-                              My Courses
-                            </Link>
-                            <Link
-                              to="/opportunities/my-applications"
-                              onClick={() => setIsUserDropdownOpen(false)}
-                              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-all text-xs font-bold uppercase tracking-widest group"
-                            >
-                              <span className="text-sm group-hover:scale-110 transition-transform">🛒</span>
-                              My Applications
-                            </Link>
-                            <div className="h-px bg-slate-200 my-2" />
+
+                          {/* Core User Actions */}
+                          <div className="p-3">
+                            <div className="space-y-1">
+                              <span className="px-3 text-[9px] font-black uppercase tracking-[0.2em] text-[#7C3AED]/60 mb-2 block">
+                                Member Center
+                              </span>
+                              
+                              <Link
+                                to="/dashboard/profile"
+                                onClick={() => setIsUserDropdownOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-[#7C3AED] hover:bg-[#7C3AED]/5 transition-all text-sm font-semibold group"
+                              >
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm text-slate-400 group-hover:text-[#7C3AED] transition-all">
+                                  <User className="w-4 h-4" />
+                                </span>
+                                My Profile
+                              </Link>
+
+                              <Link
+                                to="/dashboard/my-courses"
+                                onClick={() => setIsUserDropdownOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-[#7C3AED] hover:bg-[#7C3AED]/5 transition-all text-sm font-semibold group"
+                              >
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm text-slate-400 group-hover:text-[#7C3AED] transition-all">
+                                  <BookOpen className="w-4 h-4" />
+                                </span>
+                                My Courses
+                              </Link>
+
+                              <Link
+                                to="/opportunities/my-applications"
+                                onClick={() => setIsUserDropdownOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 hover:text-[#7C3AED] hover:bg-[#7C3AED]/5 transition-all text-sm font-semibold group"
+                              >
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white group-hover:shadow-sm text-slate-400 group-hover:text-[#7C3AED] transition-all">
+                                  <Briefcase className="w-4 h-4" />
+                                </span>
+                                My Applications
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Bottom Section */}
+                          <div className="p-3 border-t border-slate-100 bg-slate-50/50">
                             <button
                               onClick={() => {
                                 setIsUserDropdownOpen(false);
                                 logout();
                               }}
-                              className="flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-xs font-bold uppercase tracking-widest group cursor-pointer outline-none"
+                              className="flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 transition-all text-sm font-semibold group cursor-pointer outline-none"
                             >
-                              <span className="text-sm group-hover:scale-110 transition-transform">🚪</span>
-                              Sign Out
+                              <div className="flex items-center gap-3">
+                                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100/50 group-hover:bg-red-100 text-red-500 transition-all">
+                                  <LogOut className="w-4 h-4" />
+                                </span>
+                                Sign Out
+                              </div>
                             </button>
                           </div>
-                          </motion.div>
-                        )}
+                        </motion.div>
+                      )}
                     </AnimatePresence>
                   </div>
                 </div>
