@@ -617,7 +617,7 @@ async def upload_temp_image(request: Request, file: UploadFile = File(...), publ
 from models import Institution, Event, Participant, Team, Submission, Judge, Score, Notification, LeaderboardEntry, Certificate
 from services.email_service import send_notification_email, get_registration_template, get_email_verification_template
 from auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token
-import upgrade_routes
+# import upgrade_routes
 import integration_routes
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -873,7 +873,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- Include Routers ---
-app.include_router(upgrade_routes.router)
+# app.include_router(upgrade_routes.router)
 app.include_router(submission_routes.router)
 app.include_router(judge_routes.router)
 app.include_router(event_routes.router)

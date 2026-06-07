@@ -1753,4 +1753,3 @@ export default function ResumeBuilder() {
         </div>
     );
 };
-}

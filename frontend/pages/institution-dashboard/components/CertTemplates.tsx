@@ -525,9 +525,3 @@ export const CERT_TEMPLATES = [
   { id: '8', label: 'Modern Abstract',       tag: 'Vibrant',      component: Template8 },
   { id: '9', label: 'Creative Hexagonal',    tag: 'Modular',      component: Template9 },
 ];
-ate9 },
-];
-late9 },
-];
-ate9 },
-];

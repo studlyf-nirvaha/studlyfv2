@@ -1367,6 +1367,10 @@ async def get_event_roster(
         rejected_count = await registrations_col.count_documents({"event_id": str(event_id), "status": "REJECTED"})
         waitlisted_count = await registrations_col.count_documents({"event_id": str(event_id), "status": "WAITLISTED"})
         
+        # New: count pending vs sent notifications
+        notified_count = await registrations_col.count_documents({"event_id": str(event_id), "status": "APPROVED", "notified_at": {"$ne": None}})
+        pending_notification_count = approved_count - notified_count
+        
         return {
             "status": "success",
             "stats": {
@@ -1374,7 +1378,9 @@ async def get_event_roster(
                 "approved": approved_count,
                 "pending": pending_count,
                 "rejected": rejected_count,
-                "waitlisted": waitlisted_count
+                "waitlisted": waitlisted_count,
+                "notified_approved": notified_count,
+                "pending_notification": pending_notification_count
             },
             "roster": {
                 "solos": solos,
@@ -1487,12 +1493,15 @@ async def notify_approved_participants(event_id: str, user: dict = Depends(get_a
         next_stage_name = upcoming[0][1] if upcoming else ""
         next_stage_active = now >= upcoming[0][0] if upcoming else False
 
+        # Only notify those who haven't been notified yet
         approved = await registrations_col.find(
-            {"event_id": str(event_id), "status": "APPROVED"}
+            {"event_id": str(event_id), "status": "APPROVED", "notified_at": None}
         ).to_list(length=50000)
 
         sent = 0
         errors = []
+        now_notified = datetime.now(timezone.utc)
+        
         for reg in approved:
             try:
                 prof = reg.get("profile_snapshot") or {}
@@ -1510,7 +1519,7 @@ async def notify_approved_participants(event_id: str, user: dict = Depends(get_a
 
                 subj = f"Approved — {event_title}"
                 logo_html = f'<img src="{app_logo_url}" alt="Studlyf" style="max-height:32px;margin-bottom:24px;" />' if app_logo_url else ""
-                body_html = f"""<div style="font-family: 'Poppins', sans-serif'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 0 24px;">
+                body_html = f"""<div style="font-family: 'Poppins', sans-serif, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 0 24px;">
                     {logo_html}
                     <div style="background: #f8f7ff; border-radius: 16px; padding: 32px; border: 1px solid #e8e5ff;">
                         <p style="font-size: 13px; color: #6C3BFF; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0;">Approved</p>
@@ -1532,6 +1541,13 @@ async def notify_approved_participants(event_id: str, user: dict = Depends(get_a
                 </div>"""
 
                 await enqueue_email(email, subj, body_html, idempotency_key=f"notify_approved_{reg['_id']}")
+                
+                # Mark as notified
+                await registrations_col.update_one(
+                    {"_id": reg["_id"]},
+                    {"$set": {"notified_at": now_notified}}
+                )
+                
                 sent += 1
             except Exception as e:
                 errors.append({"registration_id": str(reg.get("_id")), "error": str(e)})
