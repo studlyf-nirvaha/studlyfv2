@@ -324,7 +324,12 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
 
     const handleNotifyApproved = async () => {
         if (!eventId) return;
-        if (!confirm(`Send notification email to all ${regStats.approved} approved participants?`)) return;
+        const count = (regStats as any).pending_notification ?? regStats.approved;
+        if (count === 0 && regStats.approved > 0) {
+            alert('All approved participants have already been notified.');
+            return;
+        }
+        if (!confirm(`Send notification email to ${count} newly approved participant${count === 1 ? '' : 's'}?`)) return;
         setNotifyingApproved(true);
         try {
             const res = await fetch(`${API_BASE_URL}/api/v1/registration/events/${eventId}/notify-approved`, {
@@ -5166,17 +5171,6 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                             >
                                 Submit Evaluation
                             </button>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </FramerAnimatePresence>
-        </div>
-    );
-};
-
-export default EventDetails;
-     </button>
                         </div>
                     </motion.div>
                 </motion.div>
