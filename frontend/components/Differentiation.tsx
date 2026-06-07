@@ -34,7 +34,7 @@ const Differentiation: React.FC = () => {
             className="max-w-xl"
           >
             <h2 className="text-sm font-bold text-[#7C3AED] uppercase tracking-[0.4em] mb-4">Market Distinction</h2>
-            <h3 className="font-display text-5xl text-[#0F172A] italic">A standard built for those who ship.</h3>
+            <h3 className="font-poppins text-5xl text-[#0F172A] italic">A standard built for those who ship.</h3>
           </motion.div>
         </div>
 

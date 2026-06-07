@@ -152,7 +152,7 @@ const TermsAndConditions: React.FC<TermsAndConditions> = ({ onClose }) => {
           >
             <h1
               className="text-5xl sm:text-6xl font-black leading-[1.05] tracking-tight text-gray-900"
-              style={{ fontFamily: "'Sora', 'DM Sans', sans-serif" }}
+              style={{ fontFamily: "'Poppins', sans-serif" }}
             >
               Terms &<br />
               <span

@@ -555,7 +555,7 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
   container.style.padding = '0';
   container.style.boxSizing = 'border-box';
   container.style.background = '#e5e7eb';
-  container.style.fontFamily = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial';
+  container.style.fontFamily = "'Poppins', sans-serif";
   container.style.position = 'fixed';
   container.style.left = '-99999px';
   container.style.top = '0';
@@ -580,7 +580,7 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
   const nameBlock = document.createElement('div');
   nameBlock.style.cssText = 'display:flex;flex-direction:column;gap:10px;max-width:620px;';
   const nameTitle = document.createElement('div');
-  nameTitle.style.cssText = 'font-size:42px;font-weight:900;color:#0f172a;line-height:1.05;font-family:Georgia, "Times New Roman", serif;';
+  nameTitle.style.cssText = 'font-size:42px;font-weight:900;color:#0f172a;line-height:1.05;font-family: "Poppins", sans-serif;';
   nameTitle.innerText = profileDisplayName || 'Your Name';
   const roleSubtitle = document.createElement('div');
   roleSubtitle.style.cssText = 'font-size:18px;font-weight:700;color:#334155;letter-spacing:0.01em;';
@@ -872,7 +872,7 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
         container.style.padding = '0';
         container.style.boxSizing = 'border-box';
         container.style.background = '#0f0f13';
-        container.style.fontFamily = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial';
+        container.style.fontFamily = "'Poppins', sans-serif";
         container.style.position = 'fixed';
         container.style.left = '-99999px';
         container.style.top = '0';

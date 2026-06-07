@@ -134,10 +134,10 @@ export const DevHeroSection: React.FC = () => {
     const colBData = CARDS.filter((_, i) => i % 2 === 1);
 
     return (
-        <section className="relative w-full max-w-[1040px] h-[540px] bg-[#f2f2f2] rounded-[24px] overflow-hidden shadow-[0_2px_0_rgba(255,255,255,0.8)_inset,0_20px_60px_rgba(0,0,0,0.14),0_4px_16px_rgba(0,0,0,0.06)] mx-auto my-20 grid grid-cols-1 lg:grid-cols-[52%_48%] font-['Inter']">
+        <section className="relative w-full max-w-[1040px] h-[540px] bg-[#f2f2f2] rounded-[24px] overflow-hidden shadow-[0_2px_0_rgba(255,255,255,0.8)_inset,0_20px_60px_rgba(0,0,0,0.14),0_4px_16px_rgba(0,0,0,0.06)] mx-auto my-20 grid grid-cols-1 lg:grid-cols-[52%_48%] font-['Poppins']">
             <style>
                 {`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;900&display=swap');
                 
                 .card-blur-heavy {
                     filter: blur(8px) brightness(0.82);

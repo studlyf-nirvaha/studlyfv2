@@ -507,7 +507,7 @@ export default function AdsManagement() {
 
     return (
         <div style={{
-            fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh',
+            fontFamily: 'Poppins, sans-serif', minHeight: '100vh',
             background: '#f9fafb', color: '#111'
         }}>
 

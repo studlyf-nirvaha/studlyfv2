@@ -38,7 +38,7 @@ const AIReality: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="font-display text-4xl sm:text-6xl italic text-[#0F172A] leading-none mb-4"
+            className="font-poppins text-4xl sm:text-6xl italic text-[#0F172A] leading-none mb-4"
           >
             The Era of <br className="hidden sm:block" /><span className="not-italic font-sans font-black tracking-tighter uppercase text-[#7C3AED]">Human Authority.</span>
           </motion.h2>

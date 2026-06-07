@@ -116,7 +116,7 @@ const DEFAULT_RESUME_DATA: ResumeData = {
 
 // --- Styles ---
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
 
   :root {
     --v-purple: #6d28d9;
@@ -138,7 +138,7 @@ const styles = `
 
   body {
     background: var(--v-bg);
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'Poppins', sans-serif;
     color: var(--v-text);
     -webkit-font-smoothing: antialiased;
   }
@@ -156,7 +156,7 @@ const styles = `
     border-radius: 8px;
     padding: 9px 12px;
     font-size: 13.5px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     color: var(--v-text);
     transition: border-color 0.15s, box-shadow 0.15s;
     outline: none;
@@ -191,7 +191,7 @@ const styles = `
   }
 
   /* ── Classic resume typography ── */
-  .classic-resume { font-family: 'Georgia', serif; color: #111; }
+  .classic-resume { font-family: 'Poppins', sans-serif; color: #111; }
   .classic-resume h1 { font-size: 22pt; font-weight: 400; text-align: center; margin-bottom: 4pt; }
   .classic-resume .contact { font-size: 9pt; text-align: center; margin-bottom: 10pt; color: #333; }
   .classic-resume h2 { font-size: 9.5pt; font-weight: bold; border-bottom: 1px solid #111; margin: 10pt 0 5pt; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -222,7 +222,7 @@ const styles = `
     border-radius: 10px;
     font-weight: 600;
     font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     cursor: pointer;
     overflow: hidden;
     display: inline-flex;
@@ -258,7 +258,7 @@ const styles = `
     border-radius: 8px;
     font-weight: 500;
     font-size: 13.5px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -378,21 +378,21 @@ export function generatePdfHtml(data: ResumeData, template: string = 'classic') 
     if (template === 'modern') {
         const pHtml = `
             <div style="text-align:center;margin-bottom:30px">
-                <h1 style="font-family:'Outfit',sans-serif;font-size:32pt;font-weight:300;letter-spacing:2px;margin-bottom:10px;text-transform:uppercase;color:#1e293b">
+                <h1 style="font-family:'Poppins',sans-serif;font-size:32pt;font-weight:300;letter-spacing:2px;margin-bottom:10px;text-transform:uppercase;color:#1e293b">
                     ${p.firstName || "FIRST"} <span style="font-weight:600">${p.lastName || "LAST"}</span>
                 </h1>
-                <div style="font-family:'Inter',sans-serif;font-size:10pt;color:#64748b;letter-spacing:1px;margin-bottom:15px">
+                <div style="font-family:'Poppins',sans-serif;font-size:10pt;color:#64748b;letter-spacing:1px;margin-bottom:15px">
                     ${p.email || ""} ${p.phone ? ` • ${p.phone}` : ""} ${p.address ? ` • ${p.address}` : ""}
                 </div>
                 <div style="border-bottom:1px solid #e2e8f0;width:100%"></div>
             </div>`;
         const sectionHeader = (title: string) => `
             <div style="display:flex;align-items:center;margin:20px 0 12px 0">
-                <h2 style="font-family:'Outfit',sans-serif;font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#0f172a;margin-right:15px;white-space:nowrap">${title}</h2>
+                <h2 style="font-family:'Poppins',sans-serif;font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#0f172a;margin-right:15px;white-space:nowrap">${title}</h2>
                 <div style="height:1px;background:#f1f5f9;width:100%"></div>
             </div>`;
         const eduHtml = edu.map((e: any) => `
-            <div style="margin-bottom:12px;font-family:'Inter',sans-serif">
+            <div style="margin-bottom:12px;font-family:'Poppins',sans-serif">
                 <div style="display:flex;justify-content:space-between;align-items:baseline">
                     <span style="font-weight:700;font-size:11pt;color:#1e293b">${e.institution || ""}</span>
                     <span style="font-size:9pt;color:#64748b;font-weight:500">${e.year || ""}</span>
@@ -403,7 +403,7 @@ export function generatePdfHtml(data: ResumeData, template: string = 'classic') 
                 </div>
             </div>`).join("");
         const expHtml = exp.map((ex: any) => `
-            <div style="margin-bottom:18px;font-family:'Inter',sans-serif">
+            <div style="margin-bottom:18px;font-family:'Poppins',sans-serif">
                 <div style="display:flex;justify-content:space-between;align-items:baseline">
                     <span style="font-weight:700;font-size:11pt;color:#1e293b">${ex.company || ""}</span>
                     <span style="font-size:9pt;color:#64748b;font-weight:500">${ex.range || ""}</span>
@@ -416,8 +416,8 @@ export function generatePdfHtml(data: ResumeData, template: string = 'classic') 
                     ${ex.points.split('\n').filter((pt: string) => pt.trim()).map((pt: string) => `<li style="font-size:9.5pt;color:#334155;margin-bottom:4px;line-height:1.4">${pt}</li>`).join("")}
                 </ul>
             </div>`).join("");
-        return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@300;600;700&display=swap" rel="stylesheet"/><style>
-            body { font-family: 'Inter', sans-serif; line-height: 1.5; color: #1e293b; margin: 0; padding: 45px; }
+        return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/><style>
+            body { font-family: 'Poppins', sans-serif; line-height: 1.5; color: #1e293b; margin: 0; padding: 45px; }
             * { box-sizing: border-box; }
             @page { size: A4; margin: 0; }
         </style></head><body>
@@ -684,7 +684,7 @@ export default function ResumeBuilder() {
                             <motion.h1
                                 variants={fadeUp} initial="hidden" animate="visible" custom={1}
                                 className="text-5xl md:text-6xl font-bold text-gray-950 leading-[1.1] tracking-tight mb-6"
-                                style={{ fontFamily: "'DM Sans', sans-serif" }}
+                                style={{ fontFamily: "'Poppins', sans-serif" }}
                             >
                                 Build a resume<br />
                                 <span style={{ color: 'var(--v-purple)' }}>that gets noticed.</span>
@@ -1131,15 +1131,15 @@ export default function ResumeBuilder() {
         return (
             <div className="modern-resume w-full">
                 <style>{`
-                    .modern-resume { font-family: 'Inter', sans-serif; color: #1e293b; }
+                    .modern-resume { font-family: 'Poppins', sans-serif; color: #1e293b; }
                     .modern-header { text-align: center; margin-bottom: 30px; }
-                    .modern-name { font-family: 'Outfit', sans-serif; font-size: 32pt; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #1e293b; }
+                    .modern-name { font-family: 'Poppins', sans-serif; font-size: 32pt; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #1e293b; }
                     .modern-name span { font-weight: 600; }
                     .modern-contact { font-size: 10pt; color: #64748b; letter-spacing: 1px; margin-bottom: 20px; }
                     .modern-divider { border-bottom: 1px solid #e2e8f0; width: 100%; margin-bottom: 30px; }
                     .modern-section { margin-bottom: 25px; }
                     .modern-section-title { display: flex; align-items: center; margin-bottom: 12px; }
-                    .modern-section-title h2 { font-family: 'Outfit', sans-serif; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #0f172a; margin-right: 15px; white-space: nowrap; }
+                    .modern-section-title h2 { font-family: 'Poppins', sans-serif; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #0f172a; margin-right: 15px; white-space: nowrap; }
                     .modern-section-line { height: 1px; background: #f1f5f9; flex-grow: 1; }
                     .modern-entry { margin-bottom: 12px; }
                     .modern-entry-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 11pt; color: #1e293b; }
@@ -1752,4 +1752,5 @@ export default function ResumeBuilder() {
             </AnimatePresence>
         </div>
     );
+};
 }

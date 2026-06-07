@@ -268,7 +268,7 @@ async def send_daily_digest_email() -> dict:
                 email_subject = f"📬 Daily Digest: {len(upcoming_opps)} upcoming opportunities for you"
                 email_body = f"""
                 <html>
-                    <body style="font-family: system-ui, -apple-system, sans-serif; color: #111827; line-height: 1.6;">
+                    <body style="font-family: 'Poppins', sans-serif; color: #111827; line-height: 1.6;">
                         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
                                 <h1 style="margin: 0; font-size: 28px; font-weight: 900;">📬 Daily Digest</h1>
@@ -316,3 +316,4 @@ async def send_daily_digest_email() -> dict:
     except Exception as e:
         print(f"Error in send_daily_digest_email: {str(e)}")
         return {"sent_count": 0, "failed_count": 0, "error": str(e)}
+

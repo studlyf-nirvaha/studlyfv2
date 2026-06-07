@@ -2617,7 +2617,7 @@ async def checkout(user_id: str):
             
             email_body = f"""
             <html>
-            <body style="font-family: sans-serif; color: #333;">
+            <body style="font-family: 'Poppins', sans-serif; color: #333;">
                 <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 10px;">
                     <h2 style="color: #7C3AED;">Enrollment Successful!</h2>
                     <p>Hello {user_doc.get('name', 'Learner')},</p>
@@ -2804,14 +2804,14 @@ async def confirm_track_enrollment(user_id: str, data: dict = Body(...)):
         
         email_body = f"""
         <html>
-        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F9FAFB; margin: 0; padding: 0; color: #1F2937;">
+        <body style="font-family: 'Poppins', sans-serif; background-color: #F9FAFB; margin: 0; padding: 0; color: #1F2937;">
             <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04); border: 1px solid #E5E7EB;">
                 <!-- Header Gradient Banner -->
                 <div style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 40px; text-align: center; color: #ffffff;">
                     <div style="background-color: #ffffff; display: inline-block; padding: 10px 24px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-                        <strong style="color: #7C3AED; font-family: monospace; font-size: 20px; letter-spacing: 0.1em; display: inline-block;">STUDLYF</strong>
+                        <strong style="color: #7C3AED; font-family: 'Poppins', sans-serif; font-size: 20px; letter-spacing: 0.1em; display: inline-block;">STUDLYF</strong>
                     </div>
-                    <h1 style="font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; font-family: inherit;">Enrollment & Payment Confirmed</h1>
+                    <h1 style="font-size: 24px; font-weight: 800; margin: 0; text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Poppins', sans-serif;">Enrollment & Payment Confirmed</h1>
                     <p style="font-size: 14px; opacity: 0.85; margin: 10px 0 0 0; font-weight: 500;">Premium Career Track Unlocked</p>
                 </div>
 
@@ -2827,7 +2827,7 @@ async def confirm_track_enrollment(user_id: str, data: dict = Body(...)):
                         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                             <tr>
                                 <td style="padding: 6px 0; color: #6B7280; font-weight: 500;">Receipt Number:</td>
-                                <td style="padding: 6px 0; text-align: right; color: #1F2937; font-weight: 700; font-family: monospace;">{receipt_number}</td>
+                                <td style="padding: 6px 0; text-align: right; color: #1F2937; font-weight: 700; font-family: 'Poppins', sans-serif;">{receipt_number}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 6px 0; color: #6B7280; font-weight: 500;">Payment Date:</td>
@@ -7465,4 +7465,5 @@ async def enroll_course(req: EnrollRequest, current_user: dict = Depends(get_cur
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
 

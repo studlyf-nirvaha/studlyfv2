@@ -128,7 +128,7 @@ class InstitutionalCertificateService:
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700;14..32,800&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; background: #f8fafc; padding: 40px; display: flex; justify-content: center; }
+    body { font-family: 'Poppins', sans-serif'', 'Segoe UI', system-ui, sans-serif; background: #f8fafc; padding: 40px; display: flex; justify-content: center; }
     .cert { width: 900px; min-height: 600px; background: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden; position: relative; }
     .cert-border { border: 2px solid #e2e8f0; border-radius: 14px; margin: 16px; padding: 32px 40px; min-height: calc(100% - 32px); position: relative; }
     .cert-border::before { content: ''; position: absolute; top: -1px; left: 40px; right: 40px; height: 4px; background: linear-gradient(90deg, #6c3bff, #4f46e5); border-radius: 2px; }
@@ -614,3 +614,5 @@ async def process_certificate_jobs():
 
 
 certificate_service = InstitutionalCertificateService()
+
+

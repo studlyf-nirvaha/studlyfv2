@@ -896,7 +896,7 @@ export default function SkillAssessment() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Poppins', sans-serif" }}>
       <Navigation />
       {screen === "select" && <SkillSelectScreen onSelect={handleSelect} />}
       {screen === "sync"   && <SyncScreen skill={skill} onStart={() => setScreen("test")} />}

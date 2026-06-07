@@ -260,7 +260,7 @@ const ParticipantCardPage: React.FC = () => {
                             {downloading ? 'Rendering…' : 'Download Poster'}
                         </button>
                     </div>
-                    <div ref={posterRef} className="bg-[#fdfae7] rounded-2xl overflow-hidden border border-slate-200 p-4 space-y-3 text-center" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    <div ref={posterRef} className="bg-[#fdfae7] rounded-2xl overflow-hidden border border-slate-200 p-4 space-y-3 text-center" style={{ fontFamily: 'Poppins, sans-serif' }}>
                         <div className="text-[10px] font-black uppercase tracking-widest text-orange-600">India's Largest Summer AI Hackathon</div>
                         <div className="text-2xl font-black tracking-tighter">{card.eventName}</div>
                         <div className="flex items-center justify-center gap-4">

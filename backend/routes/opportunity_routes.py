@@ -1157,7 +1157,7 @@ def _stage_unlock_email_html(participant_name: str, event_title: str, org_name: 
     sn = escape(stage_name)
     ut = escape(unlock_time)
     sl = escape(stage_link)
-    return f"""<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0;">
+    return f"""<html><body style="font-family: 'Poppins', sans-serif'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0;">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
 <div style="background:linear-gradient(135deg,#6C3BFF,#8B5CF6);border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
 <div style="font-size:40px;margin-bottom:8px;">🎉</div>
@@ -1179,4 +1179,5 @@ def _stage_unlock_email_html(participant_name: str, event_title: str, org_name: 
 <p style="font-size:12px;color:#94a3b8;margin:0;">Regards,<br>Team Studlyf<br>On behalf of {on}</p>
 </div>
 </div></body></html>"""
+
 

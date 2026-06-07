@@ -313,7 +313,7 @@ export default function SkillAssessmentHistory() {
   const grouped = groupBySkill(filtered);
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Poppins', sans-serif" }}>
       <Navigation />
       <div style={{ padding: "32px 40px", marginTop: 80, maxWidth: 900, margin: "80px auto 0" }}>
         {/* Page header */}

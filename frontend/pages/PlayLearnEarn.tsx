@@ -41,7 +41,7 @@ const PlayLearnEarn: React.FC = () => {
       <div className="max-w-7xl w-full mx-auto relative z-10">
         <header className="text-center mb-24">
           <div className="inline-block border border-white/20 px-6 py-2 rounded-full mb-10 text-[#7C3AED] font-mono text-[9px] uppercase tracking-[0.5em] font-bold">Engagement Protocol // ACTIVE</div>
-          <h1 className="text-6xl sm:text-9xl font-bold text-white mb-8 tracking-tighter uppercase leading-[0.8] font-syne">Play. Learn. <br/><span className="text-[#7C3AED]">Earn.</span></h1>
+          <h1 className="text-6xl sm:text-9xl font-bold text-white mb-8 tracking-tighter uppercase leading-[0.8] font-poppins">Play. Learn. <br/><span className="text-[#7C3AED]">Earn.</span></h1>
           <p className="text-xl text-white/60 max-w-xl mx-auto font-medium">Daily technical challenges to maintain elite readiness and unlock institutional reward tiers.</p>
           {userGamification && !loading && (
             <div className="mt-8 flex justify-center gap-8 text-white/80 font-mono text-sm">

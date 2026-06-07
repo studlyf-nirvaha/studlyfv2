@@ -220,7 +220,7 @@ const TrackDetail: React.FC = () => {
                                 </div>
                                 <div className="w-full border-y border-gray-100 py-10 space-y-6 mb-12">
                                     <p className="text-sm font-medium text-gray-500 italic">This certifies that</p>
-                                    <p className="text-4xl font-syne font-black text-gray-900">Johnathan Doe</p>
+                                    <p className="text-4xl font-poppins font-black text-gray-900">Johnathan Doe</p>
                                     <p className="text-sm font-medium text-gray-500">has successfully completed the 16-week intensive track in</p>
                                     <p className="text-2xl font-black uppercase tracking-tight text-[#7C3AED]">{detail.title}</p>
                                 </div>

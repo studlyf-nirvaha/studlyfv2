@@ -47,7 +47,7 @@ const ProblemSection: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="font-display text-5xl md:text-6xl text-[#0F172A] italic mb-8 leading-tight"
+              className="font-poppins text-5xl md:text-6xl text-[#0F172A] italic mb-8 leading-tight"
             >
               Capability is rare. <br />
               <span className="text-[#7C3AED] not-italic font-sans font-bold tracking-tighter uppercase text-4xl">Claims are everywhere.</span>

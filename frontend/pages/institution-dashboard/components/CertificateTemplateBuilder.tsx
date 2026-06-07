@@ -51,19 +51,19 @@ const buildHtmlContent = (data: CertData, templateLabel?: string) => {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 32px; font-family: Georgia, serif; background: #f8fafc; }
+    body { margin: 0; padding: 32px; font-family: 'Poppins', sans-serif; background: #f8fafc; }
     .certificate { max-width: 1100px; margin: 0 auto; background: #fff; border: 8px solid #6C3BFF; border-radius: 24px; padding: 36px 44px; }
     .top { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
     .title { text-align: center; flex: 1; }
-    .institution { text-transform: uppercase; letter-spacing: 2px; font-family: Arial, sans-serif; font-size: 14px; color: #6C3BFF; font-weight: 800; }
-    .template { text-transform: uppercase; letter-spacing: 4px; font-family: Arial, sans-serif; font-size: 11px; color: #94A3B8; margin-top: 4px; }
+    .institution { text-transform: uppercase; letter-spacing: 2px; font-family: 'Poppins', sans-serif; font-size: 14px; color: #6C3BFF; font-weight: 800; }
+    .template { text-transform: uppercase; letter-spacing: 4px; font-family: 'Poppins', sans-serif; font-size: 11px; color: #94A3B8; margin-top: 4px; }
     .heading { margin-top: 26px; text-align: center; font-size: 44px; font-weight: 900; letter-spacing: 4px; color: #0f172a; }
-    .cert-type { text-align: center; font-size: 18px; font-family: Arial, sans-serif; font-weight: 800; color: #6C3BFF; text-transform: uppercase; letter-spacing: 2px; margin-top: 6px; }
+    .cert-type { text-align: center; font-size: 18px; font-family: 'Poppins', sans-serif; font-weight: 800; color: #6C3BFF; text-transform: uppercase; letter-spacing: 2px; margin-top: 6px; }
     .recipient { margin: 24px auto 12px; width: fit-content; padding: 0 36px; border-bottom: 2px solid #0f172a; font-size: 32px; font-weight: 700; font-style: italic; color: #0f172a; text-align: center; }
-    .body { text-align: center; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.8; color: #334155; max-width: 760px; margin: 18px auto 0; }
-    .meta { display: flex; justify-content: center; gap: 28px; margin-top: 16px; font-family: Arial, sans-serif; font-size: 13px; color: #475569; }
+    .body { text-align: center; font-family: 'Poppins', sans-serif; font-size: 15px; line-height: 1.8; color: #334155; max-width: 760px; margin: 18px auto 0; }
+    .meta { display: flex; justify-content: center; gap: 28px; margin-top: 16px; font-family: 'Poppins', sans-serif; font-size: 13px; color: #475569; }
     .signatures { display: flex; justify-content: space-around; gap: 24px; margin-top: 36px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-    .signatory { text-align: center; font-family: Arial, sans-serif; min-width: 180px; }
+    .signatory { text-align: center; font-family: 'Poppins', sans-serif; min-width: 180px; }
     .line { height: 26px; border-bottom: 1.5px solid #6C3BFF; margin: 0 auto 6px; width: 120px; }
     .name { font-size: 13px; font-weight: 800; color: #0f172a; }
     .title, .org { font-size: 11px; color: #64748b; }
@@ -74,12 +74,12 @@ const buildHtmlContent = (data: CertData, templateLabel?: string) => {
 <body>
   <div class="certificate">
     <div class="top">
-      <div style="width:96px;height:96px;border:2px dashed #CBD5E1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-size:10px;font-weight:800;color:#94A3B8;">INST</div>
+      <div style="width:96px;height:96px;border:2px dashed #CBD5E1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-size:10px;font-weight:800;color:#94A3B8;">INST</div>
       <div class="title">
         <div class="institution">${data.institutionName || 'Institution Name'}</div>
         <div class="template">${templateLabel || data.certType || 'Certificate Template'}</div>
       </div>
-      <div style="width:96px;height:96px;border:2px dashed #CBD5E1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-size:10px;font-weight:800;color:#94A3B8;">EVENT</div>
+      <div style="width:96px;height:96px;border:2px dashed #CBD5E1;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-size:10px;font-weight:800;color:#94A3B8;">EVENT</div>
     </div>
     <div class="heading">CERTIFICATE</div>
     <div class="cert-type">${data.certType || 'Certificate of Participation'}</div>

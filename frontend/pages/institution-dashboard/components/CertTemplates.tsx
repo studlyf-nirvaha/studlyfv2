@@ -53,7 +53,7 @@ const SponsorRow = ({ logos }: { logos: string[] }) => {
 // TEMPLATE 1 — Classic Red & Gold  (xto10x / hackathon medal style)
 // ═══════════════════════════════════════════════════════════════════
 export const Template1: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Georgia, serif', background: '#fff', border: '10px solid #B91C1C', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#fff', border: '10px solid #B91C1C', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
     {/* Gold inner border */}
     <div style={{ position: 'absolute', inset: 8, border: '3px solid #D97706', pointerEvents: 'none', zIndex: 1 }} />
     {/* Red corner decorations */}
@@ -105,7 +105,7 @@ export const Template1: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 2 — Blue Tech Wave  (Saraswati / DSC style)
 // ═══════════════════════════════════════════════════════
 export const Template2: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Arial, sans-serif', background: '#fff', border: '1px solid #BFDBFE', borderRadius: 12, overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#fff', border: '1px solid #BFDBFE', borderRadius: 12, overflow: 'hidden' }}>
     {/* Blue header bar */}
     <div style={{ background: 'linear-gradient(135deg,#1E40AF,#3B82F6)', padding: '20px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <LogoBox src={data.institutionLogo} label="INST" size={52} />
@@ -149,7 +149,7 @@ export const Template2: React.FC<{ data: CertData }> = ({ data }) => (
 // ═════════════════════════════════════════════════════════════
 const COLORS = ['#EF4444','#3B82F6','#22C55E','#F59E0B'];
 export const Template3: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Arial, sans-serif', background: '#fff', border: '4px solid #0F172A', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#fff', border: '4px solid #0F172A', borderRadius: 4, position: 'relative', overflow: 'hidden' }}>
     {/* Colorful corner triangles */}
     <div style={{ position: 'absolute', top: 0, left: 0, width: 80, height: 80, background: COLORS[0], clipPath: 'polygon(0 0,100% 0,0 100%)' }} />
     <div style={{ position: 'absolute', top: 0, right: 0, width: 80, height: 80, background: COLORS[1], clipPath: 'polygon(100% 0,100% 100%,0 0)' }} />
@@ -192,7 +192,7 @@ export const Template3: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 4 — Elite Dark  (Premium / SIH style)
 // ════════════════════════════════════════════════════════
 export const Template4: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Georgia, serif', background: 'linear-gradient(145deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: 'linear-gradient(145deg,#0F172A 0%,#1E293B 60%,#0F172A 100%)', borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
     {/* Gold shimmer lines */}
     <div style={{ position: 'absolute', top: 16, left: 16, right: 16, bottom: 16, border: '1.5px solid rgba(217,119,6,0.4)', borderRadius: 8, pointerEvents: 'none' }} />
     <div style={{ padding: '40px 48px 32px', position: 'relative', zIndex: 2 }}>
@@ -254,7 +254,7 @@ export const Template4: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 5 — Professional Clean  (Tekno'19 / academic)
 // ══════════════════════════════════════════════════════════
 export const Template5: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Georgia, serif', background: '#fff', border: '6px solid #7C3AED', borderRadius: 8, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#fff', border: '6px solid #7C3AED', borderRadius: 8, position: 'relative', overflow: 'hidden' }}>
     <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 14, background: 'linear-gradient(180deg,#7C3AED,#9D7CFF)' }} />
     <div style={{ padding: '32px 40px 28px 52px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
@@ -296,7 +296,7 @@ export const Template5: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 6 — Dark Tech (Industrial / Gaming)
 // ══════════════════════════════════════════════════════════
 export const Template6: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'monospace, sans-serif', background: '#09090B', border: '2px solid #14B8A6', borderRadius: 0, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#09090B', border: '2px solid #14B8A6', borderRadius: 0, position: 'relative', overflow: 'hidden' }}>
     {/* Tech accents */}
     <div style={{ position: 'absolute', top: 0, left: 0, width: 40, height: 40, borderTop: '4px solid #10B981', borderLeft: '4px solid #10B981' }} />
     <div style={{ position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, borderBottom: '4px solid #10B981', borderRight: '4px solid #10B981' }} />
@@ -350,7 +350,7 @@ export const Template6: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 7 — Corporate Professional (Classic Elegant)
 // ══════════════════════════════════════════════════════════
 export const Template7: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: '"Times New Roman", Times, serif', background: '#FAFAFA', border: '1px solid #E2E8F0', padding: 12, position: 'relative' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#FAFAFA', border: '1px solid #E2E8F0', padding: 12, position: 'relative' }}>
     <div style={{ border: '2px solid #1E3A8A', padding: '36px 48px', position: 'relative', background: '#fff' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <LogoBox src={data.institutionLogo} label="INST" size={60} />
@@ -405,7 +405,7 @@ export const Template7: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 8 — Modern Abstract (Vibrant Gradients)
 // ══════════════════════════════════════════════════════════
 export const Template8: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Inter, sans-serif', background: '#fff', borderRadius: 16, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#fff', borderRadius: 16, position: 'relative', overflow: 'hidden' }}>
     <div style={{ position: 'absolute', top: '-20%', right: '-10%', width: 300, height: 300, background: 'radial-gradient(circle, rgba(168,85,247,0.2) 0%, rgba(255,255,255,0) 70%)' }} />
     <div style={{ position: 'absolute', bottom: '-20%', left: '-10%', width: 300, height: 300, background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, rgba(255,255,255,0) 70%)' }} />
     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, background: 'linear-gradient(90deg, #A855F7, #3B82F6, #EC4899)' }} />
@@ -461,7 +461,7 @@ export const Template8: React.FC<{ data: CertData }> = ({ data }) => (
 // TEMPLATE 9 — Creative Hexagonal
 // ══════════════════════════════════════════════════════════
 export const Template9: React.FC<{ data: CertData }> = ({ data }) => (
-  <div style={{ fontFamily: 'Arial, sans-serif', background: '#F8FAFC', borderRadius: 8, position: 'relative', overflow: 'hidden' }}>
+  <div style={{ fontFamily: 'Poppins, sans-serif', background: '#F8FAFC', borderRadius: 8, position: 'relative', overflow: 'hidden' }}>
     {/* Hexagon shapes */}
     <div style={{ position: 'absolute', top: -30, left: -30, width: 100, height: 115, background: '#F59E0B', clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)', opacity: 0.8 }} />
     <div style={{ position: 'absolute', top: 20, left: -40, width: 80, height: 92, background: '#3B82F6', clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)', opacity: 0.8 }} />
@@ -524,4 +524,10 @@ export const CERT_TEMPLATES = [
   { id: '7', label: 'Corporate Professional',tag: 'Classic',      component: Template7 },
   { id: '8', label: 'Modern Abstract',       tag: 'Vibrant',      component: Template8 },
   { id: '9', label: 'Creative Hexagonal',    tag: 'Modular',      component: Template9 },
+];
+ate9 },
+];
+late9 },
+];
+ate9 },
 ];

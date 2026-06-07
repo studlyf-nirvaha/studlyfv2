@@ -1682,7 +1682,7 @@ async def assign_judges_to_submission_route(
     title = ev.get("title") or "Event"
     for em in emails:
         subj = f"Assigned to review a submission — {title}"
-        html = f"""<html><body style="font-family:system-ui,sans-serif;color:#111827">
+        html = f"""<html><body style="font-family: 'Poppins', sans-serif;color:#111827">
         <p>You were assigned to evaluate a submission for <strong>{title}</strong>.</p>
         <p>Open the Studlyf judge workflow for this event.</p></body></html>"""
         asyncio.create_task(send_notification_email(em, subj, html))
@@ -2583,7 +2583,7 @@ async def create_submission(submission_data: dict):
                     inst_subject = f"New Submission: {event_title}"
                     inst_body = f"""
                     <html>
-                        <body style="font-family: Arial, sans-serif; color: #333;">
+                        <body style="font-family: 'Poppins', sans-serif; color: #333;">
                             <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
                                 <h2 style="color: #10B981;">New Project Submitted!</h2>
                                 <p>Hello Admin,</p>
@@ -2768,7 +2768,7 @@ async def save_judge_score(score_data: dict, user: dict = Depends(get_auth_user)
                     subject = f"Judge Action: {team_name} Scored ({total_score}/100)"
                     body = f"""
                     <html>
-                        <body style="font-family: Arial, sans-serif; color: #333;">
+                        <body style="font-family: 'Poppins', sans-serif; color: #333;">
                             <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 20px;">
                                 <h2 style="color: #6C3BFF;">Evaluation Complete</h2>
                                 <p>Hello Admin,</p>
@@ -3116,7 +3116,7 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
     message = status_messages.get(status, f"Your team status has been updated to: {status}")
     
     body_html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+    <div style="font-family: 'Poppins', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
         <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
             <h2 style="color: #6C3BFF; margin-top: 0;">{subject}</h2>
             <p style="font-size: 16px; color: #333;">Dear Team,</p>
@@ -3976,7 +3976,7 @@ async def add_event_judge(event_id: str, judge_data: dict, user: dict = Depends(
     event_title = event.get("title") or "Event"
     email_html = f"""
     <html>
-    <body style="font-family: Arial, sans-serif; background:#f8fafc; color:#0f172a; padding:24px;">
+    <body style="font-family: 'Poppins', sans-serif; background:#f8fafc; color:#0f172a; padding:24px;">
         <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;padding:32px;">
             <p style="margin:0 0 12px 0;font-size:18px;font-weight:800;">Hello {judge_name},</p>
             <p style="margin:0 0 18px 0;line-height:1.7;color:#475569;">You have been invited to evaluate submissions for <strong>{event_title}</strong>.</p>
@@ -5433,7 +5433,7 @@ async def export_leaderboard_pdf(event_id: str):
 
     html_content = f"""
     <html><head><style>
-        body {{ font-family: Arial, sans-serif; padding: 40px; }}
+        body {{ font-family: 'Poppins', sans-serif; padding: 40px; }}
         h1 {{ color: #1e293b; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
         th, td {{ border: 1px solid #e2e8f0; padding: 12px; text-align: left; }}
@@ -6237,7 +6237,7 @@ def _stage_unlock_email_html(participant_name: str, event_title: str, org_name: 
     sn = escape(stage_name)
     ut = escape(unlock_time)
     sl = escape(stage_link)
-    return f"""<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:0;">
+    return f"""<html><body style="font-family: 'Poppins', sans-serif;background:#f8fafc;margin:0;padding:0;">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
 <div style="background:linear-gradient(135deg,#6C3BFF,#8B5CF6);border-radius:16px 16px 0 0;padding:32px 24px;text-align:center;">
 <div style="font-size:40px;margin-bottom:8px;">🎉</div>

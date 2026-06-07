@@ -9,8 +9,8 @@ module.exports = {
       fontFamily: {
         sans: ['Poppins', 'sans-serif'],
         poppins: ['Poppins', 'sans-serif'],
-        display: ['Instrument Serif', 'serif'],
-        syne: ['Syne', 'sans-serif'],
+        display: ['Poppins', 'sans-serif'],
+        syne: ['Poppins', 'sans-serif'],
       },
     },
   },

@@ -82,7 +82,7 @@ async def _notify_portal_review(app: dict, opp: dict, new_status: str) -> None:
             body = get_shortlist_template(user.get("full_name", "Participant"), title, "")
         else:
             subj = f"Application update: {title}"
-            body = f"""<html><body style="font-family:system-ui,sans-serif;color:#111827"><p>{msg}</p>
+            body = f"""<html><body style="font-family: 'Poppins', sans-serif;color:#111827"><p>{msg}</p>
             <p>Open Studlyf → Opportunities → My applications to review your status.</p></body></html>"""
         asyncio.create_task(send_notification_email(email, subj, body))
 
@@ -889,3 +889,4 @@ async def set_opportunity_application_review_status(
     except Exception:
         pass
     return app
+

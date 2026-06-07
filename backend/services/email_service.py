@@ -332,7 +332,7 @@ def get_team_join_request_approved_template(
 def get_team_join_template(new_member_name: str, team_name: str, event_name: str):
     return f"""
     <html>
-        <body style="font-family: 'Segoe UI', sans-serif; color: #1f2937; line-height: 1.6;">
+        <body style="font-family: 'Poppins', sans-serifSegoe UI', sans-serif; color: #1f2937; line-height: 1.6;">
             <div style="max-width: 600px; margin: auto; padding: 40px; border: 1px solid #f3f4f6; border-radius: 24px;">
                 <div style="text-align: center; color: #10b981; font-size: 40px; margin-bottom: 20px;">🤝</div>
                 <h1 style="color: #111827; font-size: 22px; font-weight: 800; text-align: center;">NEW SQUAD MEMBER!</h1>
@@ -350,7 +350,7 @@ def get_team_join_template(new_member_name: str, team_name: str, event_name: str
 def get_shortlist_template(team_name: str, event_name: str, stage_name: str = "next stage"):
     return f"""
     <html>
-        <body style="font-family: 'Segoe UI', sans-serif; color: #1f2937; line-height: 1.6;">
+        <body style="font-family: 'Poppins', sans-serifSegoe UI', sans-serif; color: #1f2937; line-height: 1.6;">
             <div style="max-width: 600px; margin: auto; padding: 40px; border: 1px solid #f3f4f6; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%);">
                 <div style="text-align: center; margin-bottom: 20px;">🎉</div>
                 <h1 style="color: #7C3AED; font-size: 28px; font-weight: 900; text-align: center; margin: 0;">CONGRATULATIONS!</h1>
@@ -389,7 +389,7 @@ def get_certificate_template(user_name: str, event_name: str, rank: str = None, 
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;800&display=swap');
         </style>
     </head>
-    <body style="margin: 0; padding: 0; font-family: 'Outfit', sans-serif; background-color: #F8FAFC;">
+    <body style="margin: 0; padding: 0; font-family: 'Poppins', sans-serifOutfit', sans-serif; background-color: #F8FAFC;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 20px;">
             <tr>
                 <td align="center">
@@ -463,7 +463,7 @@ def get_announcement_template(user_name: str, event_name: str, message: str, nex
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;800&display=swap');
         </style>
     </head>
-    <body style="margin: 0; padding: 0; font-family: 'Outfit', sans-serif; background-color: #F8FAFC;">
+    <body style="margin: 0; padding: 0; font-family: 'Poppins', sans-serifOutfit', sans-serif; background-color: #F8FAFC;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 20px;">
             <tr>
                 <td align="center">
@@ -512,7 +512,7 @@ def _email_shell(title: str, body_html: str, subtitle: str = "", accent: str = "
     subtitle_html = f'<p style="margin:8px 0 0 0;color:#c7d2fe;font-size:14px;font-weight:500">{_safe_text(subtitle)}</p>' if subtitle else ""
     return f"""
     <html>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0;padding:0;background:#f8fafc;">
+    <body style="font-family: 'Poppins', sans-serifSegoe UI', Roboto, 'Helvetica Neue', Arial; margin:0;padding:0;background:#f8fafc;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background:#f8fafc; padding:24px 12px;">
             <tr>
                 <td align="center">
@@ -867,7 +867,7 @@ async def send_course_purchase_email(to_email: str, student_name: str, course_na
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800&display=swap');
         </style>
     </head>
-    <body style="margin: 0; padding: 0; font-family: 'Outfit', sans-serif; background-color: #F8FAFC;">
+    <body style="margin: 0; padding: 0; font-family: 'Poppins', sans-serifOutfit', sans-serif; background-color: #F8FAFC;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 20px;">
             <tr>
                 <td align="center">
@@ -924,3 +924,5 @@ async def send_course_purchase_email(to_email: str, student_name: str, course_na
     """
     
     await send_notification_email(to_email, subject, html_content)
+
+

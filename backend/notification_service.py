@@ -315,7 +315,7 @@ class NotificationService:
         
         body_html = f"""
         <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
+        <body style="font-family: 'Poppins', sans-serif; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h2 style="color: #6B46C1;">{notification.get('title', 'New Notification')}</h2>
                 <p>{notification.get('message', '')}</p>
@@ -340,3 +340,4 @@ class NotificationService:
 
 # Global instance
 notification_service = NotificationService()
+

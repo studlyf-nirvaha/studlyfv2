@@ -93,7 +93,7 @@ class ReminderService:
                 subject = f"Urgent: Judging Deadline for {event_name}"
                 body = f"""
                 <html>
-                    <body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+                    <body style="font-family: 'Poppins', sans-serif; line-height: 1.6; color: #333;">
                         <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                             <h2 style="color: #6C3BFF;">Judging Protocol Reminder</h2>
                             <p>Hello Evaluator,</p>
@@ -236,3 +236,4 @@ class ReminderService:
         await ReminderService._send_stage_reminders(1, "1h")
 
 reminder_service = ReminderService()
+

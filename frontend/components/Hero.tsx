@@ -52,7 +52,7 @@ const Hero: React.FC = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 2, ease: [0.19, 1, 0.22, 1], delay: 0.3 }}
-                className="text-[#7C3AED] italic font-display lowercase font-normal tracking-tight block"
+                className="text-[#7C3AED] italic font-poppins lowercase font-normal tracking-tight block"
               >
                 Readiness.
               </motion.span>

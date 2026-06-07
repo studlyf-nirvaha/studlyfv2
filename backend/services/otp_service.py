@@ -19,7 +19,7 @@ async def generate_and_send_otp(email: str):
     subject = "Verification Code - Welcome to Studlyf Evolution"
     body_html = f"""
     <html>
-        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; line-height: 1.6; background-color: #f9f9f9; padding: 20px;">
+        <body style="font-family: 'Poppins', sans-serif'', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; line-height: 1.6; background-color: #f9f9f9; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #eef2f6;">
                 <div style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 40px 20px; text-align: center;">
                     <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">The Evolution Begins</h1>
@@ -78,7 +78,7 @@ async def send_welcome_email(email: str, name: str):
     subject = "Welcome to Studlyf - Registration Successful"
     body_html = f"""
     <html>
-        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; line-height: 1.6; background-color: #f9f9f9; padding: 20px;">
+        <body style="font-family: 'Poppins', sans-serif'', Tahoma, Geneva, Verdana, sans-serif; color: #1a1a1a; line-height: 1.6; background-color: #f9f9f9; padding: 20px;">
             <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #eef2f6;">
                 <div style="background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); padding: 40px 20px; text-align: center;">
                     <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase;">Registration Confirmed</h1>
@@ -109,3 +109,5 @@ async def send_welcome_email(email: str, name: str):
     </html>
     """
     await send_notification_email(email, subject, body_html)
+
+

@@ -34,7 +34,7 @@ const FinalCTA: React.FC = () => {
               <span className="font-mono text-[9px] sm:text-[10px] tracking-[0.4em] sm:tracking-[0.6em] text-[#7C3AED] font-bold uppercase">Ready for Assessment?</span>
             </motion.div>
 
-            <h2 className="font-display text-5xl sm:text-7xl lg:text-[9rem] italic text-white mb-8 sm:mb-12 tracking-tight">
+            <h2 className="font-poppins text-5xl sm:text-7xl lg:text-[9rem] italic text-white mb-8 sm:mb-12 tracking-tight">
               Verify <br /><span className="text-[#7C3AED] not-italic font-sans font-bold tracking-tighter uppercase text-4xl sm:text-6xl lg:text-[7rem] block mt-2 sm:mt-0">Your Limit.</span>
             </h2>
 

@@ -408,7 +408,7 @@ class ManualEvaluationService:
         
         body_html = f"""
         <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
+        <body style="font-family: 'Poppins', sans-serif; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h2 style="color: #6B46C1;">Manual Evaluation Assignment</h2>
                 <p>Hello {judge.get('name', 'Judge')},</p>
@@ -452,7 +452,7 @@ class ManualEvaluationService:
         
         body_html = f"""
         <html>
-        <body style="font-family: Arial, sans-serif; color: #333;">
+        <body style="font-family: 'Poppins', sans-serif; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h2 style="color: #6B46C1;">Evaluation Completed</h2>
                 <p>Hello {participant_info.get('name', 'Participant')},</p>
@@ -509,3 +509,4 @@ class ManualEvaluationService:
 
 # Global instance
 manual_evaluation_service = ManualEvaluationService()
+

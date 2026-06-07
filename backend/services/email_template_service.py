@@ -24,14 +24,14 @@ def _wrap_premium_html_shell(content_html: str, title: str, accent_color: str = 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; width: 100% !important;">
+<body style="font-family: 'Poppins', sans-serif', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; width: 100% !important;">
     <div style="background-color: #f8fafc; padding: 40px 20px; text-align: center;">
         <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 24px; overflow: hidden; border-collapse: separate; box-shadow: 0 10px 25px -5px rgba(124, 58, 237, 0.05), 0 8px 10px -6px rgba(124, 58, 237, 0.05); text-align: left;">
             <tr>
                 <td style="background: linear-gradient(135deg, {accent_color} 0%, #4f46e5 100%); padding: 32px 40px; text-align: center; color: #ffffff;">
                     <div style="font-size: 32px; margin-bottom: 8px; line-height: 1;">{emoji}</div>
-                    <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255, 255, 255, 0.8); margin-bottom: 4px; font-family: 'Segoe UI', sans-serif;">STUDLYF</div>
-                    <h1 style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; font-family: 'Segoe UI', sans-serif; color: #ffffff;">{title}</h1>
+                    <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2.5px; color: rgba(255, 255, 255, 0.8); margin-bottom: 4px; font-family: 'Poppins', sans-serif', sans-serif;">STUDLYF</div>
+                    <h1 style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; font-family: 'Poppins', sans-serif', sans-serif; color: #ffffff;">{title}</h1>
                 </td>
             </tr>
             <tr>
@@ -41,10 +41,10 @@ def _wrap_premium_html_shell(content_html: str, title: str, accent_color: str = 
             </tr>
             <tr>
                 <td style="background-color: #fafafa; padding: 24px 40px; border-top: 1px solid #f1f5f9; text-align: center; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px;">
-                    <p style="margin: 0; font-size: 12px; color: #94a3b8; font-weight: 500; font-family: 'Segoe UI', sans-serif;">
+                    <p style="margin: 0; font-size: 12px; color: #94a3b8; font-weight: 500; font-family: 'Poppins', sans-serif', sans-serif;">
                         Empowering builders, learning, and hackathons worldwide.
                     </p>
-                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #cbd5e1; font-family: 'Segoe UI', sans-serif;">
+                    <p style="margin: 6px 0 0 0; font-size: 11px; color: #cbd5e1; font-family: 'Poppins', sans-serif', sans-serif;">
                         &copy; 2026 Studlyf Platform. All rights reserved. &bull; <a href="{{{{frontend_url}}}}" style="color: {accent_color}; text-decoration: none; font-weight: 600;">Visit Platform</a>
                     </p>
                 </td>
@@ -244,7 +244,7 @@ DEFAULT_TEMPLATES = {
 <p style="margin: 0 0 24px 0; font-size: 15px; color: #475569; line-height: 1.6;">Here are the technical details and credentials for your certificate of achievement in <strong>{{event_title}}</strong>.</p>
 <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin-bottom: 24px;">
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #374151;">
-        <tr><td style="padding: 4px 0; color: #6b7280; width: 150px;">Credential ID:</td><td style="padding: 4px 0; font-weight: 600; font-family: monospace;">{{certificate_id}}</td></tr>
+        <tr><td style="padding: 4px 0; color: #6b7280; width: 150px;">Credential ID:</td><td style="padding: 4px 0; font-weight: 600; font-family: 'Poppins', sans-serif;">{{certificate_id}}</td></tr>
         <tr><td style="padding: 4px 0; color: #6b7280;">Achievement Level:</td><td style="padding: 4px 0; font-weight: 600; color: #7C3AED;">{{achievement_level}}</td></tr>
     </table>
 </div>"""
@@ -513,7 +513,7 @@ DEFAULT_TEMPLATES = {
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; color: #374151;">
         <tr><td style="padding: 4px 0; color: #6b7280; width: 140px;">Purchased Plan:</td><td style="padding: 4px 0; font-weight: 600; color: #7C3AED;">{{plan_name}}</td></tr>
         <tr><td style="padding: 4px 0; color: #6b7280;">Amount Paid:</td><td style="padding: 4px 0; font-weight: 600; color: #166534;">{{amount}}</td></tr>
-        <tr><td style="padding: 4px 0; color: #6b7280;">Transaction ID:</td><td style="padding: 4px 0; font-weight: 600; font-family: monospace;">{{transaction_id}}</td></tr>
+        <tr><td style="padding: 4px 0; color: #6b7280;">Transaction ID:</td><td style="padding: 4px 0; font-weight: 600; font-family: 'Poppins', sans-serif;">{{transaction_id}}</td></tr>
         <tr><td style="padding: 4px 0; color: #6b7280;">Billing Date:</td><td style="padding: 4px 0; font-weight: 600;">{{billing_date}}</td></tr>
     </table>
 </div>"""
@@ -828,12 +828,12 @@ def markdown_to_html(md: str) -> str:
 
         # Premium congratulations-purple theme inline styles
         styles = {
-            "h1": "font-size: 24px; font-weight: 800; color: #7C3AED; text-align: center; margin-top: 0; margin-bottom: 16px; font-family: 'Segoe UI', sans-serif;",
-            "h2": "font-size: 20px; font-weight: 800; color: #7C3AED; margin-top: 24px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif; text-align: left;",
-            "h3": "font-size: 16px; font-weight: 700; color: #1F2937; margin-top: 20px; margin-bottom: 8px; font-family: 'Segoe UI', sans-serif; text-align: left;",
-            "p": "font-size: 14px; color: #4B5563; line-height: 1.6; margin: 0 0 12px 0; font-family: 'Segoe UI', sans-serif; text-align: left;",
+            "h1": "font-size: 24px; font-weight: 800; color: #7C3AED; text-align: center; margin-top: 0; margin-bottom: 16px; font-family: 'Poppins', sans-serif', sans-serif;",
+            "h2": "font-size: 20px; font-weight: 800; color: #7C3AED; margin-top: 24px; margin-bottom: 12px; font-family: 'Poppins', sans-serif', sans-serif; text-align: left;",
+            "h3": "font-size: 16px; font-weight: 700; color: #1F2937; margin-top: 20px; margin-bottom: 8px; font-family: 'Poppins', sans-serif', sans-serif; text-align: left;",
+            "p": "font-size: 14px; color: #4B5563; line-height: 1.6; margin: 0 0 12px 0; font-family: 'Poppins', sans-serif', sans-serif; text-align: left;",
             "ul": "list-style-type: disc; padding-left: 20px; margin: 0 0 16px 0; text-align: left;",
-            "li": "font-size: 14px; color: #4B5563; margin-bottom: 6px; line-height: 1.6; font-family: 'Segoe UI', sans-serif;",
+            "li": "font-size: 14px; color: #4B5563; margin-bottom: 6px; line-height: 1.6; font-family: 'Poppins', sans-serif', sans-serif;",
             "strong": "font-weight: 700; color: #111827;",
             "a": "color: #7C3AED; font-weight: 600; text-decoration: underline;"
         }
@@ -988,5 +988,8 @@ def validate_stage_email_placeholders(subject: str, body: str) -> list:
             invalid.append(p)
             
     return sorted(invalid)
+
+
+
 
 

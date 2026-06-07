@@ -212,7 +212,7 @@ async def assign_judge_to_multiple_submissions(submission_ids: list, judge_id: s
 
     email_html = f"""
     <html>
-    <body style="font-family: 'Inter', Arial, sans-serif; color: #333; max-width: 650px; margin: auto; padding: 20px; background-color: #fcfcfd;">
+    <body style="font-family: 'Poppins', sans-serif'', Arial, sans-serif; color: #333; max-width: 650px; margin: auto; padding: 20px; background-color: #fcfcfd;">
         <div style="background: white; border: 1px solid #edf0f7; border-radius: 24px; padding: 40px; box-shadow: 0 20px 40px rgba(0,0,0,0.03);">
             <div style="text-align: center; margin-bottom: 30px;">
                 <div style="display: inline-block; padding: 12px; background: #f8f9ff; border-radius: 16px; margin-bottom: 15px;">
@@ -265,3 +265,5 @@ async def assign_judge_to_multiple_submissions(submission_ids: list, judge_id: s
         "count": len(projects_data),
         "message": f"Assigned {len(projects_data)} projects. " + ("Email sent successfully." if email_sent else "Email delivery failed (check SMTP/API config).")
     }
+
+

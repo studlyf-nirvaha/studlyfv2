@@ -81,7 +81,7 @@ const FAQ: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-10 sm:mb-14">
           <motion.h2 initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-[10px] font-black text-[#7C3AED] uppercase tracking-[0.4em] mb-3">FAQ</motion.h2>
-          <motion.h3 initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="font-display text-3xl sm:text-4xl italic text-[#0F172A]">Everything you need to know.</motion.h3>
+          <motion.h3 initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="font-poppins text-3xl sm:text-4xl italic text-[#0F172A]">Everything you need to know.</motion.h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

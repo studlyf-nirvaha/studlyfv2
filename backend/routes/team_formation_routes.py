@@ -40,7 +40,7 @@ async def send_team_formation_email(data: dict = Body(...)):
         # Create HTML email content
         email_html = f"""
         <html>
-        <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; padding: 20px;">
+        <body style="font-family: 'Poppins', sans-serif; color: #333; max-width: 600px; margin: auto; padding: 20px;">
             <div style="background: #f0f9ff; border: 2px solid #0ea5e9; border-radius: 12px; padding: 30px;">
                 <h2 style="color: #0ea5e9; text-align: center;">🎯 Team Formation Confirmation</h2>
                 <p>Hello <strong>{leader_name}</strong>,</p>
@@ -95,3 +95,4 @@ async def send_team_formation_email(data: dict = Body(...)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send team formation email: {str(e)}")
+

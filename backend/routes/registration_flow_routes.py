@@ -1510,7 +1510,7 @@ async def notify_approved_participants(event_id: str, user: dict = Depends(get_a
 
                 subj = f"Approved — {event_title}"
                 logo_html = f'<img src="{app_logo_url}" alt="Studlyf" style="max-height:32px;margin-bottom:24px;" />' if app_logo_url else ""
-                body_html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 0 24px;">
+                body_html = f"""<div style="font-family: 'Poppins', sans-serif'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 0 24px;">
                     {logo_html}
                     <div style="background: #f8f7ff; border-radius: 16px; padding: 32px; border: 1px solid #e8e5ff;">
                         <p style="font-size: 13px; color: #6C3BFF; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 8px 0;">Approved</p>
@@ -1664,3 +1664,4 @@ async def update_event_registration(event_id: str, request: ApplyRegistrationReq
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

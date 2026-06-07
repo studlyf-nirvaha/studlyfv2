@@ -23,8 +23,7 @@ const GetHiredSection: React.FC = () => {
                 {/* Left Side: Title and Button (55% width approx) */}
                 <div className="flex flex-col items-start w-full lg:w-[55%]">
                     <h2
-                        className="text-white font-bold text-4xl sm:text-6xl lg:text-[4.5rem] leading-[1.1] mb-10 tracking-tight"
-                        style={{ fontFamily: "'Playfair Display', 'Instrument Serif', Georgia, serif" }}
+                        className="text-white font-bold text-4xl sm:text-6xl lg:text-[4.5rem] leading-[1.1] mb-10 tracking-tight font-poppins"
                     >
                         GET HIRED!<br />
                         IN STARTUP'S
@@ -128,7 +127,7 @@ const GetHiredSection: React.FC = () => {
 
             {/* Bottom bar for stipend, startup hirings, and success rate */}
             <div className="hidden lg:grid w-full absolute left-1/2 -translate-x-1/2 bottom-12 z-30 pointer-events-none grid-cols-3 items-center max-w-[1400px] px-6 sm:px-12 lg:px-20">
-                <div className="text-white text-xl font-bold pointer-events-auto text-left tracking-wide" style={{fontFamily: "'Poppins', sans-serif"}}>
+                <div className="text-white text-xl font-bold pointer-events-auto text-left tracking-wide">
                     <span className="text-blue-400">#</span> Tech
                 </div>
                 <div className="text-white text-xl font-bold pointer-events-auto text-center tracking-wide" style={{fontFamily: "'Poppins', sans-serif"}}>

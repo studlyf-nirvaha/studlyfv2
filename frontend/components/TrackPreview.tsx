@@ -26,7 +26,7 @@ const TrackPreview: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="font-display text-7xl md:text-8xl italic text-white"
+            className="font-poppins text-7xl md:text-8xl italic text-white"
           >
             Active Tracks.
           </motion.h3>
