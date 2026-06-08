@@ -9,6 +9,7 @@ from services.stage_service import (
     get_participant_stage_progress,
     get_stage_action_required,
 )
+import asyncio
 from services.team_service import (
     create_team,
     generate_invite_code,

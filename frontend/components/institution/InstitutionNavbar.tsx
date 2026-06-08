@@ -100,18 +100,14 @@ const InstitutionNavbar: React.FC<{ refreshKey?: number, onNavigate?: (tab: stri
         const fetchNotifications = async () => {
             if (role !== 'institution') return;
             try {
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
-
                 const endpoint = institutionId
-                    ? `${API_BASE_URL}/api/v1/institution/notifications/${institutionId}?t=${Date.now()}`
-                    : `${API_BASE_URL}/api/v1/institution/notifications/me?t=${Date.now()}`;
+                    ? `${API_BASE_URL}/api/v1/institution/notifications/${institutionId}`
+                    : `${API_BASE_URL}/api/v1/institution/notifications/me`;
 
                 const res = await fetch(endpoint, {
-                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache', ...authHeaders() },
+                    headers: { ...authHeaders() },
                     signal: controller.signal
                 });
-                
-                clearTimeout(timeoutId);
                 
                 if (res.ok) {
                     const data = await res.json();
@@ -128,7 +124,8 @@ const InstitutionNavbar: React.FC<{ refreshKey?: number, onNavigate?: (tab: stri
         };
         fetchNotifications();
         
-        const interval = setInterval(fetchNotifications, 30000);
+        // Increase polling interval to 2 minutes to reduce server load
+        const interval = setInterval(fetchNotifications, 120000);
         return () => {
             controller.abort();
             clearInterval(interval);

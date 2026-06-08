@@ -52,7 +52,8 @@ const PipelineView: React.FC<PipelineViewProps> = ({ eventId, stages }) => {
                     { headers: { ...authHeaders() } }),
                 fetch(`${API_BASE_URL}/api/v1/stages/events/${eventId}/stage-analytics`,
                     { headers: { ...authHeaders() } }),
-            ]);
+                ]);
+
             if (pRes.ok) {
                 const pData = await pRes.json();
                 setParticipants(pData.participants || []);
