@@ -160,13 +160,14 @@ const OpportunitiesManagement: React.FC<OpportunitiesManagementProps> = ({ insti
             try {
                 setLoading('institutionOpportunities', true);
                 console.log(`DEBUG: Fetching events for institution: ${institutionId}`);
-                const response = await fetch(`${API_BASE_URL}/api/v1/institution/events/${institutionId}`, { headers: { ...authHeaders() } });
+                const response = await fetch(`${API_BASE_URL}/api/v1/institution/events/${institutionId}/summary?limit=100`, { headers: { ...authHeaders() } });
                 
                 if (!response.ok) {
                     throw new Error(`API Error - Status: ${response.status}`);
                 }
                 
-                const data = await response.json();
+                const body = await response.json();
+                const data = Array.isArray(body?.items) ? body.items : Array.isArray(body) ? body : [];
                 
                 const filteredData = data.filter((e: any) => 
                     e.category !== 'Job' && e.category !== 'Internship'

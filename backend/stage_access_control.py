@@ -5,11 +5,41 @@ Also enforces time-based stage deadlines (e.g., registration 18:00-19:00)
 """
 
 from fastapi import HTTPException
-from db import participants_col, opportunities_col, events_col, teams_col
+from db import participants_col, opportunities_col, events_col, teams_col, submission_data_col
 from datetime import datetime, timezone
 from bson import ObjectId
 from services.stage_service import get_event_stages
-from typing import Optional
+from typing import Optional, List, Dict, Any
+
+
+async def _event_id_variants(event_id: str) -> List[str]:
+    from routes.registration_flow_routes import resolve_event_id
+
+    resolved = await resolve_event_id(event_id)
+    variants: List[str] = []
+    for candidate in (event_id, resolved):
+        if candidate and str(candidate) not in variants:
+            variants.append(str(candidate))
+    try:
+        ev = await events_col.find_one({"_id": ObjectId(resolved)}, {"event_id": 1})
+        if ev and ev.get("event_id") and str(ev["event_id"]) not in variants:
+            variants.append(str(ev["event_id"]))
+    except Exception:
+        pass
+    return variants
+
+
+async def _find_participant(event_id: str, user_id: str) -> Optional[dict]:
+    """Fast participant lookup across event_id formats; self-heal only as last resort."""
+    event_ids = await _event_id_variants(event_id)
+    participant = await participants_col.find_one({
+        "user_id": str(user_id),
+        "event_id": {"$in": event_ids},
+    })
+    if participant:
+        return participant
+    return await _get_participant_fallback(event_id, user_id)
+
 
 async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dict]:
     """Helper to query participant with fallback for legacy human-readable event_id strings and self-healing opportunity apps."""
@@ -72,6 +102,10 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                 app_status = str(opp_app.get("status") or "").strip().lower()
                 # Check if the application is approved, accepted, shortlisted, or active
                 if app_status in ["shortlisted", "accepted", "approved", "applied", "selected", "hired", "registered"]:
+                    mapped_status = (
+                        "shortlisted" if app_status in ("shortlisted", "accepted", "approved", "selected", "hired")
+                        else "registered"
+                    )
                     # User is registered via opportunity application! Let's dynamically create the participant record
                     user_doc = await users_col.find_one({"user_id": str(user_id)})
                     email = (user_doc or {}).get("email", "")
@@ -106,9 +140,9 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                         "institution_id": inst_id,
                         "name": name,
                         "email": email,
-                        "current_stage": first_stage,
                         "registration_data": opp_app.get("profile_snapshot") or {},
-                        "status": "registered",
+                        "status": mapped_status,
+                        "current_stage": opp_app.get("current_stage") or first_stage,
                         "registered_at": opp_app.get("applied_at") or datetime.now(timezone.utc),
                         "updated_at": datetime.now(timezone.utc)
                     }
@@ -148,6 +182,466 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
         
     return None
 
+
+def _parse_dt(value) -> Optional[datetime]:
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except Exception:
+            return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _stage_order(stage_obj: dict, fallback: int = 0) -> int:
+    try:
+        if stage_obj.get("order") is not None:
+            return int(stage_obj.get("order"))
+    except Exception:
+        pass
+    return fallback
+
+
+def _find_stage_index(stages: List[dict], ref: str) -> Optional[int]:
+    if not ref:
+        return None
+    ref_str = str(ref)
+    ref_lower = ref_str.lower()
+    for idx, s in enumerate(stages):
+        if str(s.get("id") or "") == ref_str:
+            return idx
+        if str(s.get("name") or "") == ref_str:
+            return idx
+        if str(s.get("name") or "").lower() == ref_lower:
+            return idx
+        if str(s.get("type") or "").upper() == ref_str.upper():
+            return idx
+    return None
+
+
+def _build_stage_map(stages: List[dict]) -> dict:
+    stage_map = {}
+    for s in stages:
+        sid = str(s.get("id") or "")
+        sname = str(s.get("name") or "")
+        stype = str(s.get("type") or "")
+        if sid:
+            stage_map[sid] = s
+        if sname:
+            stage_map.setdefault(sname, s)
+            stage_map.setdefault(sname.lower(), s)
+        if stype:
+            stage_map.setdefault(stype, s)
+            stage_map.setdefault(stype.upper(), s)
+    return stage_map
+
+
+def _resolve_dep_stage(dep_ref: str, stages: List[dict], stage_map: dict) -> Optional[dict]:
+    dep_stage = stage_map.get(dep_ref) or stage_map.get(str(dep_ref).lower())
+    if dep_stage:
+        return dep_stage
+    for s in stages:
+        if str(s.get("type", "")).upper() == str(dep_ref).upper():
+            return s
+        if str(s.get("name", "")).lower() == str(dep_ref).lower():
+            return s
+    return None
+
+
+async def _dependency_completed(
+    event_id: str,
+    user_id: str,
+    dep_stage: dict,
+    participant: dict,
+    stages: List[dict],
+    submitted_stage_ids: Optional[set] = None,
+) -> bool:
+    """Return True when a dependency stage is satisfied for this participant."""
+    participant_status = (participant.get("status") or "pending").lower()
+    participant_current_stage = participant.get("current_stage")
+    participant_team_id = str(participant.get("team_id") or "").strip()
+    dep_id = str(dep_stage.get("id") or "")
+    dep_type = str(dep_stage.get("type") or "").upper()
+    dep_name = str(dep_stage.get("name") or "")
+    dep_name_lower = dep_name.lower()
+    dep_idx = _find_stage_index(stages, dep_id or dep_name) if dep_id or dep_name else _stage_order(dep_stage)
+
+    if dep_type == "REGISTRATION" or "register" in dep_name_lower:
+        return participant_status not in ("not_registered", "rejected")
+
+    if dep_type == "TEAM_FORMATION" or "team" in dep_name_lower or "formation" in dep_name_lower:
+        team_doc = None
+        if participant_team_id:
+            try:
+                team_doc = await teams_col.find_one({"_id": ObjectId(participant_team_id)})
+            except Exception:
+                team_doc = await teams_col.find_one({"team_id": participant_team_id})
+        if not team_doc:
+            team_doc = await teams_col.find_one({
+                "event_id": str(event_id),
+                "team_leader_id": str(user_id),
+            })
+        if not team_doc:
+            return False
+        team_status = str(team_doc.get("status") or "").lower()
+        if team_status in ("approved", "finalized", "shortlisted", "accepted"):
+            return True
+        members = team_doc.get("members") or []
+        return any(str(member.get("user_id") or "") == str(user_id) for member in members if isinstance(member, dict))
+
+    completed_stages = participant.get("completed_stages") or []
+    completed_refs = {str(x).lower() for x in completed_stages}
+    if dep_name_lower in completed_refs or dep_id in completed_stages:
+        return True
+
+    last_submitted = str(participant.get("last_stage_submitted") or "")
+    if dep_id and last_submitted == dep_id:
+        return True
+
+    if dep_id:
+        if submitted_stage_ids is not None:
+            if dep_id in submitted_stage_ids:
+                return True
+        else:
+            sub_query: Dict[str, Any] = {"event_id": str(event_id), "stage_id": dep_id}
+            if participant_team_id:
+                sub_query["team_id"] = participant_team_id
+            else:
+                sub_query["user_id"] = str(user_id)
+            if await submission_data_col.find_one(sub_query):
+                return True
+
+    current_idx = _find_stage_index(stages, str(participant_current_stage or ""))
+    if current_idx is not None and dep_idx is not None and current_idx > dep_idx:
+        return True
+    if current_idx is not None and dep_idx is not None and current_idx == dep_idx:
+        dep_visibility = str(dep_stage.get("visibility") or (dep_stage.get("config") or {}).get("visibility") or "").lower()
+        if "shortlist" not in dep_visibility:
+            return True
+        if participant_status in ("shortlisted", "accepted", "approved"):
+            return True
+
+    dep_visibility = str(dep_stage.get("visibility") or (dep_stage.get("config") or {}).get("visibility") or "").lower()
+    if "shortlist" in dep_visibility and participant_status in ("shortlisted", "accepted", "approved"):
+        return True
+
+    return False
+
+
+async def get_stage_access_state(
+    event_id: str,
+    user_id: str,
+    stage: dict,
+    participant: Optional[dict] = None,
+    stages: Optional[List[dict]] = None,
+    event: Optional[dict] = None,
+    submitted_stage_ids: Optional[set] = None,
+) -> Dict[str, Any]:
+    """
+    Single source of truth for per-stage unlock/submit state.
+    Used by APIs and should drive all participant UI badges.
+    """
+    stage_id = str(stage.get("id") or "")
+    stage_name = str(stage.get("name") or "Stage")
+    stage_type = str(stage.get("type") or "").upper()
+
+    if stages is None:
+        stages = await get_event_stages(event_id)
+    for idx, s in enumerate(stages):
+        if s.get("order") is None:
+            s["order"] = idx
+
+    if participant is None:
+        participant = await _find_participant(event_id, user_id)
+
+    if not participant:
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": False,
+            "can_submit": False,
+            "has_submission": False,
+            "lock_reason": "not_registered",
+            "status_badge": "locked",
+        }
+
+    participant_status = (participant.get("status") or "pending").lower()
+    participant_team_id = str(participant.get("team_id") or "").strip()
+
+    # Self-heal: team already approved by admin but participant record not synced (legacy)
+    if participant_status in ("registered", "pending", "active") and participant_team_id:
+        try:
+            team_doc = await teams_col.find_one({"_id": ObjectId(participant_team_id)})
+        except Exception:
+            team_doc = await teams_col.find_one({"team_id": participant_team_id})
+        if team_doc and str(team_doc.get("status") or "").lower() in ("approved", "finalized", "shortlisted", "accepted"):
+            participant_status = "shortlisted"
+            heal_update = {"status": "shortlisted", "updated_at": datetime.now(timezone.utc)}
+            stages_list = stages or await get_event_stages(event_id)
+            next_name = None
+            for idx, s in enumerate(stages_list):
+                stype = str(s.get("type") or "").upper()
+                sname = str(s.get("name") or "").lower()
+                if stype == "TEAM_FORMATION" or "team formation" in sname:
+                    if idx + 1 < len(stages_list):
+                        next_name = stages_list[idx + 1].get("name")
+                    break
+            if next_name:
+                cur_idx = _find_stage_index(stages_list, str(participant.get("current_stage") or ""))
+                next_idx = _find_stage_index(stages_list, next_name)
+                if cur_idx is None or (next_idx is not None and cur_idx < next_idx):
+                    heal_update["current_stage"] = next_name
+            await participants_col.update_one(
+                {"_id": participant["_id"]},
+                {"$set": heal_update},
+            )
+            participant = {**participant, **heal_update}
+
+    if participant_status == "rejected":
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": False,
+            "can_submit": False,
+            "has_submission": False,
+            "lock_reason": "rejected",
+            "status_badge": "locked",
+        }
+
+    stage_idx = _find_stage_index(stages, stage_id or stage_name)
+    current_idx = _find_stage_index(stages, str(participant.get("current_stage") or ""))
+
+    depends_on = stage.get("depends_on") or []
+    for dep_ref in depends_on:
+        dep_stage = _resolve_dep_stage(str(dep_ref), stages, _build_stage_map(stages))
+        if not dep_stage:
+            continue
+        if not await _dependency_completed(
+            event_id, user_id, dep_stage, participant, stages, submitted_stage_ids
+        ):
+            dep_label = dep_stage.get("name") or dep_ref
+            return {
+                "stage_id": stage_id,
+                "stage_name": stage_name,
+                "is_unlocked": False,
+                "can_submit": False,
+                "has_submission": False,
+                "lock_reason": "dependency",
+                "lock_detail": f"You must complete '{dep_label}' first.",
+                "status_badge": "locked",
+            }
+
+    admin_advanced = current_idx is not None and stage_idx is not None and current_idx >= stage_idx
+
+    stage_visibility = str(
+        stage.get("visibility") or (stage.get("config") or {}).get("visibility") or ""
+    ).lower().strip()
+    requires_shortlist = "shortlist" in stage_visibility
+
+    allow_individual = False
+    if event is None:
+        try:
+            event = await events_col.find_one({"_id": ObjectId(event_id)})
+        except Exception:
+            event = await events_col.find_one({"event_id": event_id}) or await events_col.find_one({"event_link_id": str(event_id)})
+    if event and event.get("allow_individual_progress_with_no_team"):
+        allow_individual = True
+
+    allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered", "shortlisted", "accepted", "approved"]
+    if allow_individual:
+        allowed_statuses.append("registered")
+
+    if requires_shortlist and participant_status not in allowed_statuses and not admin_advanced:
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": False,
+            "can_submit": False,
+            "has_submission": False,
+            "lock_reason": "not_shortlisted",
+            "lock_detail": (
+                f"Your application status is '{participant_status}'. "
+                "Only shortlisted or approved participants can submit at this stage."
+            ),
+            "status_badge": "locked",
+        }
+
+    cfg = stage.get("config") or {}
+    stage_team_required = cfg.get("team_required") if isinstance(cfg, dict) else None
+    if stage_team_required is None:
+        stage_team_required = stage.get("team_required", False)
+    if stage_team_required and not participant_team_id and not allow_individual:
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": True,
+            "can_submit": False,
+            "has_submission": False,
+            "lock_reason": "team_required",
+            "lock_detail": "This stage requires a team. Please form or join a team before submitting.",
+            "status_badge": "open",
+        }
+
+    has_submission = False
+    if stage_id:
+        if submitted_stage_ids is not None:
+            has_submission = stage_id in submitted_stage_ids
+        else:
+            sub_query: Dict[str, Any] = {"event_id": str(event_id), "stage_id": stage_id}
+            if participant_team_id:
+                sub_query["team_id"] = participant_team_id
+            else:
+                sub_query["user_id"] = str(user_id)
+            has_submission = bool(await submission_data_col.find_one(sub_query))
+
+    now = datetime.now(timezone.utc)
+    start_date = _parse_dt(stage.get("start_date") or stage.get("startDate"))
+    end_date = _parse_dt(stage.get("end_date") or stage.get("endDate") or stage.get("deadline"))
+
+    if start_date and now < start_date:
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": True,
+            "can_submit": False,
+            "has_submission": has_submission,
+            "lock_reason": "not_started",
+            "lock_detail": f"This stage opens at {start_date.strftime('%Y-%m-%d %H:%M UTC')}.",
+            "status_badge": "upcoming",
+        }
+
+    if end_date and now > end_date:
+        return {
+            "stage_id": stage_id,
+            "stage_name": stage_name,
+            "is_unlocked": True,
+            "can_submit": False,
+            "has_submission": has_submission,
+            "lock_reason": "ended",
+            "lock_detail": f"This stage closed at {end_date.strftime('%Y-%m-%d %H:%M UTC')}.",
+            "status_badge": "completed" if has_submission else "closed",
+        }
+
+    if has_submission and (stage_type in ("FINAL", "REVIEW") or stage.get("view_only")):
+        status_badge = "completed"
+    elif has_submission:
+        status_badge = "submitted"
+    else:
+        status_badge = "open"
+
+    return {
+        "stage_id": stage_id,
+        "stage_name": stage_name,
+        "is_unlocked": True,
+        "can_submit": True,
+        "has_submission": has_submission,
+        "lock_reason": None,
+        "lock_detail": None,
+        "status_badge": status_badge,
+    }
+
+
+async def get_all_stages_access(event_id: str, user_id: str) -> Dict[str, Any]:
+    """Return access state for every configured stage (admin-driven, per participant)."""
+    from routes.registration_flow_routes import resolve_event_id
+
+    event_id = await resolve_event_id(event_id)
+    stages = await get_event_stages(event_id)
+    if not stages:
+        return {"stages": [], "active_stage_id": None, "participant_status": "not_registered"}
+
+    participant = await _find_participant(event_id, user_id)
+    event_ids_to_check = await _event_id_variants(event_id)
+    event = None
+    try:
+        event = await events_col.find_one({"_id": ObjectId(event_ids_to_check[0])})
+    except Exception:
+        event = await events_col.find_one({"event_id": event_id}) or await events_col.find_one({"event_link_id": str(event_id)})
+
+    submitted_stage_ids: set = set()
+    if participant:
+        participant_team_id = str(participant.get("team_id") or "").strip()
+        or_filters: List[Dict[str, Any]] = [{"user_id": str(user_id)}]
+        if participant_team_id:
+            or_filters.append({"team_id": participant_team_id})
+        async for sub_doc in submission_data_col.find(
+            {"event_id": {"$in": event_ids_to_check}, "$or": or_filters},
+            {"stage_id": 1},
+        ):
+            sid = sub_doc.get("stage_id")
+            if sid:
+                submitted_stage_ids.add(str(sid))
+
+    access_list = []
+    active_stage_id = None
+    for idx, stage in enumerate(stages):
+        if stage.get("order") is None:
+            stage["order"] = idx
+        stype = str(stage.get("type") or "").upper()
+        sname = str(stage.get("name") or "").lower()
+        if stype in ("REGISTRATION", "TEAM_FORMATION") or "regist" in sname or "team formation" in sname:
+            continue
+
+        state = await get_stage_access_state(
+            event_id, user_id, stage, participant, stages, event, submitted_stage_ids
+        )
+        state["order"] = stage.get("order", idx)
+        state["description"] = stage.get("description") or (stage.get("config") or {}).get("description") or ""
+        raw_fields = stage.get("fields") or (stage.get("config") or {}).get("fields") or []
+        if event and event.get("stages"):
+            for raw in event.get("stages", []):
+                if str(raw.get("id")) == str(stage.get("id")):
+                    raw_fields = raw.get("fields") or (raw.get("config") or {}).get("fields") or raw_fields
+                    break
+        try:
+            from services.field_validation import normalize_stage_fields
+            state["fields"] = normalize_stage_fields(raw_fields)
+        except Exception:
+            state["fields"] = raw_fields
+        state["type"] = stype
+        access_list.append(state)
+
+        if active_stage_id is None and state.get("is_unlocked") and state.get("can_submit") and not state.get("has_submission"):
+            active_stage_id = state.get("stage_id")
+        elif active_stage_id is None and state.get("is_unlocked") and state.get("can_submit"):
+            active_stage_id = state.get("stage_id")
+
+    if active_stage_id is None:
+        for state in access_list:
+            if state.get("is_unlocked"):
+                active_stage_id = state.get("stage_id")
+                break
+
+    team_name = None
+    team_id_str = str(participant.get("team_id") or "") if participant else ""
+    if team_id_str:
+        try:
+            team_doc = await teams_col.find_one({"_id": ObjectId(team_id_str)})
+        except Exception:
+            team_doc = await teams_col.find_one({"team_id": team_id_str})
+        if team_doc:
+            team_name = team_doc.get("team_name") or team_doc.get("name")
+
+    active_stage_obj = next((s for s in access_list if s.get("stage_id") == active_stage_id), None)
+    # Only expose unlocked or already-submitted stages — hide locked future stages from participant UI
+    visible_stages = [s for s in access_list if s.get("is_unlocked") or s.get("has_submission")]
+    completed_stages = [s for s in access_list if s.get("has_submission") and s.get("stage_id") != active_stage_id]
+
+    return {
+        "stages": visible_stages,
+        "active_stage": active_stage_obj,
+        "active_stage_id": active_stage_id,
+        "completed_stages": completed_stages,
+        "team_name": team_name,
+        "team_id": team_id_str or None,
+        "participant_status": (participant.get("status") if participant else "not_registered"),
+        "current_stage": participant.get("current_stage") if participant else None,
+        "total_configured_stages": len(access_list),
+    }
+
+
 async def check_stage_unlock_rules(
     event_id: str,
     user_id: str,
@@ -163,100 +657,17 @@ async def check_stage_unlock_rules(
     
     Raises HTTPException 403 if any dependency is not met.
     """
-    depends_on = stage.get("depends_on", [])
-    if not depends_on:
-        return
-
-    participant = await _get_participant_fallback(event_id, user_id)
-    if not participant:
-        raise HTTPException(
-            status_code=403,
-            detail="You must register before accessing this stage."
-        )
-
-    stages = await get_event_stages(event_id)
-    if not stages:
-        raise HTTPException(status_code=404, detail="No stages configured for this event")
-
-    participant_status = (participant.get("status") or "pending").lower()
-    participant_current_stage = participant.get("current_stage")
-    participant_team_id = str(participant.get("team_id") or "").strip()
-
-    # Build a map of stage identifiers for quick lookup
-    stage_map = {}
-    for s in stages:
-        sid = str(s.get("id") or "")
-        sname = str(s.get("name") or "")
-        stype = str(s.get("type") or "")
-        if sid:
-            stage_map[sid] = s
-        if sname:
-            stage_map.setdefault(sname, s)
-            stage_map.setdefault(sname.lower(), s)
-        if stype:
-            stage_map.setdefault(stype, s)
-            stage_map.setdefault(stype.upper(), s)
-
-    def _stage_order(stage_obj: dict) -> int:
-        try:
-            return int(stage_obj.get("order") or 0)
-        except Exception:
-            return 0
-
-    async def _dependency_completed(dep_stage: dict) -> bool:
-        dep_type = str(dep_stage.get("type") or "").upper()
-        dep_name = str(dep_stage.get("name") or "").lower()
-
-        if dep_type == "REGISTRATION" or "register" in dep_name:
-            return participant_status not in ("not_registered", "rejected")
-
-        if dep_type == "TEAM_FORMATION" or "team" in dep_name or "formation" in dep_name:
-            if not participant_team_id:
-                return False
-            try:
-                team_doc = await teams_col.find_one({"_id": ObjectId(participant_team_id)})
-            except Exception:
-                team_doc = await teams_col.find_one({"team_id": participant_team_id})
-            if not team_doc:
-                return False
-            members = team_doc.get("members") or []
-            return any(str(member.get("user_id") or "") == str(user_id) for member in members if isinstance(member, dict))
-
-        return False
-
-    for dep_ref in depends_on:
-        # Find the dependency stage by id or by type name
-        dep_stage = stage_map.get(dep_ref)
-        if not dep_stage:
-            for s in stages:
-                if str(s.get("type", "")).upper() == str(dep_ref).upper() or str(s.get("name", "")).lower() == str(dep_ref).lower():
-                    dep_stage = s
-                    break
-
-        if not dep_stage:
-            continue  # unknown dependency — skip
-
-        dep_name = dep_stage.get("name", dep_ref)
-        dep_order = _stage_order(dep_stage)
-
-        if await _dependency_completed(dep_stage):
-            continue
-
-        # Check if participant's current_stage is past the dependency for generic stage chains.
-        if participant_current_stage:
-            current_past_dep = False
-            for s in stages:
-                if s.get("id") == participant_current_stage or s.get("name") == participant_current_stage or s.get("type") == participant_current_stage:
-                    if _stage_order(s) > dep_order:
-                        current_past_dep = True
-                    break
-            if current_past_dep:
-                continue
-
-        raise HTTPException(
-            status_code=403,
-            detail=f"Stage '{stage.get('name', 'this stage')}' is locked. You must complete '{dep_name}' first."
-        )
+    state = await get_stage_access_state(event_id, user_id, stage)
+    if not state.get("is_unlocked"):
+        reason = state.get("lock_detail") or state.get("lock_reason") or "Stage is locked."
+        if state.get("lock_reason") == "dependency":
+            raise HTTPException(status_code=403, detail=f"Stage '{stage.get('name', 'this stage')}' is locked. {reason}")
+        if state.get("lock_reason") == "not_shortlisted":
+            raise HTTPException(
+                status_code=403,
+                detail=f"You cannot submit at this stage. {reason} Please wait for admin review."
+            )
+        raise HTTPException(status_code=403, detail=reason)
 
 
 async def check_stage_submission_access(
@@ -289,7 +700,7 @@ async def check_stage_submission_access(
     """
     
     # Find participant record
-    participant = await _get_participant_fallback(event_id, user_id)
+    participant = await _find_participant(event_id, user_id)
     
     if not participant:
         raise HTTPException(
@@ -299,52 +710,18 @@ async def check_stage_submission_access(
     
     current_status = (participant.get("status") or "pending").lower()
 
-    # Enforce unlock rules if stage object is provided
     if stage:
-        await check_stage_unlock_rules(event_id, user_id, stage)
-
-    # Stage-specific validation (applies to all types except team_formation)
-    if stage_type not in ("team_formation",):
-        # Fetch event to determine participation rules
-        try:
-            event = await events_col.find_one({"_id": ObjectId(event_id)})
-        except Exception:
-            event = await events_col.find_one({"event_link_id": str(event_id)})
-
-        allow_individual = False
-        try:
-            if event and event.get("allow_individual_progress_with_no_team"):
-                allow_individual = True
-        except:
-            allow_individual = False
-
-        # Dynamically determine required status from stage visibility
-        stage_visibility = str((stage and (stage.get("visibility") or (stage.get("config") or {}).get("visibility"))) or "").lower().strip()
-        requires_shortlist = "shortlist" in stage_visibility
-
-        allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered"]
-        # Allow registered if event explicitly allows individual progress without team
-        if allow_individual:
-            allowed_statuses.append("registered")
-        
-        if current_status not in allowed_statuses:
-            raise HTTPException(
-                status_code=403,
-                detail=f"You cannot submit at this stage. Your application status is '{current_status}'. "
-                       f"Only shortlisted or approved participants can submit. Please wait for admin review."
-            )
-
-        # If the current stage requires a team, ensure participant belongs to a team
-        if stage and not participant.get("team_id") and not allow_individual:
-            cfg = stage.get("config") or {}
-            stage_team_required = cfg.get("team_required") if isinstance(cfg, dict) else None
-            if stage_team_required is None:
-                stage_team_required = stage.get("team_required", False)
-            if stage_team_required:
-                raise HTTPException(
-                    status_code=403,
-                    detail="This stage requires a team. Please form or join a team before submitting."
+        access = await get_stage_access_state(event_id, user_id, stage, participant)
+        if not access.get("can_submit"):
+            detail = access.get("lock_detail") or access.get("lock_reason") or "Access denied."
+            if access.get("lock_reason") == "not_shortlisted":
+                detail = (
+                    f"You cannot submit at this stage. Your application status is '{current_status}'. "
+                    "Only shortlisted or approved participants can submit. Please wait for admin review."
                 )
+            elif access.get("lock_reason") == "dependency":
+                detail = f"Stage '{stage.get('name', 'this stage')}' is locked. {access.get('lock_detail') or detail}"
+            raise HTTPException(status_code=403, detail=detail)
     
     if stage_type == "team_formation":
         # Registered participants can form teams

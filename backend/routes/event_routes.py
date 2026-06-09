@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, Depends, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Body, Depends, File, UploadFile, Form, Query
 from services.event_service import (
     create_event,
     get_all_events,
@@ -422,51 +422,103 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
 # ============================================================================
 
 @router.get("/{event_id}/dashboard-data")
-async def get_event_dashboard_data(event_id: str, user: dict = Depends(get_auth_user)):
+async def get_event_dashboard_data(
+    event_id: str,
+    limit: int = Query(0, ge=0, le=50000, description="Per-collection cap; 0 = no cap"),
+    user: dict = Depends(get_auth_user),
+):
     """
-    Admin/Institution endpoint: Aggregate event dashboard data to reduce network waterfall.
+    Admin/Institution endpoint: Aggregate event dashboard data.
+    All queries are scoped dynamically to the resolved event_id variants — no static event lists.
     """
-    from db import participants_col, quizzes_col, teams_col, submissions_col, submission_data_col, events_col
+    from db import participants_col, quizzes_col, teams_col, submissions_col, submission_data_col
+    from routes.registration_flow_routes import resolve_event_id
+    from services.submission_format import summarize_submission_data
     import logging
     logger = logging.getLogger("event_routes")
 
-    try:
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
-    except Exception:
-        event = None
+    event = await assert_institution_owns_event(event_id, user)
+    resolved = await resolve_event_id(event_id)
+    event_ids = list(dict.fromkeys([
+        str(event_id),
+        str(resolved),
+        str(event.get("_id", "")),
+        str(event.get("event_id", "")),
+    ]))
+    event_ids = [eid for eid in event_ids if eid]
+    event_filter = {"event_id": {"$in": event_ids}}
+    list_cap = limit if limit > 0 else None
 
-    if not event:
-        logger.error(f"Event not found in dashboard data endpoint: {event_id}")
-        raise HTTPException(status_code=404, detail="Event not found")
-        
-    # Institution check - allow if super_admin or owner
-    role = str(user.get("role") or "").lower()
-    if role not in ["super_admin", "admin"]:
-        if str(event.get("institution_id")) != str(user.get("institution_id")):
-            logger.error(f"Access denied for user {user.get('user_id')} to event {event_id}")
-            raise HTTPException(status_code=403, detail="Only event hosts can view dashboard data")
-        
-    tasks = [
-        participants_col.find({"event_id": str(event_id)}).to_list(length=None),
-        quizzes_col.find({"event_id": str(event_id)}).to_list(length=None),
-        teams_col.find({"event_id": str(event_id)}).to_list(length=None),
-        submissions_col.find({"event_id": str(event_id)}).to_list(length=None),
-        submission_data_col.find({"event_id": str(event_id)}).to_list(length=None),
-    ]
-    
+    async def _load(cursor):
+        return await cursor.to_list(length=list_cap)
+
     try:
-        results = await asyncio.gather(*tasks)
-        participants, quizzes, teams, submissions, stage_submissions = results
+        participants, quizzes, teams, submissions, stage_submissions = await asyncio.gather(
+            _load(participants_col.find(event_filter)),
+            _load(quizzes_col.find(event_filter)),
+            _load(teams_col.find(event_filter)),
+            _load(submissions_col.find(event_filter)),
+            _load(submission_data_col.find(
+                event_filter,
+                {
+                    "stage_id": 1,
+                    "stage_name": 1,
+                    "user_id": 1,
+                    "team_id": 1,
+                    "status": 1,
+                    "submitted_at": 1,
+                    "last_updated_at": 1,
+                    "event_id": 1,
+                    "data": 1,
+                },
+            )),
+        )
+        counts = await asyncio.gather(
+            participants_col.count_documents(event_filter),
+            quizzes_col.count_documents(event_filter),
+            teams_col.count_documents(event_filter),
+            submissions_col.count_documents(event_filter),
+            submission_data_col.count_documents(event_filter),
+        )
     except Exception as e:
         logger.error(f"Error gathering dashboard data for {event_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error gathering data: {str(e)}")
-    
+
+    team_lookup = {str(t.get("_id")): t for t in teams if t.get("_id")}
+    enriched_stage_submissions = []
+    for doc in stage_submissions:
+        row = dict(doc)
+        row["_id"] = str(row.get("_id", ""))
+        if isinstance(row.get("data"), dict):
+            row["data_summary"] = summarize_submission_data(row["data"])
+            row["data"] = summarize_submission_data(row["data"])
+        tid = str(row.get("team_id") or "")
+        if tid and tid in team_lookup:
+            row["team_name"] = team_lookup[tid].get("team_name") or team_lookup[tid].get("name")
+        enriched_stage_submissions.append(row)
+
+    for collection_rows in (participants, quizzes, teams, submissions):
+        for row in collection_rows:
+            if row.get("_id"):
+                row["_id"] = str(row["_id"])
+
     return {
+        "event_ids": event_ids,
         "participants": participants,
         "quizzes": quizzes,
         "teams": teams,
         "submissions": submissions,
-        "stage_submissions": stage_submissions
+        "stage_submissions": enriched_stage_submissions,
+        "counts": {
+            "participants": counts[0],
+            "quizzes": counts[1],
+            "teams": counts[2],
+            "submissions": counts[3],
+            "stage_submissions": counts[4],
+        },
+        "truncated": bool(limit > 0 and any(len(c) > limit for c in [
+            participants, quizzes, teams, submissions, stage_submissions
+        ])),
     }
 
 

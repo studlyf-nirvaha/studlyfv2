@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
+import { fileMatchesAcceptTypes, inferAcceptTypes } from '../../utils/fileValidation';
 
 type StageField = {
     id: string;
@@ -17,6 +18,11 @@ type SubmissionFormProps = {
     eventId: string;
     stage: any;
     participationType?: string;
+    onSubmitted?: () => void;
+    /** Skip redundant progress API when parent already resolved access */
+    teamIdHint?: string | null;
+    teamNameHint?: string | null;
+    skipAccessCheck?: boolean;
 };
 
 const normalizeFields = (rawFields: any[]): StageField[] => {
@@ -30,11 +36,40 @@ const normalizeFields = (rawFields: any[]): StageField[] => {
         helpText: field.help_text || '',
         options: Array.isArray(field.options) ? field.options.map(String) : undefined,
         maxLength: typeof field.max_length === 'number' ? field.max_length : undefined,
-        acceptTypes: Array.isArray(field.accept_types) ? field.accept_types.map(String) : undefined,
+        acceptTypes: Array.isArray(field.accept_types) ? field.accept_types.map(String)
+            : Array.isArray(field.acceptTypes) ? field.acceptTypes.map(String)
+            : inferAcceptTypes(String(field.label || field.name || ''), String(field.field_type || field.type || 'text').toLowerCase()),
     }));
 };
 
-const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, participationType }) => {
+const renderStoredFile = (field: StageField, value: any) => {
+    if (!value) return null;
+    if (typeof value === 'object' && value._stored_file) {
+        const sizeKb = Math.max(1, Math.round((value.size || 0) / 1024));
+        return (
+            <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <span className="font-semibold">{value.filename || field.label}</span>
+                <span className="text-emerald-600 ml-2">({sizeKb} KB)</span>
+            </div>
+        );
+    }
+    if (typeof value === 'string' && value.startsWith('data:')) {
+        const mime = value.slice(5, value.indexOf(';')) || 'application/octet-stream';
+        const ext = mime.includes('pdf') ? 'pdf' : mime.includes('presentation') ? 'pptx' : 'file';
+        return (
+            <a
+                href={value}
+                download={`${field.label.replace(/\s+/g, '_')}.${ext}`}
+                className="mt-2 inline-flex text-sm font-semibold text-purple-700 underline"
+            >
+                Download uploaded {field.label}
+            </a>
+        );
+    }
+    return null;
+};
+
+const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, participationType, onSubmitted, teamIdHint, teamNameHint, skipAccessCheck }) => {
     const [formValues, setFormValues] = useState<Record<string, any>>({});
     const [fileNames, setFileNames] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
@@ -109,6 +144,10 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
     }, [stage]);
 
     useEffect(() => {
+        if (teamNameHint) setTeamDisplayName(teamNameHint);
+    }, [teamNameHint]);
+
+    useEffect(() => {
         const fetchSubmission = async () => {
             if (!eventId || !stageId) {
                 setLoading(false);
@@ -119,38 +158,33 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
             setError(null);
 
             try {
-                if (fields.length === 0) {
-                    const stagesRes = await fetch(`${API_BASE_URL}/api/v1/stages/events/${eventId}/stages`, {
-                        headers: { ...authHeaders() },
-                    });
-                    if (stagesRes.ok) {
-                        const stagesData = await stagesRes.json();
-                        const found = (stagesData.stages || []).find((s: any) => s.id === stageId) ||
-                            (stagesData.stages || []).find((s: any) => String(s.type || '').toUpperCase() === 'SUBMISSION');
-                        if (found) {
-                            setResolvedStage(found);
-                        }
-                    }
+                if (teamIdHint) {
+                    setTeamId(teamIdHint);
+                    setRegistered(true);
                 }
 
-                const [progressRes, submissionRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/v1/stages/events/${eventId}/progress`, {
-                        headers: { ...authHeaders() },
-                    }),
-                    fetch(`${API_BASE_URL}/api/v1/stages/events/${eventId}/stages/${stageId}/submission`, {
-                        headers: { ...authHeaders() },
-                    }),
-                ]);
+                const accessQuery = skipAccessCheck ? '?access_verified=true' : '';
+                const submissionRes = await fetch(
+                    `${API_BASE_URL}/api/v1/stages/events/${eventId}/stages/${stageId}/submission${accessQuery}`,
+                    { headers: { ...authHeaders() } },
+                );
 
-                if (progressRes.ok) {
-                    const progress = await progressRes.json();
-                    if (progress.status === 'not_registered') {
-                        setRegistered(false);
-                        setTeamId(null);
-                    } else {
-                        setRegistered(true);
-                        setTeamId(progress.team?._id || null);
+                if (!teamIdHint && !skipAccessCheck) {
+                    const progressRes = await fetch(`${API_BASE_URL}/api/v1/stages/events/${eventId}/progress`, {
+                        headers: { ...authHeaders() },
+                    });
+                    if (progressRes.ok) {
+                        const progress = await progressRes.json();
+                        if (progress.status === 'not_registered') {
+                            setRegistered(false);
+                            setTeamId(null);
+                        } else {
+                            setRegistered(true);
+                            setTeamId(progress.team?._id || null);
+                        }
                     }
+                } else if (skipAccessCheck) {
+                    setRegistered(true);
                 }
 
                 if (submissionRes.ok) {
@@ -177,7 +211,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
         };
 
         fetchSubmission();
-    }, [eventId, stageId, fields.length]);
+    }, [eventId, stageId, teamIdHint, skipAccessCheck]);
 
     const updateValue = (fieldId: string, value: any) => {
         setFormValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -189,6 +223,17 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
 
         for (const field of fields) {
             const value = formValues[field.id];
+            if (field.type === 'file' && value) {
+                const allowed = field.acceptTypes?.length ? field.acceptTypes : inferAcceptTypes(field.label, 'file');
+                if (allowed?.length && typeof value === 'string' && value.startsWith('data:')) {
+                    const mime = value.slice(5, value.indexOf(';'));
+                    const fakeFile = { name: `upload.${allowed[0].replace('.', '')}`, type: mime } as File;
+                    if (!fileMatchesAcceptTypes(fakeFile, allowed)) {
+                        setError(`${field.label}: file type not allowed. Allowed: ${allowed.join(', ')}`);
+                        return;
+                    }
+                }
+            }
             if (field.required) {
                 if (field.type === 'checkbox' && value !== true) {
                     setError(`${field.label} is required`);
@@ -236,7 +281,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
             } else {
                 setMirrorNotice('Saved successfully.');
             }
-            alert('Submission saved successfully!');
+            onSubmitted?.();
         } catch (err: any) {
             setError(err.message || 'Failed to save submission.');
         } finally {
@@ -319,19 +364,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
         );
     }
 
-    if (submitted && !canEditSubmission) {
-        return (
-            <div className="bg-white p-6 rounded-lg shadow-md text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <h2 className="text-2xl font-bold mb-2">{stageTitle}</h2>
-                <p className="text-green-700 font-medium">Your submission has been saved.</p>
-                {mirrorNotice ? <p className="text-sm text-slate-600 mt-2">{mirrorNotice}</p> : null}
-                <p className="text-sm text-slate-500 mt-3">Editing is closed for this stage.</p>
-            </div>
-        );
-    }
+    const readOnly = submitted && !canEditSubmission;
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -349,7 +382,12 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                     ) : null}
                 </div>
             </div>
-            {submitted && canEditSubmission ? (
+            {readOnly ? (
+                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    Your submission is saved. Editing is closed for this stage.
+                    {mirrorNotice ? <div className="mt-1 font-medium text-slate-600">{mirrorNotice}</div> : null}
+                </div>
+            ) : submitted && canEditSubmission ? (
                 <div className="mb-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                     Your submission is saved. You can still edit it until the deadline.
                     {mirrorNotice ? <div className="mt-1 font-medium text-emerald-700">{mirrorNotice}</div> : null}
@@ -379,21 +417,13 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {isSolo ? (
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Team Name <span className="text-gray-400 font-normal">(for display)</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={teamDisplayName}
-                            onChange={(e) => setTeamDisplayName(e.target.value)}
-                            placeholder="Enter your team name"
-                            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                        />
+            <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-4">
+                {(teamDisplayName || teamNameHint) && (
+                    <div className="rounded-lg border border-purple-100 bg-purple-50 px-4 py-3 text-sm">
+                        <span className="font-semibold text-purple-900">Team: </span>
+                        <span className="text-purple-800">{teamDisplayName || teamNameHint}</span>
                     </div>
-                ) : null}
+                )}
                 {fields.map((field) => {
                     const value = formValues[field.id];
                     const inputClass =
@@ -412,6 +442,8 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                                     onChange={(e) => updateValue(field.id, e.target.value)}
                                     className={inputClass}
                                     placeholder={field.placeholder || ''}
+                                    disabled={readOnly}
+                                    readOnly={readOnly}
                                 />
                             ) : field.type === 'select' ? (
                                 <select
@@ -419,6 +451,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                                     value={value || ''}
                                     onChange={(e) => updateValue(field.id, e.target.value)}
                                     className={inputClass}
+                                    disabled={readOnly}
                                 >
                                     <option value="">Select an option</option>
                                     {(field.options || []).map((opt) => (
@@ -435,40 +468,30 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                                         checked={value === true}
                                         onChange={(e) => updateValue(field.id, e.target.checked)}
                                         className="h-4 w-4"
+                                        disabled={readOnly}
                                     />
                                     <span className="text-sm text-gray-700">{field.placeholder || 'Yes'}</span>
                                 </label>
                             ) : field.type === 'file' ? (
                                 <div className="mt-2">
+                                    {renderStoredFile(field, value)}
                                     <input
                                         id={field.id}
                                         type="file"
                                         accept={field.acceptTypes?.join(',')}
+                                        disabled={readOnly}
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
 
                                             // Explicit validation against acceptTypes
-                                            if (field.acceptTypes && field.acceptTypes.length > 0) {
-                                                const fileExt = file.name.split('.').pop()?.toLowerCase();
-                                                console.log(`[DEBUG] File: ${file.name}, Ext: ${fileExt}, Type: ${file.type}, Allowed:`, field.acceptTypes);
-                                                
-                                                const isValid = field.acceptTypes.some(type => {
-                                                    const allowedExt = type.replace('.', '').toLowerCase();
-                                                    // Normalize check
-                                                    const match = fileExt === allowedExt || 
-                                                                 (type === '.pdf' && file.type === 'application/pdf') || 
-                                                                 ((type === '.ppt' || type === '.pptx') && file.type.includes('presentation'));
-                                                    return match;
-                                                });
-                                                
-                                                if (!isValid) {
-                                                    console.warn(`[DEBUG] File ${file.name} validation FAILED.`);
-                                                    alert(`Invalid file type. Allowed: ${field.acceptTypes.join(', ')}`);
-                                                    e.target.value = '';
-                                                    return;
-                                                }
-                                                console.log(`[DEBUG] File ${file.name} validation PASSED.`);
+                                            const allowed = field.acceptTypes && field.acceptTypes.length > 0
+                                                ? field.acceptTypes
+                                                : inferAcceptTypes(field.label, 'file');
+                                            if (allowed && allowed.length > 0 && !fileMatchesAcceptTypes(file, allowed)) {
+                                                setError(`Invalid file type for ${field.label}. Allowed: ${allowed.join(', ')}`);
+                                                e.target.value = '';
+                                                return;
                                             }
 
                                             setFileNames((prev) => ({ ...prev, [field.id]: file.name }));
@@ -490,6 +513,8 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                                     onChange={(e) => updateValue(field.id, e.target.value)}
                                     className={inputClass}
                                     placeholder={field.placeholder || ''}
+                                    disabled={readOnly}
+                                    readOnly={readOnly}
                                 />
                             )}
                             {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
@@ -497,15 +522,17 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                     );
                 })}
 
-                <div className="flex justify-end">
-                    <button
-                        type="submit"
-                        disabled={saving || (!isStageActive && !submitted) || (!canEditSubmission && submitted)}
-                        className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isStageActive ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' : 'bg-gray-300 cursor-not-allowed'} focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-80`}
-                    >
-                        {saving ? 'Saving...' : submitted ? 'Update submission' : (isStageActive ? 'Submit' : 'Stage Closed')}
-                    </button>
-                </div>
+                {!readOnly ? (
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={saving || (!isStageActive && !submitted) || (!canEditSubmission && submitted)}
+                            className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${isStageActive ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' : 'bg-gray-300 cursor-not-allowed'} focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-80`}
+                        >
+                            {saving ? 'Saving...' : submitted ? 'Update submission' : (isStageActive ? 'Submit' : 'Stage Closed')}
+                        </button>
+                    </div>
+                ) : null}
             </form>
         </div>
     );

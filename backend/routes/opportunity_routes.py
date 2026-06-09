@@ -157,12 +157,20 @@ async def view_opportunity(
         None,
         description="If set, draft listings remain visible when this user has already applied.",
     ),
+    include_process_stats: bool = Query(
+        False,
+        description="Include live participant aggregation stats (slow; off by default).",
+    ),
     user: Optional[dict] = Depends(get_auth_user_optional),
 ):
     """API to view a specific opportunity."""
     try:
         trusted_applicant_user_id = user.get("user_id") if user else None
-        opportunity = await get_opportunity_by_id(opportunity_id, trusted_applicant_user_id)
+        opportunity = await get_opportunity_by_id(
+            opportunity_id,
+            trusted_applicant_user_id,
+            include_process_stats=include_process_stats,
+        )
         if not opportunity:
             raise HTTPException(status_code=404, detail="Opportunity not found")
         return opportunity
@@ -954,6 +962,15 @@ async def learner_submit_stage_data(
             
     if not target_stage:
         raise HTTPException(status_code=404, detail="Stage not found")
+
+    from stage_access_control import check_stage_submission_access
+    await check_stage_submission_access(
+        event_id=str(event_id),
+        user_id=uid,
+        team_id=str(p.get("team_id") or "") or None,
+        stage_type=str(target_stage.get("type") or "").lower(),
+        stage=target_stage,
+    )
         
     # Check deadline
     from services.opportunity_service import _safe_dt
@@ -1151,7 +1168,11 @@ async def hackathon_project_submit(
 
     try:
         result = await submissions_col.update_one(query, {"$set": submission_doc}, upsert=True)
-        submission_doc["_id"] = str(result.upserted_id) if result.upserted_id else "updated"
+        if getattr(result, "upserted_id", None):
+            submission_doc["_id"] = str(result.upserted_id)
+        else:
+            existing = await submissions_col.find_one(query, {"_id": 1})
+            submission_doc["_id"] = str(existing["_id"]) if existing else "updated"
     except Exception as e:
         logger.error(f"Error upserting submission: {e}")
         raise HTTPException(status_code=500, detail="Database error during submission")

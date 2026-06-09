@@ -452,6 +452,7 @@ const App: React.FC = () => {
             {/* Opportunities */}
             <Route path="/opportunities" element={<ProtectedRoute><OpportunitiesList /></ProtectedRoute>} />
             <Route path="/opportunities/my-applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
+            <Route path="/notifications" element={<Navigate to="/opportunities/my-applications" replace />} />
             <Route path="/opportunities/:id" element={<ProtectedRoute><OpportunityDetails /></ProtectedRoute>} />
             <Route path="/opportunities/:id/results" element={<PublicRoute><ResultsPage /></PublicRoute>} />
 

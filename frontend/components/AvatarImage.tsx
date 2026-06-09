@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-const CATALOG_URL = '/avatars/catalog.webp';
+const DEFAULT_CATALOG_URL = '/avatars/catalog.png';
 const CATALOG_SIZE = 1024;
 
 interface AvatarImageProps {
@@ -9,10 +9,13 @@ interface AvatarImageProps {
   className?: string;
 }
 
-function parseCrop(src: string): { cx: number; cy: number; cw: number; ch: number } | null {
-  const m = src.match(/#(\d+),(\d+),(\d+),(\d+)$/);
+function parseCrop(src: string): { catalogUrl: string; cx: number; cy: number; cw: number; ch: number } | null {
+  const hashIdx = src.lastIndexOf('#');
+  if (hashIdx === -1) return null;
+  const catalogUrl = src.slice(0, hashIdx) || DEFAULT_CATALOG_URL;
+  const m = src.slice(hashIdx + 1).match(/^(\d+),(\d+),(\d+),(\d+)$/);
   if (!m) return null;
-  return { cx: +m[1], cy: +m[2], cw: +m[3], ch: +m[4] };
+  return { catalogUrl, cx: +m[1], cy: +m[2], cw: +m[3], ch: +m[4] };
 }
 
 const AvatarImage: React.FC<AvatarImageProps> = ({ src, alt = '', className = '' }) => {
@@ -44,14 +47,15 @@ const AvatarImage: React.FC<AvatarImageProps> = ({ src, alt = '', className = ''
       ref={ref}
       className={className}
       style={{
-        backgroundImage: `url(${CATALOG_URL})`,
+        backgroundImage: `url(${crop.catalogUrl})`,
         backgroundSize: `${CATALOG_SIZE * scale}px`,
         backgroundPosition: `${-crop.cx * scale}px ${-crop.cy * scale}px`,
         backgroundRepeat: 'no-repeat',
       }}
+      role="img"
+      aria-label={alt}
     />
   );
 };
 
 export default AvatarImage;
-

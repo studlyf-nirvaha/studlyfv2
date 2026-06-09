@@ -7,7 +7,6 @@ from typing import List, Dict, Any, Optional
 from bson import ObjectId
 from db import notifications_col, users_col, institutions_col
 from services.email_service import send_notification_email
-from notification_helpers import notify_institution
 import os
 
 class NotificationService:
@@ -36,11 +35,9 @@ class NotificationService:
             "category": "general"  # general, judge, event, system
         }
         
-        # Add optional fields
+        # Add optional fields (never tag user notifications with institution_id — that leaks into institution dashboard)
         if metadata:
             notification_doc["meta"] = metadata
-        if institution_id:
-            notification_doc["institution_id"] = institution_id
         if event_id:
             notification_doc["event_id"] = event_id
         
@@ -53,16 +50,6 @@ class NotificationService:
             await self._send_email_notification_if_enabled(user_id, notification_doc)
         except Exception as e:
             print(f"[EMAIL] Failed to send email notification: {e}")
-        
-        # Create institution notification if applicable
-        if institution_id:
-            await notify_institution(
-                institution_id,
-                type=notification_type,
-                title=title,
-                message=message,
-                meta=metadata
-            )
         
         return {"notification_id": notification_id, "status": "created"}
     
@@ -310,9 +297,16 @@ class NotificationService:
         if not user_email:
             return
         
-        # Send email
+        from services.submission_format import resolve_notification_action_url
+
+        action_url = await resolve_notification_action_url(
+            notification.get("event_id"),
+            notification.get("meta") or {},
+        )
+        notif_type = notification.get("type", "")
+        cta_label = "View Submission" if notif_type == "submission" else "View in Event Hub"
         subject = f"Studlyf: {notification.get('title', 'New Notification')}"
-        
+
         body_html = f"""
         <html>
         <body style="font-family: 'Poppins', sans-serif; color: #333;">
@@ -320,10 +314,10 @@ class NotificationService:
                 <h2 style="color: #6B46C1;">{notification.get('title', 'New Notification')}</h2>
                 <p>{notification.get('message', '')}</p>
                 <p>
-                    <a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/notifications" 
-                       style="background-color: #6B46C1; color: white; padding: 12px 24px; 
+                    <a href="{action_url}"
+                       style="background-color: #6B46C1; color: white; padding: 12px 24px;
                               text-decoration: none; border-radius: 6px; display: inline-block;">
-                        View Notifications
+                        {cta_label}
                     </a>
                 </p>
                 <p>Best Regards,<br>Studlyf Team</p>

@@ -2,7 +2,7 @@
 Routes for Dynamic Stage Navigation & Submission - Unstop-like Flow
 """
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from auth_institution import get_auth_user, assert_institution_owns_event
 from services.stage_service import (
     get_event_stages,
@@ -28,7 +28,7 @@ from services.registration_service import (
     get_registration_fields_with_prefill,
     check_registration_status,
 )
-from stage_access_control import check_stage_deadline, check_stage_submission_access
+from stage_access_control import check_stage_deadline, check_stage_submission_access, get_all_stages_access
 from typing import Optional
 from bson import ObjectId
 from datetime import datetime, timezone
@@ -58,6 +58,13 @@ async def get_progress(event_id: str, user: dict = Depends(get_auth_user)):
     if "error" in progress:
         raise HTTPException(status_code=400, detail=progress["error"])
     return progress
+
+
+@router.get("/events/{event_id}/stages-access")
+async def get_stages_access(event_id: str, user: dict = Depends(get_auth_user)):
+    """Per-participant unlock/submit state for each admin-configured stage."""
+    resolved_id = await resolve_event_id(event_id)
+    return await get_all_stages_access(resolved_id, user["user_id"])
 
 @router.get("/events/{event_id}/stages/{stage_id}/action")
 async def get_stage_action(event_id: str, stage_id: str, user: dict = Depends(get_auth_user)):
@@ -333,40 +340,44 @@ async def get_existing_submission(
     event_id: str,
     stage_id: str,
     team_id: Optional[str] = None,
+    access_verified: bool = Query(
+        False,
+        description="Skip redundant access re-check when stages-access already ran.",
+    ),
     user: dict = Depends(get_auth_user)
 ):
     """Get existing submission data for a stage (if any)."""
-    # Resolve event_id in case it's an opportunity_id
     resolved_id = await resolve_event_id(event_id)
-    stages = await get_event_stages(resolved_id)
-    target_stage = None
-    if stages:
-        for s in stages:
-            if s.get("id") == stage_id:
-                target_stage = s
-                break
-                
-    if not target_stage and stages:
-        # Fallback to SUBMISSION type if stage_id is missing or doesn't match
-        for s in stages:
-            if str(s.get("type", "")).upper() == "SUBMISSION":
-                target_stage = s
-                break
 
-    if not target_stage:
-        raise HTTPException(status_code=404, detail="Stage not found")
+    if not access_verified:
+        stages = await get_event_stages(resolved_id)
+        target_stage = None
+        if stages:
+            for s in stages:
+                if s.get("id") == stage_id:
+                    target_stage = s
+                    break
 
-    stage_type = str(target_stage.get("type", "")).lower()
-    await check_stage_submission_access(
-        event_id=resolved_id,
-        user_id=user["user_id"],
-        team_id=team_id,
-        stage_type=stage_type,
-        stage=target_stage
-    )
+        if not target_stage and stages:
+            for s in stages:
+                if str(s.get("type", "")).upper() == "SUBMISSION":
+                    target_stage = s
+                    break
+
+        if not target_stage:
+            raise HTTPException(status_code=404, detail="Stage not found")
+
+        stage_type = str(target_stage.get("type", "")).lower()
+        await check_stage_submission_access(
+            event_id=resolved_id,
+            user_id=user["user_id"],
+            team_id=team_id,
+            stage_type=stage_type,
+            stage=target_stage,
+        )
 
     result = await get_submission_data(
-        event_id=event_id,
+        event_id=resolved_id,
         stage_id=stage_id,
         user_id=user["user_id"],
         team_id=team_id,
@@ -416,7 +427,7 @@ async def submit_stage(
     )
 
     result = await submit_stage_data(
-        event_id=event_id,
+        event_id=resolved_id,
         stage_id=stage_id,
         user_id=user["user_id"],
         form_data=form_data,

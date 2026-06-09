@@ -96,6 +96,37 @@ def _event_status_listable(status) -> bool:
     return str(status).strip().upper() in _LISTABLE_EVENT_STATUSES
 
 
+def _strip_payload_bloat(doc: dict) -> None:
+    """Remove embedded binary blobs that inflate API responses."""
+    if not doc:
+        return
+    for key in ("banner_url", "image_url", "logo_url", "profilePhoto"):
+        val = doc.get(key)
+        if isinstance(val, str) and val.startswith("data:") and len(val) > 2048:
+            doc.pop(key, None)
+    sections = doc.get("sections")
+    if isinstance(sections, list):
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            for block in section.get("blocks") or section.get("content") or []:
+                if isinstance(block, dict):
+                    for bk in ("image", "url", "src", "data"):
+                        bv = block.get(bk)
+                        if isinstance(bv, str) and bv.startswith("data:") and len(bv) > 2048:
+                            block.pop(bk, None)
+    attachments = doc.get("attachments")
+    if isinstance(attachments, list):
+        doc["attachments"] = [
+            a for a in attachments
+            if not (
+                isinstance(a, dict)
+                and isinstance(a.get("url") or a.get("data"), str)
+                and str(a.get("url") or a.get("data")).startswith("data:")
+            )
+        ]
+
+
 def _apply_event_snapshot_to_opportunity(doc: dict, ev: dict) -> None:
     """Use the source event as the authority for student-visible copy (stages, description, etc.)."""
     if not doc or not ev:
@@ -401,7 +432,9 @@ async def get_all_opportunities(filters: dict = None) -> List[dict]:
     return await _hydrate_opportunity_list_from_events(filtered)
 
 async def get_opportunity_by_id(
-    opportunity_id: str, applicant_user_id: Optional[str] = None
+    opportunity_id: str,
+    applicant_user_id: Optional[str] = None,
+    include_process_stats: bool = False,
 ) -> Optional[dict]:
     """Retrieves a single opportunity by its ID.
 
@@ -436,6 +469,7 @@ async def get_opportunity_by_id(
                     await _hydrate_institution_branding(doc)
                 except Exception:
                     pass
+                _strip_payload_bloat(doc)
                 return doc
             if not _event_status_listable(ev.get("status")):
                 if applicant_user_id:
@@ -453,10 +487,12 @@ async def get_opportunity_by_id(
                             await _hydrate_institution_branding(doc)
                         except Exception:
                             pass
-                        try:
-                            await _hydrate_public_process_stats(doc)
-                        except Exception:
-                            pass
+                        if include_process_stats:
+                            try:
+                                await _hydrate_public_process_stats(doc)
+                            except Exception:
+                                pass
+                        _strip_payload_bloat(doc)
                         return doc
                 return None
             _apply_event_snapshot_to_opportunity(doc, ev)
@@ -464,15 +500,18 @@ async def get_opportunity_by_id(
                 await _hydrate_institution_branding(doc)
             except Exception:
                 pass
-            try:
-                await _hydrate_public_process_stats(doc)
-            except Exception:
-                pass
+            if include_process_stats:
+                try:
+                    await _hydrate_public_process_stats(doc)
+                except Exception:
+                    pass
+            _strip_payload_bloat(doc)
             return doc
         try:
             await _hydrate_institution_branding(doc)
         except Exception:
             pass
+        _strip_payload_bloat(doc)
         return doc
     except Exception as e:
         print(f"[ERROR] get_opportunity_by_id failed: {e}")

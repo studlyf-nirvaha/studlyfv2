@@ -586,6 +586,13 @@ async def get_registration_form_config(event_id: str, user: dict = Depends(get_a
         event = await events_col.find_one({"_id": ev_id}) if isinstance(ev_id, ObjectId) else await events_col.find_one({"event_id": event_id})
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
+
+        legacy, new_profile, reg, participant = await asyncio.gather(
+            fetch_legacy_profile(user["user_id"]),
+            user_profiles_col.find_one({"user_id": user["user_id"]}),
+            registrations_col.find_one({"event_id": str(event_id), "user_id": user["user_id"]}),
+            participants_col.find_one({"event_id": str(event_id), "user_id": user["user_id"]}),
+        )
         
         settings = event.get("registration_settings") or {}
         raw_profile_config = settings.get("profile_fields_config")
@@ -600,17 +607,11 @@ async def get_registration_form_config(event_id: str, user: dict = Depends(get_a
                 "college": "REQUIRED"
             }
         
-        # Load user global profile; merge new profile on top of legacy for maximum prefill
-        legacy = await fetch_legacy_profile(user["user_id"])
-        new_profile = await user_profiles_col.find_one({"user_id": user["user_id"]})
         profile = {**legacy, **(new_profile or {})}
 
         custom_questions = event.get("custom_questions") or []
             
-        reg = await registrations_col.find_one({"event_id": str(event_id), "user_id": user["user_id"]})
         reg_status = reg.get("status", "NOT_REGISTERED") if reg else "NOT_REGISTERED"
-        
-        participant = await participants_col.find_one({"event_id": str(event_id), "user_id": user["user_id"]})
         
         if reg_status == "NOT_REGISTERED" and participant:
             ps = (participant.get("status") or "").lower()
@@ -685,10 +686,9 @@ async def get_registration_form_config(event_id: str, user: dict = Depends(get_a
             "profile_fields_config": profile_fields_config,
             "fields_definitions": fields_definitions,
             "custom_questions": custom_questions,
-            "user_profile": profile,
             "approval_mode": settings.get("approval_mode", "AUTO_APPROVE"),
             "status": reg_status,
-            "registration": reg
+            "registration": reg,
         }
     except HTTPException:
         raise
@@ -1461,17 +1461,10 @@ async def notify_approved_participants(
 ):
     """Send email notification to APPROVED participants about next stage (optionally specific ones)."""
     try:
-        try:
-            ev_id = ObjectId(event_id)
-        except Exception:
-            ev_id = event_id
+        from auth_institution import assert_institution_owns_event
 
-        event = await events_col.find_one({"_id": ev_id}) if isinstance(ev_id, ObjectId) else await events_col.find_one({"event_id": event_id})
-        if not event:
-            raise HTTPException(status_code=404, detail="Event not found")
-
-        if str(event.get("institution_id")) != str(user.get("institution_id")):
-            raise HTTPException(status_code=403, detail="Permission denied")
+        event = await assert_institution_owns_event(event_id, user)
+        event_id = await resolve_event_id(event_id)
 
         from services.email_queue_service import enqueue_email
         from services.email_template_service import get_active_template, render_template
@@ -1502,8 +1495,14 @@ async def notify_approved_participants(
         next_stage_name = upcoming[0][1] if upcoming else ""
         next_stage_active = now >= upcoming[0][0] if upcoming else False
 
-        # Query filter
-        query = {"event_id": str(event_id), "status": "APPROVED"}
+        event_id_variants = list(dict.fromkeys([
+            str(event_id),
+            str(event.get("_id", "")),
+            str(event.get("event_id", "")),
+        ]))
+        event_id_variants = [eid for eid in event_id_variants if eid]
+
+        query = {"event_id": {"$in": event_id_variants}, "status": "APPROVED"}
         if request.registration_ids:
             query["_id"] = {"$in": [ObjectId(rid) for rid in request.registration_ids]}
         else:

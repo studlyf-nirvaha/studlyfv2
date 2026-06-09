@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
-import { API_BASE_URL, authHeaders } from '../../apiConfig';
+import { useInstitutionEvents } from '../../hooks/useInstitutionEvents';
 
 interface RecentListingsProps {
     institutionId: string;
@@ -10,32 +10,8 @@ interface RecentListingsProps {
 }
 
 const RecentListings: React.FC<RecentListingsProps> = ({ institutionId, onViewEvent, onViewAll }) => {
-    const [events, setEvents] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { events, loading } = useInstitutionEvents(institutionId);
     const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
-
-    useEffect(() => {
-        const fetchRecent = async () => {
-            try {
-                setLoading(true);
-                console.log('Fetching recent listings for:', institutionId);
-                const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${institutionId}`, { headers: { ...authHeaders() } });
-                console.log('Recent listings response status:', res.status);
-                if (res.ok) {
-                    const data = await res.json();
-                    console.log('Recent listings data:', data);
-                    setEvents(Array.isArray(data) ? data : []);
-                } else {
-                    console.error('Recent listings fetch failed:', await res.text());
-                }
-            } catch (err) {
-                try { console.error("Failed to fetch recent listings", err instanceof Error ? err.message : String(err)); } catch (_) {}
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchRecent();
-    }, [institutionId]);
 
     return (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm min-h-[450px] flex flex-col font-sans">

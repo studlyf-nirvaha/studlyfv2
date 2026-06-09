@@ -6,8 +6,57 @@ from db import submission_data_col, participants_col, events_col, users_col, tea
 from notification_service import notification_service
 from bson import ObjectId
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+import asyncio
 import os
+from services.field_validation import (
+    normalize_stage_fields,
+    validate_file_value,
+    sanitize_submission_data_for_client,
+)
+from services.submission_format import format_submission_timestamp, resolve_notification_action_url
+
+
+async def _resolve_event_id(event_id: str) -> str:
+    from routes.registration_flow_routes import resolve_event_id
+    return await resolve_event_id(event_id)
+
+
+async def _event_id_variants(event_id: str) -> List[str]:
+    """All event_id strings that may have been used when saving submissions."""
+    resolved = await _resolve_event_id(event_id)
+    variants: List[str] = []
+    for candidate in (event_id, resolved):
+        if candidate and str(candidate) not in variants:
+            variants.append(str(candidate))
+    try:
+        ev = await events_col.find_one({"_id": ObjectId(resolved)})
+        if ev:
+            for key in ("event_id", "_id"):
+                val = ev.get(key)
+                if val and str(val) not in variants:
+                    variants.append(str(val))
+    except Exception:
+        pass
+    return variants
+
+
+async def _find_stage_submission(
+    event_id: str,
+    stage_id: str,
+    user_id: str,
+    team_id: Optional[str] = None,
+) -> Optional[dict]:
+    for eid in await _event_id_variants(event_id):
+        query: Dict[str, Any] = {"event_id": eid, "stage_id": str(stage_id)}
+        if team_id:
+            query["team_id"] = str(team_id)
+        else:
+            query["user_id"] = str(user_id)
+        doc = await submission_data_col.find_one(query)
+        if doc:
+            return doc
+    return None
 
 async def validate_submission_data(
     event_id: str,
@@ -17,13 +66,20 @@ async def validate_submission_data(
 ) -> dict:
     """Validate submission data against required fields."""
     errors = {}
+    fields = normalize_stage_fields(required_fields)
     
-    for field in required_fields:
+    for field in fields:
         field_id = field.get("field_id")
         field_type = field.get("field_type", "text")
         is_required = field.get("required", True)
+        label = field.get("label") or field_id
         
         value = form_data.get(field_id)
+        if value is None and field_id:
+            for key in form_data:
+                if str(key) == str(field_id):
+                    value = form_data[key]
+                    break
         
         # Check required
         if is_required and (value is None or value == "" or value == []):
@@ -60,6 +116,12 @@ async def validate_submission_data(
                 max_length = field.get("max_length", 100)
                 if len(value) > max_length:
                     errors[field_id] = f"Text cannot exceed {max_length} characters"
+
+        elif field_type == "file":
+            accept_types = field.get("accept_types") or []
+            file_err = validate_file_value(value, accept_types, label)
+            if file_err:
+                errors[field_id] = file_err
     
     return {
         "valid": len(errors) == 0,
@@ -75,6 +137,8 @@ async def submit_stage_data(
 ) -> dict:
     """Submit data for a stage (registration, submission, etc.)."""
     try:
+        event_id = await _resolve_event_id(event_id)
+
         # Verify participant
         participant = await participants_col.find_one({
             "event_id": str(event_id),
@@ -183,11 +247,29 @@ async def submit_stage_data(
             except Exception:
                 pass
         
-        # Validate required fields
-        fields = target_stage.get("fields", [])
-        required_fields = [f for f in fields if f.get("required", True)]
-        
-        validation = await validate_submission_data(event_id, stage_id, form_data, required_fields)
+        # Validate required fields (admin stores in config.fields)
+        raw_fields = target_stage.get("fields") or (target_stage.get("config") or {}).get("fields", [])
+        fields = normalize_stage_fields(raw_fields)
+
+        existing_sub = await _find_stage_submission(event_id, stage_id, user_id, team_id)
+        if existing_sub:
+            old_data = existing_sub.get("data") or {}
+            for field in fields:
+                if str(field.get("field_type", "")).lower() != "file":
+                    continue
+                fid = str(field.get("field_id") or "")
+                if not fid:
+                    continue
+                incoming = form_data.get(fid)
+                keep_existing = (
+                    incoming is None
+                    or incoming == ""
+                    or (isinstance(incoming, dict) and incoming.get("_stored_file"))
+                )
+                if keep_existing and old_data.get(fid):
+                    form_data[fid] = old_data[fid]
+
+        validation = await validate_submission_data(event_id, stage_id, form_data, fields)
         if not validation["valid"]:
             return {
                 "status": "validation_error",
@@ -203,8 +285,6 @@ async def submit_stage_data(
         else:
             query["user_id"] = str(user_id)
         
-        # Check for existing submission to track changes
-        existing_sub = await submission_data_col.find_one(query)
         now = datetime.now(timezone.utc)
         
         if existing_sub:
@@ -228,14 +308,15 @@ async def submit_stage_data(
             update_doc = {
                 "$set": {
                     "data": form_data,
+                    "event_id": str(event_id),
                     "last_updated_at": now,
                     "edit_count": edit_count,
                     "change_log": change_log,
-                    "status": "submitted"
+                    "status": "submitted",
                 }
             }
-            
-            result = await submission_data_col.update_one(query, update_doc)
+
+            result = await submission_data_col.update_one({"_id": existing_sub["_id"]}, update_doc)
             submission_id = str(existing_sub.get("_id"))
             
         else:
@@ -341,23 +422,109 @@ async def submit_stage_data(
                 )
         except Exception as e:
             print(f"[WARN] Failed to sync opportunity application: {e}")
-            # Create notification for user and institution admins (if any)
-            try:
-                # Notify submitting user
-                title = f"Submission received: {target_stage.get('name')}"
-                message = f"Your submission for '{target_stage.get('name')}' has been received. You can view it in My Applications or on the Event page."
-                await notification_service.create_notification(
-                    user_id=str(user_id),
-                    notification_type="submission",
-                    title=title,
-                    message=message,
-                    metadata={"stage_id": stage_id, "event_id": str(event_id)},
-                    institution_id=str(event.get("institution_id")) if event else None,
-                    event_id=str(event_id)
+
+        try:
+            title = f"Submission received: {target_stage.get('name')}"
+            message = (
+                f"Your submission for '{target_stage.get('name')}' has been received. "
+                "You can view it in My Applications or on the Event page."
+            )
+            opp = await opportunities_col.find_one({"event_link_id": str(event_id)})
+            meta = {
+                "stage_id": stage_id,
+                "event_id": str(event_id),
+                "opportunity_id": str(opp["_id"]) if opp else None,
+            }
+            await notification_service.create_notification(
+                user_id=str(user_id),
+                notification_type="submission",
+                title=title,
+                message=message,
+                metadata=meta,
+                event_id=str(event_id),
+            )
+            inst_id = str(event.get("institution_id") or "").strip()
+            if inst_id:
+                from notification_helpers import notify_institution
+                participant_name = (
+                    participant.get("name")
+                    or participant.get("full_name")
+                    or participant.get("email")
+                    or "A participant"
                 )
+                await notify_institution(
+                    inst_id,
+                    message=(
+                        f"New submission received for '{target_stage.get('name')}' "
+                        f"from {participant_name}."
+                    ),
+                    ntype="submission",
+                    title=f"New submission: {target_stage.get('name')}",
+                    meta=meta,
+                )
+        except Exception as e:
+            print(f"[WARN] Could not create submission notification: {e}")
+
+        async def _send_confirmation_email():
+            try:
+                from services.email_service import send_notification_email
+                from services.email_template_service import get_active_template, render_template
+
+                participant_email = participant.get("email") or ""
+                if not participant_email:
+                    user_profile = await users_col.find_one({"user_id": str(user_id)})
+                    participant_email = (user_profile or {}).get("email") or ""
+
+                if not participant_email:
+                    return
+
+                institution_id = str(event.get("institution_id") or "")
+                tmpl = await get_active_template(str(event_id), institution_id, "submission_confirmation")
+                team_name = form_data.get("team_display_name") or participant.get("name") or "Participant"
+                if team_id:
+                    try:
+                        team_doc = await teams_col.find_one({"_id": ObjectId(str(team_id))})
+                        if team_doc:
+                            team_name = team_doc.get("team_name") or team_name
+                    except Exception:
+                        pass
+
+                action_time = now
+                opp_doc = await opportunities_col.find_one({"event_link_id": str(event_id)})
+                action_url = await resolve_notification_action_url(
+                    str(event_id),
+                    {
+                        "stage_id": stage_id,
+                        "opportunity_id": str(opp_doc["_id"]) if opp_doc else None,
+                    },
+                )
+
+                context = {
+                    "participant_name": participant.get("name") or "Participant",
+                    "team_name": team_name,
+                    "event_title": event.get("title") or "Event",
+                    "event_name": event.get("title") or "Event",
+                    "round_name": target_stage.get("name") or "Submission",
+                    "stage_name": target_stage.get("name") or "Submission",
+                    "submission_time": format_submission_timestamp(action_time),
+                    "action_url": action_url,
+                }
+                if tmpl:
+                    subject, body_html = render_template(tmpl, context)
+                else:
+                    subject = f"Submission received — {context['round_name']}"
+                    body_html = (
+                        f"<p>Hi {context['participant_name']},</p>"
+                        f"<p>Your submission for <strong>{context['round_name']}</strong> "
+                        f"in <strong>{context['event_title']}</strong> was received at {context['submission_time']}.</p>"
+                        f'<p><a href="{action_url}">View your submission</a></p>'
+                    )
+                await send_notification_email(participant_email, subject, body_html)
             except Exception as e:
-                print(f"[WARN] Could not create submission notification: {e}")
-        
+                print(f"[WARN] submission confirmation email failed: {e}")
+
+        asyncio.create_task(_send_confirmation_email())
+
         # Prepare submission data for return
         if existing_sub:
             ret_submitted_at = existing_sub.get("submitted_at")
@@ -367,8 +534,8 @@ async def submit_stage_data(
         return {
             "status": "success",
             "message": f"'{target_stage.get('name')}' submitted successfully",
-            "submission_id": str(result.upserted_id) if result.upserted_id else "updated",
-            "data": form_data,
+            "submission_id": submission_id,
+            "data": sanitize_submission_data_for_client(form_data),
             "submitted_at": ret_submitted_at.isoformat() if hasattr(ret_submitted_at, 'isoformat') else str(ret_submitted_at),
             "mirrored_application": mirrored,
             "mirrored_application_id": mirrored_app_id,
@@ -386,7 +553,10 @@ async def get_submission_data(
 ) -> dict:
     """Get submission data for a stage."""
     try:
+        event_id = await _resolve_event_id(event_id)
         event = await events_col.find_one({"_id": ObjectId(event_id)})
+        if not event:
+            event = await events_col.find_one({"event_id": event_id})
         if not event:
             return {"status": "error", "error": "Event not found"}
 
@@ -396,14 +566,7 @@ async def get_submission_data(
                 target_stage = stage
                 break
 
-        query = {"event_id": str(event_id), "stage_id": str(stage_id)}
-        
-        if team_id:
-            query["team_id"] = str(team_id)
-        else:
-            query["user_id"] = str(user_id)
-        
-        submission = await submission_data_col.find_one(query)
+        submission = await _find_stage_submission(event_id, stage_id, user_id, team_id)
         
         if not submission:
             can_edit = True
@@ -436,7 +599,7 @@ async def get_submission_data(
         
         return {
             "status": "found",
-            "data": submission.get("data", {}),
+            "data": sanitize_submission_data_for_client(submission.get("data", {})),
             "submitted_at": submission.get("submitted_at"),
             "can_edit": can_edit,
         }
@@ -503,10 +666,18 @@ async def update_profile_registration(
             upsert=True
         )
         
+        participant_id = "updated"
+        if getattr(result, "upserted_id", None):
+            participant_id = str(result.upserted_id)
+        elif getattr(result, "matched_count", 0):
+            existing = await participants_col.find_one({"event_id": str(event_id), "user_id": str(user_id)})
+            if existing:
+                participant_id = str(existing.get("_id"))
+
         return {
             "status": "success",
             "message": "Registration completed successfully",
-            "participant_id": str(result.upserted_id) if result.upserted_id else "updated",
+            "participant_id": participant_id,
         }
     except Exception as e:
         print(f"[ERROR] update_profile_registration: {e}")

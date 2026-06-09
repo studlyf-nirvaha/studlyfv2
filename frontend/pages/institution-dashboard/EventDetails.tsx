@@ -86,9 +86,10 @@ interface EventDetailsProps {
     onEditEvent?: (eventId: string) => void;
 }
 
-const BUNDLE_TABS = ['shortlisted', 'approved', 'pending', 'rejected'] as const;
+const BUNDLE_TABS = ['shortlisted', 'approved', 'waitlisted', 'pending', 'rejected'] as const;
 const BUNDLE_TAB_LABEL: Record<string, string> = {
     shortlisted: 'Shortlisted',
+    waitlisted: 'Waitlisted',
     approved: 'Approved',
     pending: 'Pending',
     rejected: 'Rejected',
@@ -144,13 +145,22 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     const [criteria, setCriteria] = useState<any[]>([]);
     const [bundleData, setBundleData] = useState<any>(null);
     const [prizeDistribution, setPrizeDistribution] = useState<any[]>([]);
-    const [threshold, setThreshold] = useState(0);
-    const [debouncedThreshold, setDebouncedThreshold] = useState(0);
+    const [threshold, setThreshold] = useState(80);
+    const [waitlistThreshold, setWaitlistThreshold] = useState(65);
+    const [rejectThreshold, setRejectThreshold] = useState(65);
+    const [debouncedThreshold, setDebouncedThreshold] = useState(80);
+    const [debouncedWaitlist, setDebouncedWaitlist] = useState(65);
+    const [debouncedReject, setDebouncedReject] = useState(65);
     const [bundleTab, setBundleTab] = useState<string>('shortlisted');
+    const [bundleNotifyFilter, setBundleNotifyFilter] = useState<'ALL' | 'APPROVED_UNNOTIFIED' | 'APPROVED_NOTIFIED'>('ALL');
+    const [selectedSubmissionStageId, setSelectedSubmissionStageId] = useState('');
+    const [textPreview, setTextPreview] = useState<{ title: string; content: string } | null>(null);
     const [teams, setTeams] = useState<ITeam[]>([]);
     const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
     const [submissions, setSubmissions] = useState<ISubmission[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [teamStatusFilter, setTeamStatusFilter] = useState('All');
+    const [notifyingTeams, setNotifyingTeams] = useState(false);
 
     useEffect(() => {
         if (initialSection) setActiveTab(initialSection);
@@ -238,9 +248,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     const [profileTypeLockedForPrefill, setProfileTypeLockedForPrefill] = useState(false);
 
     const fetchRegistrations = async () => {
-        console.log('fetchRegistrations called. eventId:', eventId, 'activeTab:', activeTab);
         if (!eventId || activeTab !== 'registrations') {
-            console.log('fetchRegistrations skipped: eventId missing or activeTab is not registrations');
             return;
         }
         setRegLoading(true);
@@ -481,6 +489,31 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         }
     };
 
+    const openStageSubmissionFile = async (submissionId: string, fieldId: string, filenameHint?: string) => {
+        if (!eventId) return;
+        try {
+            const res = await fetch(
+                `${API_BASE_URL}/api/v1/institution/events/${eventId}/stage-submissions/${submissionId}/file/${encodeURIComponent(fieldId)}`,
+                { headers: authHeaders() },
+            );
+            if (!res.ok) {
+                alert('Could not open file. It may have been removed or you may not have access.');
+                return;
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const mime = blob.type || 'application/octet-stream';
+            const ext = mime.split('/')[1] || 'bin';
+            setPreviewAsset({
+                url,
+                filename: filenameHint || `Attachment.${ext}`,
+                type: 'file',
+            });
+        } catch {
+            alert('Network error while opening file.');
+        }
+    };
+
     const handleExportRegistrationsCsv = async () => {
         if (!eventId) return;
         try {
@@ -653,6 +686,19 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 setEvent(eventData);
                 setStages(Array.isArray(eventData.stages) ? eventData.stages : []);
                 setCriteria(eventData.judging_criteria || []);
+                const eth = eventData.evaluation_thresholds || {};
+                if (typeof eth.shortlist_min === 'number' && eth.shortlist_min > 0) {
+                    setThreshold(eth.shortlist_min);
+                    setDebouncedThreshold(eth.shortlist_min);
+                }
+                if (typeof eth.waitlist_min === 'number') {
+                    setWaitlistThreshold(eth.waitlist_min);
+                    setDebouncedWaitlist(eth.waitlist_min);
+                }
+                if (typeof eth.reject_below === 'number') {
+                    setRejectThreshold(eth.reject_below);
+                    setDebouncedReject(eth.reject_below);
+                }
                 const instId = eventData.institution_id;
 
                 // Step 2: Fetch dashboard data and institution profile in parallel
@@ -681,7 +727,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                         ...ss,
                         _sourceType: 'stage',
                         source: 'stage_deliverable',
-                        teamName: ss.team_id || (ss.data?.team_name) || '',
+                        teamName: ss.team_name || ss.data?.team_display_name || '',
+                        team_name: ss.team_name || ss.data?.team_display_name || '',
                         user_name: ss.data?.name || ss.data?.full_name || '',
                         submitted_at: ss.submitted_at || ss.last_updated_at,
                     })) : [];
@@ -776,22 +823,47 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         return () => { cancelled = true; };
     }, [eventId, activeTab, user]);
 
-    const fetchBundle = async (tVal: number) => {
-        console.log('[BUNDLE] fetchBundle called', { eventId, activeTab, tVal });
-        if (!eventId || activeTab !== 'submissions') { console.log('[BUNDLE] Skipped:', { eventId, activeTab }); return; }
+    const saveEvaluationThresholds = async () => {
+        if (!eventId) return;
+        const payload = {
+            criteria,
+            evaluation_thresholds: {
+                shortlist_min: threshold,
+                waitlist_min: waitlistThreshold,
+                reject_below: rejectThreshold,
+            },
+        };
+        const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${eventId}/criteria`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+            setEvent((prev) => (prev ? { ...prev, evaluation_thresholds: payload.evaluation_thresholds } : prev));
+            setShowSaveSuccess(true);
+            setTimeout(() => setShowSaveSuccess(false), 2000);
+            fetchBundle();
+        } else {
+            const err = await res.json().catch(() => ({}));
+            alert(err?.detail || 'Failed to save thresholds');
+        }
+    };
+
+    const fetchBundle = async () => {
+        if (!eventId || activeTab !== 'submissions') return;
         try {
-            const url = `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?threshold=${tVal}`;
-            console.log('[BUNDLE] Fetching:', url);
-            const res = await fetch(url, {
-                headers: { ...authHeaders() }
+            const params = new URLSearchParams({
+                threshold: String(debouncedThreshold),
+                waitlist_min: String(debouncedWaitlist),
+                reject_below: String(debouncedReject),
             });
-            console.log('[BUNDLE] Response status:', res.status);
+            if (selectedSubmissionStageId) params.set('stage_id', selectedSubmissionStageId);
+            const res = await fetch(
+                `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?${params}`,
+                { headers: { ...authHeaders() } },
+            );
             if (res.ok) {
-                const data = await res.json();
-                console.log('[BUNDLE] Data received:', JSON.stringify(data));
-                setBundleData(data);
-            } else {
-                console.log('[BUNDLE] Response not OK:', res.status, await res.text().catch(() => ''));
+                setBundleData(await res.json());
             }
         } catch (e) {
             console.error('[BUNDLE] Failed to fetch evaluation bundle:', e);
@@ -895,10 +967,38 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     }, [activeTab, submissionSubTab, selectedSubTabQuizStageId, eventId, refreshCounter]);
 
     useEffect(() => {
-        if (eventId && activeTab === 'submissions') {
-            fetchBundle(debouncedThreshold);
+        const timer = window.setTimeout(() => setDebouncedThreshold(threshold), 400);
+        return () => window.clearTimeout(timer);
+    }, [threshold]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebouncedWaitlist(waitlistThreshold), 400);
+        return () => window.clearTimeout(timer);
+    }, [waitlistThreshold]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebouncedReject(rejectThreshold), 400);
+        return () => window.clearTimeout(timer);
+    }, [rejectThreshold]);
+
+    useEffect(() => {
+        const submissionStages = stages.filter((s) => {
+            const t = String(s.type || '').toUpperCase();
+            const n = String(s.name || '').toLowerCase();
+            return !['REGISTRATION', 'TEAM_FORMATION', 'QUIZ'].includes(t)
+                && !n.includes('registration')
+                && !n.includes('team formation');
+        });
+        if (submissionStages.length > 0 && !selectedSubmissionStageId) {
+            setSelectedSubmissionStageId(submissionStages[0].id);
         }
-    }, [eventId, activeTab, debouncedThreshold, refreshCounter]);
+    }, [stages, selectedSubmissionStageId]);
+
+    useEffect(() => {
+        if (eventId && activeTab === 'submissions') {
+            fetchBundle();
+        }
+    }, [eventId, activeTab, debouncedThreshold, debouncedWaitlist, debouncedReject, selectedSubmissionStageId, refreshCounter]);
 
     useEffect(() => {
         if (activeTab !== 'assessments' || !eventId || quizzes.length === 0) return;
@@ -962,7 +1062,14 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${eventId}/criteria`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                body: JSON.stringify(criteria)
+                body: JSON.stringify({
+                    criteria,
+                    evaluation_thresholds: {
+                        shortlist_min: threshold,
+                        waitlist_min: waitlistThreshold,
+                        reject_below: rejectThreshold,
+                    },
+                })
             });
             if (res.ok) {
                 setEvent(prev => prev ? { ...prev, judging_criteria: criteria } : prev);
@@ -1426,6 +1533,26 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                     }));
                     setShowSaveSuccess(true);
                     setTimeout(() => setShowSaveSuccess(false), 2000);
+                    if (item && ['Shortlisted', 'Accepted', 'Rejected'].includes(newStatus)) {
+                        try {
+                            const stageInfo = getCurrentStageInfo();
+                            await fetch(`${API_BASE_URL}/api/v1/institution/events/${eventId}/send-status-email`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                                body: JSON.stringify({
+                                    submission_id: submissionId,
+                                    team_id: item.team_id,
+                                    status: newStatus,
+                                    team_name: item.team_name,
+                                    emails: item.member_emails || [],
+                                    stage_context: stageInfo,
+                                }),
+                            });
+                            fetchBundle();
+                        } catch (emailErr) {
+                            try { console.error('Failed to send email:', emailErr instanceof Error ? emailErr.message : String(emailErr)); } catch (_) {}
+                        }
+                    }
                 }
             } catch (err) {
                 try { console.error('Failed to update stage submission status:', err instanceof Error ? err.message : String(err)); } catch (_) {}
@@ -1731,7 +1858,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     const renderTabContent_SubmissionManagement = () => {
         // Merge hackathon + regular submissions for ALL event types
         const allSubmissions = [
-            ...(hackathonSubmissions || []).map((s: any) => ({
+            ...(hackathonSubmissions || []).filter((s: any) => s && (s._id || s.id) && (s.project_title || s.team_name || s.teamName)).map((s: any) => ({
                 ...s,
                 _sourceType: 'hackathon',
                 project_title: s.project_title || s.teamName || s.team_name || '',
@@ -1777,15 +1904,70 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             seenKeys.add(key);
             return true;
         });
-        const allDomains = [...new Set(dedupedSubmissions.map(s => s.domain).filter(Boolean))];
-        const domains = ['All Domains', ...allDomains];
+        const submissionStages = stages.filter((s) => {
+            const t = String(s.type || '').toUpperCase();
+            const n = String(s.name || '').toLowerCase();
+            return !['REGISTRATION', 'TEAM_FORMATION', 'QUIZ'].includes(t)
+                && !n.includes('registration')
+                && !n.includes('team formation');
+        });
+        const activeStage = submissionStages.find((s) => s.id === selectedSubmissionStageId) || submissionStages[0];
+        const stageDomainOptions = (activeStage?.config?.domains || activeStage?.domains || []) as string[];
+        const submissionDomains = dedupedSubmissions
+            .filter((s) => !selectedSubmissionStageId || s.stage_id === selectedSubmissionStageId)
+            .map((s) => s.domain || (s.data && (s.data.domain || s.data.Domain)))
+            .filter(Boolean);
+        const domains = ['All Domains', ...new Set([...stageDomainOptions, ...submissionDomains])];
         const filtered = dedupedSubmissions.filter(s => {
             const name = s.teamName || s.team_name || s.user_name || '';
             const lead = s.teamLead || s.team_lead || '';
             const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) || lead.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesDomain = domainFilter === 'All Domains' || s.domain === domainFilter;
+            const subDomain = s.domain || s.data?.domain || s.data?.Domain;
+            const matchesDomain = domainFilter === 'All Domains' || subDomain === domainFilter;
             const matchesJudge = judgeFilter === 'All Judges' || s.assignedJudgeId === judgeFilter;
-            return matchesSearch && matchesDomain && matchesJudge;
+            const matchesStage = !selectedSubmissionStageId || s.stage_id === selectedSubmissionStageId;
+            return matchesSearch && matchesDomain && matchesJudge && matchesStage;
+        });
+
+        const getStageFieldGroups = (sub: any) => {
+            const stageData = sub._sourceType === 'stage' ? sub.data : null;
+            if (!stageData || typeof stageData !== 'object') {
+                return { texts: [] as { label: string; value: string }[], files: [] as { key: string; label: string; value: any; mime?: string }[] };
+            }
+            const stageConfig = stages.find((st: any) => st.id === sub.stage_id || st._id === sub.stage_id);
+            const fieldConfigs: Record<string, any> = {};
+            if (stageConfig) {
+                const fields = stageConfig.fields || stageConfig.config?.fields || [];
+                for (const f of fields) fieldConfigs[f.id || f.key] = f;
+            }
+            const texts: { label: string; value: string }[] = [];
+            const files: { key: string; label: string; value: any; mime?: string }[] = [];
+            for (const [key, value] of Object.entries(stageData)) {
+                const label = fieldConfigs[key]?.label || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                if (typeof value === 'object' && value && (value as any)._stored_file) {
+                    files.push({ key, label, value });
+                } else if (typeof value === 'string' && value.startsWith('data:')) {
+                    const mime = value.split(';')[0].split(':')[1] || '';
+                    files.push({ key, label, value, mime });
+                } else if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
+                    files.push({ key, label, value, mime: 'url' });
+                } else if (typeof value === 'string' && value.trim()) {
+                    texts.push({ label, value });
+                }
+            }
+            return { texts, files };
+        };
+
+        const bundleItemsRaw = bundleData?.[bundleTab] || [];
+        const bundleItems = bundleItemsRaw.filter((item: any) => {
+            if (bundleNotifyFilter === 'ALL') return true;
+            const st = String(item.status || '').toLowerCase();
+            const isApproved = st.includes('approve') || st.includes('accept') || st.includes('shortlist');
+            if (!isApproved) return false;
+            const notified = !!item.notified_at;
+            if (bundleNotifyFilter === 'APPROVED_NOTIFIED') return notified;
+            if (bundleNotifyFilter === 'APPROVED_UNNOTIFIED') return !notified;
+            return true;
         });
 
         if (submissionSubTab === 'assessments') {
@@ -2010,20 +2192,48 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                     <div className="absolute -right-20 -top-20 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px]"></div>
                 </div>
 
-                <div className="flex bg-slate-100 p-1.5 rounded-[2.2rem] shadow-inner border border-slate-200/50 w-fit mx-4">
+                <div className="flex flex-wrap items-center gap-4 px-4">
+                    <div className="flex bg-slate-100 p-1.5 rounded-[2.2rem] shadow-inner border border-slate-200/50 w-fit">
+                        <button 
+                            type="button"
+                            onClick={() => setSubmissionSubTab('projects')}
+                            className={`px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${submissionSubTab === 'projects' ? 'bg-white text-[#6C3BFF] shadow-xl' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Projects & Deliverables
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => {
+                                setSubmissionSubTab('assessments');
+                                const linkedQuiz = stages.find((s) => s.id === selectedSubmissionStageId && s.type === 'QUIZ' && s.config?.quiz_id);
+                                if (linkedQuiz) setSelectedSubTabQuizStageId(linkedQuiz.id);
+                            }}
+                            className={`px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${submissionSubTab === 'assessments' ? 'bg-white text-[#6C3BFF] shadow-xl' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Quizzes & Assessments
+                        </button>
+                    </div>
+                    {submissionStages.length > 0 && (
+                        <select
+                            value={selectedSubmissionStageId}
+                            onChange={(e) => {
+                                const nextId = e.target.value;
+                                setSelectedSubmissionStageId(nextId);
+                                const quizForStage = stages.find((s) => s.id === nextId && s.type === 'QUIZ' && s.config?.quiz_id);
+                                if (quizForStage) setSelectedSubTabQuizStageId(quizForStage.id);
+                            }}
+                            className="px-6 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-purple-50 min-w-[220px]"
+                        >
+                            {submissionStages.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name || s.id}</option>
+                            ))}
+                        </select>
+                    )}
                     <button 
-                        type="button"
-                        onClick={() => setSubmissionSubTab('projects')}
-                        className={`px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${submissionSubTab === 'projects' ? 'bg-white text-[#6C3BFF] shadow-xl' : 'text-slate-500 hover:text-slate-800'}`}
+                        onClick={() => setIsBulkMode(!isBulkMode)}
+                        className={`px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${isBulkMode ? 'bg-purple-600 text-white shadow-xl shadow-purple-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                     >
-                        Projects & Deliverables
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => setSubmissionSubTab('assessments')}
-                        className={`px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${submissionSubTab === 'assessments' ? 'bg-white text-[#6C3BFF] shadow-xl' : 'text-slate-500 hover:text-slate-800'}`}
-                    >
-                        Quizzes & Assessments
+                        Bulk Assignment
                     </button>
                 </div>
 
@@ -2057,12 +2267,6 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                         </select>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setIsBulkMode(!isBulkMode)}
-                            className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${isBulkMode ? 'bg-purple-600 text-white shadow-xl shadow-purple-600/20' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                        >
-                            Bulk Assignment
-                        </button>
                         {isBulkMode && selectedSubmissions.length > 0 && (
                             <select 
                                 onChange={(e) => handleBulkAssign(e.target.value)}
@@ -2083,7 +2287,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                             <tr className="bg-slate-50/50">
                                 {isBulkMode && <th className="px-10 py-6 w-10"></th>}
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Team Detail</th>
-                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Idea & Solution</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Submission</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Files</th>
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Judge</th>
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Score</th>
                                 <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
@@ -2112,125 +2317,88 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                                 {sub.teamLead || sub.team_lead || sub.team_name ? (
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Lead: {sub.teamLead || sub.team_lead || sub.team_name}</span>
                                                 ) : null}
-                                                {sub.domain && <span className="text-[9px] font-black text-purple-600 uppercase tracking-[0.2em] mt-2">{sub.domain}</span>}
-                                                {sub._sourceType === 'stage' && sub.stage_name ? (
-                                                    <span className="mt-2 inline-flex w-fit px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
-                                                        {sub.stage_name}
-                                                    </span>
-                                                ) : null}
+                                                {(sub.domain || sub.data?.domain) && (
+                                                    <span className="text-[9px] font-black text-purple-600 uppercase tracking-[0.2em] mt-2">{sub.domain || sub.data?.domain}</span>
+                                                )}
                                             </div>
                                         </td>
-                                        <td className="px-10 py-8 max-w-md">
-                                            <div className="space-y-2">
-                                                {(() => {
-                                                    const stageData = sub._sourceType === 'stage' ? sub.data : null;
-                                                    if (stageData && typeof stageData === 'object') {
-                                                        // Find stage config for field labels
-                                                        const stageConfig = stages.find((st: any) =>
-                                                            st.id === sub.stage_id || st._id === sub.stage_id
-                                                        );
-                                                        const fieldConfigs: Record<string, any> = {};
-                                                        if (stageConfig) {
-                                                            const fields = stageConfig.fields || (stageConfig.config?.fields) || [];
-                                                            for (const f of fields) {
-                                                                fieldConfigs[f.id || f.key] = f;
-                                                            }
-                                                        }
-                                                        const fieldEntries = Object.entries(stageData).filter(
-                                                            ([k, v]) => typeof v === 'string' && v.trim()
-                                                        );
-                                                        return (
-                                                            <div className="divide-y divide-slate-100">
-                                                                {fieldEntries.map(([key, value]) => {
-                                                                    const label = fieldConfigs[key]?.label || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                                                                    if (value.startsWith('data:')) {
-                                                                        const mime = value.split(';')[0].split(':')[1] || '';
-                                                                        const icon = mime.includes('pdf') ? <FileText size={14} /> :
-                                                                            mime.includes('presentation') || mime.includes('ppt') ? <FileCheck size={14} /> :
-                                                                            mime.startsWith('image/') ? <FileImage size={14} /> :
-                                                                            mime.startsWith('video/') ? <FileVideo size={14} /> : <FileText size={14} />;
-                                                                        return (
-                                                                            <div key={key} className="py-2 first:pt-0 last:pb-0">
-                                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</span>
-                                                                                <button onClick={() => setPreviewAsset({ url: value, filename: `Attachment.${mime.split('/')[1] || 'bin'}`, type: 'file' })}
-                                                                                    className="flex items-center gap-2 text-xs font-bold text-purple-600 hover:text-purple-800 transition-colors">
-                                                                                    {icon} View {mime.includes('pdf') ? 'PDF' : mime.includes('presentation') ? 'PPT' : mime.startsWith('image/') ? 'Image' : 'File'}
-                                                                                </button>
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    if (value.startsWith('http://') || value.startsWith('https://')) {
-                                                                        let domain = '';
-                                                                        try { domain = new URL(value).hostname; } catch {}
-                                                                        const icon = domain.includes('github.com') ? <Github size={14} /> : <Globe size={14} />;
-                                                                        return (
-                                                                            <div key={key} className="py-2 first:pt-0 last:pb-0">
-                                                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</span>
-                                                                                <a href={value} target="_blank" rel="noreferrer"
-                                                                                    className="flex items-center gap-2 text-xs font-bold text-purple-600 hover:text-purple-800 transition-colors">
-                                                                                    {icon} {domain}
-                                                                                </a>
-                                                                            </div>
-                                                                        );
-                                                                    }
-                                                                    return (
-                                                                        <div key={key} className="py-2 first:pt-0 last:pb-0">
-                                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</span>
-                                                                            <p className="text-sm font-bold text-slate-800">{value}</p>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    // Legacy non-stage submissions
-                                                    const descText = sub.problemStatement && sub.problemStatement !== 'Submitted link' && sub.problemStatement !== 'Submitted file' ? sub.problemStatement : '';
-                                                    interface LegacyAsset { type: 'file' | 'link'; url: string; mime?: string; domain?: string }
-                                                    const assets: LegacyAsset[] = [];
-                                                    if (sub.pptLink) {
-                                                        if (sub.pptLink.startsWith('data:')) {
-                                                            const mime = sub.pptLink.split(';')[0].split(':')[1] || '';
-                                                            assets.push({ type: 'file', url: sub.pptLink, mime });
-                                                        } else {
-                                                            let domain = '';
-                                                            try { domain = new URL(sub.pptLink).hostname; } catch {}
-                                                            assets.push({ type: 'link', url: sub.pptLink, domain });
-                                                        }
-                                                    }
-                                                    if (sub.githubLink) {
-                                                        let domain = '';
-                                                        try { domain = new URL(sub.githubLink).hostname; } catch {}
-                                                        assets.push({ type: 'link', url: sub.githubLink, domain });
-                                                    }
+                                        <td className="px-10 py-8 max-w-xs">
+                                            {(() => {
+                                                const { texts } = getStageFieldGroups(sub);
+                                                if (texts.length > 0) {
                                                     return (
-                                                        <>
-                                                            {descText && <p className="text-sm font-bold text-slate-800 line-clamp-2">{descText}</p>}
-                                                            {assets.length > 0 && (
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    {assets.map((asset, ai) => {
-                                                                        const icon = asset.type === 'file'
-                                                                            ? (asset.mime?.includes('pdf') ? <FileText size={16} /> :
-                                                                                asset.mime?.includes('presentation') ? <FileCheck size={16} /> :
-                                                                                asset.mime?.startsWith('image/') ? <FileImage size={16} /> :
-                                                                                asset.mime?.startsWith('video/') ? <FileVideo size={16} /> : <FileText size={16} />)
-                                                                            : (asset.domain?.includes('github.com') ? <Github size={16} /> : <Globe size={16} />);
-                                                                        return asset.type === 'file' ? (
-                                                                            <button key={ai}
-                                                                                onClick={() => setPreviewAsset({ url: asset.url, filename: `Attachment.${(asset.mime || '').split('/')[1] || 'bin'}`, type: 'file' })}
-                                                                                className="flex items-center justify-center w-9 h-9 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors cursor-pointer">
-                                                                                {icon}
-                                                                            </button>
-                                                                        ) : (
-                                                                            <a key={ai} href={asset.url} target="_blank" rel="noreferrer"
-                                                                                className="flex items-center justify-center w-9 h-9 bg-slate-100 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-200 transition-colors">
-                                                                                {icon}
-                                                                            </a>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                        </>
+                                                        <div className="space-y-2">
+                                                            {texts.slice(0, 2).map((t, i) => (
+                                                                <button
+                                                                    key={i}
+                                                                    type="button"
+                                                                    onClick={() => setTextPreview({ title: t.label, content: t.value })}
+                                                                    className="block text-left w-full group"
+                                                                >
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t.label}</span>
+                                                                    <p className="text-sm font-bold text-slate-800 line-clamp-2 group-hover:text-[#6C3BFF] transition-colors">{t.value}</p>
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     );
+                                                }
+                                                const descText = sub.problemStatement && !['Submitted link', 'Submitted file'].includes(sub.problemStatement) ? sub.problemStatement : '';
+                                                return descText ? (
+                                                    <button type="button" onClick={() => setTextPreview({ title: 'Submission', content: descText })} className="text-sm font-bold text-slate-800 line-clamp-2 text-left hover:text-[#6C3BFF]">{descText}</button>
+                                                ) : <span className="text-slate-300 text-xs font-bold">—</span>;
+                                            })()}
+                                        </td>
+                                        <td className="px-10 py-8">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {(() => {
+                                                    const { files } = getStageFieldGroups(sub);
+                                                    if (files.length > 0) {
+                                                        return files.map((f) => {
+                                                            const mime = f.mime || '';
+                                                            const isUrl = mime === 'url';
+                                                            const icon = isUrl ? <Globe size={16} /> :
+                                                                mime.includes('pdf') ? <FileText size={16} /> :
+                                                                mime.includes('presentation') || mime.includes('ppt') ? <FileCheck size={16} /> :
+                                                                mime.startsWith('image/') ? <FileImage size={16} /> :
+                                                                mime.startsWith('video/') ? <FileVideo size={16} /> : <FileText size={16} />;
+                                                            if (typeof f.value === 'object' && f.value?._stored_file) {
+                                                                return (
+                                                                    <button key={f.key} type="button" title={f.label}
+                                                                        onClick={() => openStageSubmissionFile(String(sub._id), f.key, f.value.filename)}
+                                                                        className="flex items-center justify-center w-9 h-9 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors">
+                                                                        {icon}
+                                                                    </button>
+                                                                );
+                                                            }
+                                                            if (typeof f.value === 'string' && f.value.startsWith('data:')) {
+                                                                return (
+                                                                    <button key={f.key} type="button" title={f.label}
+                                                                        onClick={() => setPreviewAsset({ url: f.value, filename: `${f.label}.${mime.split('/')[1] || 'bin'}`, type: 'file' })}
+                                                                        className="flex items-center justify-center w-9 h-9 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors">
+                                                                        {icon}
+                                                                    </button>
+                                                                );
+                                                            }
+                                                            if (isUrl) {
+                                                                return (
+                                                                    <a key={f.key} href={f.value} target="_blank" rel="noreferrer" title={f.label}
+                                                                        className="flex items-center justify-center w-9 h-9 bg-slate-100 text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-200 transition-colors">
+                                                                        {icon}
+                                                                    </a>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        });
+                                                    }
+                                                    const legacyAssets: { url: string; mime?: string }[] = [];
+                                                    if (sub.pptLink?.startsWith('data:')) legacyAssets.push({ url: sub.pptLink, mime: sub.pptLink.split(';')[0].split(':')[1] });
+                                                    return legacyAssets.map((asset, ai) => (
+                                                        <button key={ai} type="button"
+                                                            onClick={() => setPreviewAsset({ url: asset.url, filename: `Attachment.${(asset.mime || '').split('/')[1] || 'bin'}`, type: 'file' })}
+                                                            className="flex items-center justify-center w-9 h-9 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors">
+                                                            <FileText size={16} />
+                                                        </button>
+                                                    ));
                                                 })()}
                                             </div>
                                         </td>
@@ -2292,7 +2460,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={isBulkMode ? 6 : 5} className="px-10 py-32 text-center text-slate-300 font-black text-[10px] uppercase tracking-[0.4em]">No submissions match your filters</td>
+                                    <td colSpan={isBulkMode ? 7 : 6} className="px-10 py-32 text-center text-slate-300 font-black text-[10px] uppercase tracking-[0.4em]">No submissions match your filters</td>
                                 </tr>
                             )}
                         </tbody>
@@ -2301,6 +2469,63 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
 
             {/* Bundle Categorization Section */}
             <div className="mt-16 space-y-8">
+                <div className="flex flex-wrap items-end justify-between gap-6 px-6">
+                    <div className="space-y-4 flex-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shortlist ≥ (%)</label>
+                                <div className="flex items-center gap-3">
+                                    <input type="range" min={0} max={100} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="flex-1" />
+                                    <span className="text-sm font-black text-[#6C3BFF] w-10">{threshold}%</span>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Waitlist ≥ (%)</label>
+                                <div className="flex items-center gap-3">
+                                    <input type="range" min={0} max={100} value={waitlistThreshold} onChange={(e) => setWaitlistThreshold(Number(e.target.value))} className="flex-1" />
+                                    <span className="text-sm font-black text-amber-600 w-10">{waitlistThreshold}%</span>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reject &lt; (%)</label>
+                                <div className="flex items-center gap-3">
+                                    <input type="range" min={0} max={100} value={rejectThreshold} onChange={(e) => setRejectThreshold(Number(e.target.value))} className="flex-1" />
+                                    <span className="text-sm font-black text-rose-600 w-10">{rejectThreshold}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <button type="button" onClick={saveEvaluationThresholds}
+                                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider hover:bg-slate-800">
+                                Save thresholds
+                            </button>
+                            {bundleData?.thresholds ? (
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                    Active: Shortlist ≥ {bundleData.thresholds.shortlist_min}% · Waitlist ≥ {bundleData.thresholds.waitlist_min}% · Reject &lt; {bundleData.thresholds.reject_below}%
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <select
+                            value={bundleNotifyFilter}
+                            onChange={(e) => setBundleNotifyFilter(e.target.value as typeof bundleNotifyFilter)}
+                            className="px-4 py-2 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-600"
+                        >
+                            <option value="ALL">All candidates</option>
+                            <option value="APPROVED_UNNOTIFIED">Approved & Unnotified</option>
+                            <option value="APPROVED_NOTIFIED">Approved & Notified</option>
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => setIsBulkNotifyModalOpen(true)}
+                            disabled={!bundleItems.some((i: any) => ['shortlisted', 'approved', 'accepted'].some((s) => String(i.status || '').toLowerCase().includes(s)))}
+                            className="px-4 py-2 rounded-xl bg-[#6C3BFF] text-white text-[10px] font-black uppercase tracking-wider hover:bg-purple-700 disabled:opacity-40 flex items-center gap-2"
+                        >
+                            <Send size={12} /> Notify selected
+                        </button>
+                    </div>
+                </div>
                 <div className="flex items-center gap-10 border-b border-slate-100 px-6">
                     {BUNDLE_TABS.map((tab) => (
                         <button
@@ -2336,8 +2561,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {(bundleData?.[bundleTab] || []).length > 0 ? (
-                                (bundleData[bundleTab] || []).map((item: any, idx: number) => (
+                            {bundleItems.length > 0 ? (
+                                bundleItems.map((item: any, idx: number) => (
                                     <motion.tr
                                         key={item.team_id || item.user_id || idx}
                                         initial={{ opacity: 0, y: 10 }}
@@ -2357,6 +2582,11 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                                     <span className="px-2.5 py-1 rounded-full border border-purple-100 bg-purple-50 text-[9px] font-black uppercase tracking-[0.2em] text-purple-600">
                                                         {getBundleStatusLabel(item.status || 'Pending')}
                                                     </span>
+                                                    {item.notified_at && (
+                                                        <span className="px-2.5 py-1 rounded-full border border-emerald-100 bg-emerald-50 text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600">
+                                                            Notified
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -3542,11 +3772,45 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                     </div>
                 );
             case 'teams':
-                const filteredTeams = teams.filter(t => 
-                    !searchQuery || 
-                    (t.team_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (t.leader_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-                );
+                const filteredTeams = teams.filter(t => {
+                    const q = searchQuery.toLowerCase();
+                    const leader = t.members?.find(m => m.is_leader || String(m.user_id) === String(t.team_leader_id));
+                    const matchesSearch = !q ||
+                        (t.team_name || '').toLowerCase().includes(q) ||
+                        (t.leader_name || leader?.name || '').toLowerCase().includes(q) ||
+                        (leader?.email || '').toLowerCase().includes(q);
+                    const matchesStatus = teamStatusFilter === 'All' ||
+                        String(t.status || '').toLowerCase() === teamStatusFilter.toLowerCase();
+                    return matchesSearch && matchesStatus;
+                });
+                const handleNotifyTeamsByStatus = async () => {
+                    if (!eventId || teamStatusFilter === 'All') {
+                        alert('Choose a status filter (e.g. Approved) before sending notifications.');
+                        return;
+                    }
+                    if (!confirm(`Email all ${teamStatusFilter} teams?`)) return;
+                    setNotifyingTeams(true);
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${eventId}/teams/notify-by-status`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                            body: JSON.stringify({
+                                status: teamStatusFilter.toLowerCase(),
+                                message: `Your team status is "${teamStatusFilter}". Please continue in the event portal.`,
+                            }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            alert(`Notifications queued for ${data.sent || 0} member(s) across ${data.teams || 0} team(s).`);
+                        } else {
+                            alert(data.detail || 'Failed to send team notifications.');
+                        }
+                    } catch {
+                        alert('Network error while notifying teams.');
+                    } finally {
+                        setNotifyingTeams(false);
+                    }
+                };
                 return (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -3554,7 +3818,28 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                 <h3 className="text-2xl font-black text-slate-900 tracking-tight">Team Management</h3>
                                 <p className="text-slate-500 text-sm font-medium mt-1">Direct control over participant grouping and identities for this event.</p>
                             </div>
-                            <div className="relative group">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <select
+                                    value={teamStatusFilter}
+                                    onChange={(e) => setTeamStatusFilter(e.target.value)}
+                                    className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900"
+                                >
+                                    <option value="All">All statuses</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="shortlisted">Shortlisted</option>
+                                    <option value="waitlisted">Waitlisted</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="pending">Pending</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleNotifyTeamsByStatus}
+                                    disabled={notifyingTeams || teamStatusFilter === 'All'}
+                                    className="px-4 py-3 bg-[#6C3BFF] text-white rounded-2xl text-xs font-black uppercase tracking-wider disabled:opacity-50"
+                                >
+                                    {notifyingTeams ? 'Sending…' : 'Email filtered teams'}
+                                </button>
+                                <div className="relative group">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
                                 <input
                                     type="text"
@@ -3563,6 +3848,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="pl-12 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all w-full md:w-80 font-medium"
                                 />
+                            </div>
                             </div>
                         </div>
 
@@ -4875,6 +5161,25 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 stageName={reviewQuiz?.stageName || ''}
             />
 
+            {/* Text submission preview */}
+            <FramerAnimatePresence>
+                {textPreview && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => setTextPreview(null)}>
+                        <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl p-8 max-h-[80vh] overflow-y-auto">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-black text-slate-900">{textPreview.title}</h3>
+                                <button onClick={() => setTextPreview(null)} className="p-2 rounded-xl hover:bg-slate-100"><X size={20} /></button>
+                            </div>
+                            <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{textPreview.content}</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </FramerAnimatePresence>
+
             {/* Asset Preview Modal */}
             <FramerAnimatePresence>
                 {previewAsset && (
@@ -4912,7 +5217,10 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                         <Download size={14} /> Download
                                     </a>
                                     <button 
-                                        onClick={() => setPreviewAsset(null)}
+                                        onClick={() => {
+                                            if (previewAsset?.url?.startsWith('blob:')) URL.revokeObjectURL(previewAsset.url);
+                                            setPreviewAsset(null);
+                                        }}
                                         className="p-4 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition-all"
                                     >
                                         <X size={20} />

@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../components/AuthLayout';
 import LoginForm from '../components/LoginForm';
 import SignupForm from '../components/SignupForm';
-import LoginBranding from '../components/LoginBranding';
-import SignupBranding from '../components/SignupBranding';
+
+const LoginBranding = lazy(() => import('../components/LoginBranding'));
+const SignupBranding = lazy(() => import('../components/SignupBranding'));
 
 const UnifiedAuth: React.FC = () => {
     const location = useLocation();
@@ -48,24 +49,23 @@ const UnifiedAuth: React.FC = () => {
 
                     {/* Background Layers (Fixed Content) */}
                     <div className="flex-1 flex flex-col lg:flex-row w-full h-full relative z-10">
-                        {/* Login Branding Area */}
                         <div className="w-full lg:w-1/2 h-full flex items-center justify-center p-6 lg:p-10">
-                            <motion.div
-                                animate={{ opacity: isLogin ? 1 : 0.1, filter: isLogin ? 'blur(0px)' : 'blur(4px)' }}
-                                className="w-full pointer-events-none"
-                            >
-                                <LoginBranding />
-                            </motion.div>
+                            {isLogin ? (
+                                <Suspense fallback={<div className="w-full h-40" />}>
+                                    <LoginBranding />
+                                </Suspense>
+                            ) : (
+                                <div className="w-full h-full opacity-20" />
+                            )}
                         </div>
-
-                        {/* Signup Branding Area */}
                         <div className="w-full lg:w-1/2 h-full flex items-center justify-center p-6 lg:p-10">
-                            <motion.div
-                                animate={{ opacity: !isLogin ? 1 : 0.1, filter: !isLogin ? 'blur(0px)' : 'blur(4px)' }}
-                                className="w-full pointer-events-none"
-                            >
-                                <SignupBranding />
-                            </motion.div>
+                            {!isLogin ? (
+                                <Suspense fallback={<div className="w-full h-40" />}>
+                                    <SignupBranding />
+                                </Suspense>
+                            ) : (
+                                <div className="w-full h-full opacity-20" />
+                            )}
                         </div>
                     </div>
 

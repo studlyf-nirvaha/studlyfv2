@@ -18,7 +18,17 @@ export interface Field {
     required: boolean;
     placeholder?: string;
     description?: string;
+    accept_types?: string[];
 }
+
+const FILE_TYPE_PRESETS: { label: string; types: string[] }[] = [
+    { label: 'PDF only', types: ['.pdf'] },
+    { label: 'PPT / PPTX', types: ['.ppt', '.pptx'] },
+    { label: 'Images (PNG/JPG)', types: ['.png', '.jpg', '.jpeg'] },
+    { label: 'PDF + PPT', types: ['.pdf', '.ppt', '.pptx'] },
+    { label: 'Documents', types: ['.pdf', '.doc', '.docx'] },
+    { label: 'ZIP archive', types: ['.zip'] },
+];
 
 interface FieldBuilderProps {
     fields: Field[];
@@ -40,7 +50,8 @@ const FieldBuilder: React.FC<FieldBuilderProps> = ({ fields, onUpdate }) => {
             label: `New ${type} field`,
             type,
             required: true,
-            placeholder: type === 'url' ? 'https://...' : ''
+            placeholder: type === 'url' ? 'https://...' : '',
+            accept_types: type === 'file' ? ['.pdf'] : undefined,
         };
         onUpdate([...fields, newField]);
     };
@@ -104,6 +115,26 @@ const FieldBuilder: React.FC<FieldBuilderProps> = ({ fields, onUpdate }) => {
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">Required</span>
                                     </label>
                                 </div>
+                                {field.type === 'file' && (
+                                    <div className="md:col-span-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Allowed file types</label>
+                                        <select
+                                            value={JSON.stringify(field.accept_types || ['.pdf'])}
+                                            onChange={(e) => {
+                                                try {
+                                                    updateField(field.id, { accept_types: JSON.parse(e.target.value) });
+                                                } catch { /* ignore */ }
+                                            }}
+                                            className="w-full px-3 py-1.5 bg-slate-50 border border-emerald-100 rounded-lg text-xs font-semibold text-slate-700"
+                                        >
+                                            {FILE_TYPE_PRESETS.map((preset) => (
+                                                <option key={preset.label} value={JSON.stringify(preset.types)}>
+                                                    {preset.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
 
                             <button 

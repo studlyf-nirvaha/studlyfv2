@@ -173,7 +173,7 @@ DEFAULT_TEMPLATES = {
         "name": "Submission Confirmation",
         "type": "submission_confirmation",
         "subject": "Submission Confirmed: {{round_name}} - {{event_title}}",
-        "placeholders": ["participant_name", "team_name", "event_title", "round_name", "submission_time"],
+        "placeholders": ["participant_name", "team_name", "event_title", "round_name", "submission_time", "action_url"],
         "is_default": True,
         "emoji": "🚀",
         "body_html": """<p style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b;">Hi <strong>{{participant_name}}</strong>,</p>
@@ -185,7 +185,10 @@ DEFAULT_TEMPLATES = {
         <tr><td style="padding: 4px 0; color: #6b7280;">Submitted At:</td><td style="padding: 4px 0; font-weight: 600;">{{submission_time}}</td></tr>
     </table>
 </div>
-<p style="margin: 0 0 24px 0; font-size: 14px; color: #475569;">You can review or update your submission details directly inside the Event Hub dashboard before the round closing window.</p>"""
+<p style="margin: 0 0 24px 0; font-size: 14px; color: #475569;">You can review or update your submission details directly inside the Event Hub dashboard before the round closing window.</p>
+<div style="text-align: center;">
+    <a href="{{action_url}}" style="background-color: #7C3AED; color: #ffffff; padding: 14px 28px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">View Submission</a>
+</div>"""
     },
     "winner_announcement": {
         "name": "Winner Announcement",

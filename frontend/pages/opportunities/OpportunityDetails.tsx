@@ -49,7 +49,7 @@ import SectionRenderer from '../../components/SectionRenderer';
 import { useRegistrationState } from '../../utils/useRegistrationState';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
 import { useAuth } from '../../AuthContext';
-import SubmissionForm from '../../components/opportunities/SubmissionForm';
+import StageSubmissionsPanel from '../../components/opportunities/StageSubmissionsPanel';
 import AvatarImage from '../../components/AvatarImage';
 import TeamManager from '../../components/opportunities/TeamManager';
 import {
@@ -273,8 +273,11 @@ const OpportunityDetails: React.FC = () => {
         return 'active';
     };
 
+    const isDedicatedTab = activeTab === 'submissions' || activeTab === 'team';
+    const needsRegistrationForm = !isDedicatedTab;
+
     useEffect(() => {
-        if (!id) return;
+        if (!id || isDedicatedTab) return;
         // Fetch live stats
         fetch(`${API_BASE_URL}/api/hackathons/events/${id}/stats`)
             .then(res => res.json())
@@ -307,7 +310,7 @@ const OpportunityDetails: React.FC = () => {
         } else {
             setEventLeaderboard([]);
         }
-    }, [id, opportunity?.title, opportunity?.name, opportunity?.location, opportunity?.venue, opportunity?.opportunity_title, opportunity?.opportunityName]);
+    }, [id, isDedicatedTab, opportunity?.title, opportunity?.name, opportunity?.location, opportunity?.venue, opportunity?.opportunity_title, opportunity?.opportunityName]);
 
     // Fetch user profile photo & gender for sidebar
     useEffect(() => {
@@ -375,7 +378,7 @@ const OpportunityDetails: React.FC = () => {
     }, [id]);
 
     useEffect(() => {
-        if (!opportunity?._id) return;
+        if (!opportunity?._id || isDedicatedTab) return;
         const t = opportunity.type || 'General';
         fetch(`${API_BASE_URL}/api/opportunities?type=${encodeURIComponent(t)}`)
             .then((r) => r.json())
@@ -384,27 +387,31 @@ const OpportunityDetails: React.FC = () => {
                 setRelated(list.filter((o: any) => String(o._id) !== String(id)).slice(0, 6));
             })
             .catch(() => setRelated([]));
-    }, [opportunity?._id, opportunity?.type, id]);
+    }, [opportunity?._id, opportunity?.type, id, isDedicatedTab]);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
+                const statsParam = isDedicatedTab ? '' : '&include_process_stats=true';
                 const oppUrl = user?.user_id
-                    ? `${API_BASE_URL}/api/opportunities/${id}?applicant_user_id=${encodeURIComponent(user.user_id)}`
-                    : `${API_BASE_URL}/api/opportunities/${id}`;
+                    ? `${API_BASE_URL}/api/opportunities/${id}?applicant_user_id=${encodeURIComponent(user.user_id)}${statsParam}`
+                    : `${API_BASE_URL}/api/opportunities/${id}${isDedicatedTab ? '' : '?include_process_stats=true'}`;
+                const fetchReviews = !isDedicatedTab;
                 const [oppRes, appRes, subRes, reviewsRes] = await Promise.all([
                     fetch(oppUrl, { headers: { ...authHeaders() } }),
-                    user
+                    user && !isDedicatedTab
                         ? fetch(`${API_BASE_URL}/api/opportunities/me/applications`, {
                               headers: { ...authHeaders() },
                           })
                         : Promise.resolve({ ok: false, json: async () => [] } as Response),
-                    user
+                    user && !isDedicatedTab
                         ? fetch(`${API_BASE_URL}/api/hackathons/my-submission/${id}`, {
                               headers: { ...authHeaders() },
                           })
                         : Promise.resolve({ ok: false, json: async () => ({ hasSubmitted: false }) } as Response),
-                    fetch(`${API_BASE_URL}/api/opportunities/${id}/reviews`)
+                    fetchReviews
+                        ? fetch(`${API_BASE_URL}/api/opportunities/${id}/reviews`)
+                        : Promise.resolve({ ok: false, json: async () => ({ reviews: [] }) } as Response),
                 ]);
 
                 const opp = await oppRes.json();
@@ -432,7 +439,12 @@ const OpportunityDetails: React.FC = () => {
                 if (!oppRes.ok) {
                     setOpportunity(null);
                 } else {
-                    if (opp.event_link_id) {
+                    const needsExternalLink =
+                        !isDedicatedTab &&
+                        opp.event_link_id &&
+                        !opp.external_registration_link &&
+                        !opp.externalRegistrationLink;
+                    if (needsExternalLink) {
                         try {
                             const evRes = await fetch(`${API_BASE_URL}/api/v1/events/${opp.event_link_id}`, { headers: { ...authHeaders() } });
                             if (evRes.ok) {
@@ -478,12 +490,7 @@ const OpportunityDetails: React.FC = () => {
         };
 
         fetchData();
-        
-        // Set up periodic refresh to check for stage updates
-        const refreshInterval = setInterval(fetchData, 30000); // Refresh every 30 seconds
-        
-        return () => clearInterval(refreshInterval);
-    }, [id, user?.user_id]);
+    }, [id, user?.user_id, isDedicatedTab]);
 
     // Keep the visible tab in sync with the `tab` URL parameter so Back/Forward preserves tab state
     useEffect(() => {
@@ -497,7 +504,7 @@ const OpportunityDetails: React.FC = () => {
     }, [location.search]);
 
     useEffect(() => {
-        if (!user || !eventId) return;
+        if (!user || !eventId || !needsRegistrationForm) return;
         
         setLoadingFields(true);
         fetch(`${API_BASE_URL}/api/v1/registration/events/${eventId}/form`, {
@@ -547,7 +554,7 @@ const OpportunityDetails: React.FC = () => {
         })
         .catch(err => console.error("Error loading registration form config:", err))
         .finally(() => setLoadingFields(false));
-    }, [user, eventId, isApplied]);
+    }, [user, eventId, needsRegistrationForm]);
 
     useEffect(() => {
         if (!formConfig?.fields_definitions || !userProfileData) return;
@@ -1422,59 +1429,15 @@ const OpportunityDetails: React.FC = () => {
                     </div>
                 ) : activeTab === 'submissions' && opportunity ? (
                     <div className="my-8">
-                        {eventId && submittableStages.length > 0 ? (
-                            <div className="space-y-8">
-                                {submittableStages.map((stage: any, idx: number) => {
-                                    // Determine lock status from participant data
-                                    const st = String(stage.type || '').toUpperCase();
-                                    const stageRegStatus = String(myApplication?.status || '').toLowerCase();
-                                    const pType = String(opportunity?.participationType || opportunity?.participation_type || '').toLowerCase();
-                                    const isSoloEvent = pType === 'individual' || pType === 'both';
-                                    const isSolo = !myApplication?.team_id || myApplication?.is_solo_participant === true;
-                                    const allowedStatuses = ['approved', 'shortlisted', 'accepted'];
-                                    if (isSoloEvent && isSolo) allowedStatuses.push('registered');
-                                    const isStageAuthorized = allowedStatuses.includes(stageRegStatus);
-
-                                    return (
-                                        <div key={stage.id || idx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                                                <div>
-                                                    <h3 className="text-lg font-black text-slate-900">{stage.name || stage.type || `Stage ${idx + 1}`}</h3>
-                                                    {stage.description && (
-                                                        <p className="text-sm text-slate-500 mt-0.5">{stage.description}</p>
-                                                    )}
-                                                </div>
-                                                <span className={`text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${
-                                                    isStageAuthorized
-                                                        ? 'bg-emerald-50 text-emerald-700'
-                                                        : 'bg-amber-50 text-amber-700'
-                                                }`}>
-                                                    {isStageAuthorized ? 'Open' : 'Locked'}
-                                                </span>
-                                            </div>
-                                            <div className="p-5">
-                                                {isStageAuthorized ? (
-                                                    <SubmissionForm eventId={eventId} stage={stage} participationType={opportunity?.participationType} />
-                                                ) : (
-                                                    <div className="bg-slate-50 rounded-xl p-6 text-center">
-                                                        <p className="text-sm font-bold text-slate-500">
-                                                            This stage is locked. You must be shortlisted or approved to proceed.
-                                                        </p>
-                                                        {stage.depends_on && stage.depends_on.length > 0 && (
-                                                            <p className="text-xs text-slate-400 mt-1">
-                                                                Complete the previous stages to unlock this one.
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                        {eventId ? (
+                            <StageSubmissionsPanel
+                                eventId={eventId}
+                                participationType={opportunity?.participationType || opportunity?.participation_type}
+                                stagesFromOpportunity={opportunity?.stages}
+                            />
                         ) : (
                             <div className="bg-white p-6 rounded-lg shadow-md text-slate-600">
-                                No submission stages configured for this event yet.
+                                Event data is still loading. Please refresh the page.
                             </div>
                         )}
                     </div>

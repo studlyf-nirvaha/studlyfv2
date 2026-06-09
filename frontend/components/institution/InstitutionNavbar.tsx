@@ -408,7 +408,7 @@ const InstitutionNavbar: React.FC<{ refreshKey?: number, onNavigate?: (tab: stri
                                                                     </p>
                                                                     <div className="flex items-center gap-2 mt-2">
                                                                         <Clock size={10} className="text-slate-300" />
-                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{n.time || 'Just now'}</p>
+                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{n.created_at ? new Date(n.created_at).toLocaleString() : 'Just now'}</p>
                                                                     </div>
                                                                 </div>
                                                             </div>

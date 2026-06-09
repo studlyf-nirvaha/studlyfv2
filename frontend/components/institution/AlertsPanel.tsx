@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Calendar, Star, Info, ChevronRight, Zap, Clock } from 'lucide-react';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
+import { useInstitutionEvents } from '../../hooks/useInstitutionEvents';
 
 interface AlertsPanelProps {
     institutionId?: string;
@@ -12,47 +13,38 @@ interface AlertsPanelProps {
 const AlertsPanel: React.FC<AlertsPanelProps> = ({ institutionId, onUpgrade }) => {
     const [activeTab, setActiveTab] = useState('upcoming');
     const [alerts, setAlerts] = useState<any[]>([]);
-    const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+    const { events: summaryEvents, loading: eventsLoading } = useInstitutionEvents(institutionId);
     const [loading, setLoading] = useState(true);
 
+    const upcomingEvents = React.useMemo(() => {
+        const now = new Date();
+        return summaryEvents
+            .filter((e) => new Date(e.start_date || e.created_at) >= now)
+            .sort((a, b) => new Date(a.start_date || a.created_at).getTime() - new Date(b.start_date || b.created_at).getTime())
+            .slice(0, 5);
+    }, [summaryEvents]);
+
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchNotifications = async () => {
             if (!institutionId) {
                 setAlerts([]);
-                setUpcomingEvents([]);
                 setLoading(false);
                 return;
             }
             try {
                 setLoading(true);
-                
-                // Fetch Notifications (What's New)
                 const notifRes = await fetch(`${API_BASE_URL}/api/v1/institution/notifications/${institutionId}`, { headers: { ...authHeaders() } });
                 if (notifRes.ok) {
                     const notifData = await notifRes.json();
                     setAlerts(Array.isArray(notifData) ? notifData : []);
                 }
-
-                // Fetch Events (Upcoming Activity)
-                const eventRes = await fetch(`${API_BASE_URL}/api/v1/institution/events/${institutionId}`, { headers: { ...authHeaders() } });
-                if (eventRes.ok) {
-                    const eventData = await eventRes.json();
-                    if (Array.isArray(eventData)) {
-                        const now = new Date();
-                        const upcoming = eventData
-                            .filter(e => new Date(e.start_date || e.created_at) >= now)
-                            .sort((a, b) => new Date(a.start_date || a.created_at).getTime() - new Date(b.start_date || b.created_at).getTime())
-                            .slice(0, 5);
-                        setUpcomingEvents(upcoming);
-                    }
-                }
             } catch (err) {
-                try { console.error("Failed to load alerts/events:", err instanceof Error ? err.message : String(err)); } catch (_) {}
+                try { console.error("Failed to load alerts:", err instanceof Error ? err.message : String(err)); } catch (_) {}
             } finally {
                 setLoading(false);
             }
         };
-        fetchData();
+        fetchNotifications();
     }, [institutionId]);
 
     const formatTime = (dateStr: string) => {
@@ -168,7 +160,9 @@ const AlertsPanel: React.FC<AlertsPanelProps> = ({ institutionId, onUpgrade }) =
                                             </div>
                                             <div className="flex-1">
                                                 <p className="text-sm font-bold text-slate-900 leading-snug group-hover:text-[#6C3BFF] transition-colors">{n.message || 'Notification'}</p>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{n.time || 'JUST NOW'}</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                                                    {n.created_at ? new Date(n.created_at).toLocaleString() : 'Just now'}
+                                                </p>
                                             </div>
                                         </div>
                                     </motion.div>

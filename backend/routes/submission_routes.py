@@ -327,14 +327,52 @@ async def admin_view_stage_submissions(
         if inst_id != calling_inst_id:
             raise HTTPException(status_code=403, detail="Permission denied")
         
-        # Get stage name from event stages
+        # Get stage name and field schema from event stages (admin-configured, dynamic)
         stage_name = ""
+        stage_fields = []
         stages = event.get("stages") or []
         for stage in stages:
             if stage.get("id") == stage_id or stage.get("name") == stage_id:
                 stage_name = stage.get("name", stage_id)
+                raw_fields = stage.get("fields") or (stage.get("config") or {}).get("fields") or []
+                try:
+                    from services.field_validation import normalize_stage_fields
+                    stage_fields = normalize_stage_fields(raw_fields)
+                except Exception:
+                    stage_fields = raw_fields
                 break
-        
+
+        def _format_labeled_data(data: dict) -> list:
+            if not isinstance(data, dict):
+                return []
+            labeled = []
+            used = set()
+            for f in stage_fields:
+                fid = str(f.get("field_id") or f.get("id") or "")
+                if not fid:
+                    continue
+                val = data.get(fid)
+                if val is None:
+                    continue
+                used.add(fid)
+                ftype = str(f.get("field_type") or f.get("type") or "text")
+                display = val
+                if ftype == "file" and isinstance(val, str) and val.startswith("data:"):
+                    display = "[File uploaded]"
+                elif isinstance(val, str) and len(val) > 200:
+                    display = val[:200] + "…"
+                labeled.append({
+                    "field_id": fid,
+                    "label": f.get("label") or fid,
+                    "type": ftype,
+                    "value": display,
+                })
+            for key, val in data.items():
+                if key in used or key == "team_display_name":
+                    continue
+                labeled.append({"field_id": key, "label": key.replace("_", " ").title(), "type": "text", "value": val})
+            return labeled
+
         # Fetch submissions for this stage
         query = {"event_id": str(event_id), "stage_id": stage_id}
         cursor = submissions_col.find(query).sort("submitted_at", -1)
@@ -346,6 +384,7 @@ async def admin_view_stage_submissions(
             
             participant_name = ""
             participant_email = ""
+            team = None
             
             if sub_team_id:
                 team = await teams_col.find_one({"_id": ObjectId(sub_team_id) if isinstance(sub_team_id, str) else sub_team_id})
@@ -355,13 +394,21 @@ async def admin_view_stage_submissions(
                 participant_name = (usr.get("full_name") or usr.get("name")) if usr else sub_user_id
                 participant_email = usr.get("email") if usr else ""
             
+            team_name = participant_name if sub_team_id else ""
+            if sub_team_id and team:
+                team_name = team.get("team_name") or team.get("name") or participant_name
+
             submissions.append({
                 "_id": str(sub.get("_id")),
                 "participant_name": participant_name,
                 "participant_email": participant_email,
+                "team_name": team_name,
                 "user_id": sub_user_id,
                 "team_id": sub_team_id,
+                "stage_id": stage_id,
+                "stage_name": stage_name or sub.get("stage_name"),
                 "data": sub.get("data") or {},
+                "labeled_data": _format_labeled_data(sub.get("data") or {}),
                 "status": sub.get("status"),
                 "submitted_at": sub.get("submitted_at"),
                 "last_updated_at": sub.get("last_updated_at") or sub.get("updated_at"),
@@ -375,6 +422,7 @@ async def admin_view_stage_submissions(
             "event_title": event.get("title"),
             "stage_id": stage_id,
             "stage_name": stage_name,
+            "stage_fields": stage_fields,
             "total_submissions": len(submissions),
             "submissions": submissions
         }

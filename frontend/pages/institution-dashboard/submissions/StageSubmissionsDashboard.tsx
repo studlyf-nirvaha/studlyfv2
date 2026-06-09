@@ -143,10 +143,10 @@ const StageSubmissionsDashboard: React.FC<StageSubmissionsDashboardProps> = ({ e
                                     onChange={toggleSelectAll}
                                 />
                             </th>
-                            <th className=\"px-6 py-4 font-bold text-slate-600\">Participant</th>
+                            <th className=\"px-6 py-4 font-bold text-slate-600\">Team / Participant</th>
                             <th className=\"px-6 py-4 font-bold text-slate-600\">Submitted</th>
-                            <th className=\"px-6 py-4 font-bold text-slate-600\">Evaluation</th>
-                            <th className=\"px-6 py-4 font-bold text-slate-600\">Data</th>
+                            <th className=\"px-6 py-4 font-bold text-slate-600\">Score</th>
+                            <th className=\"px-6 py-4 font-bold text-slate-600\">Submission fields</th>
                         </tr>
                     </thead>
                     <tbody className=\"divide-y divide-slate-100\">
@@ -160,7 +160,7 @@ const StageSubmissionsDashboard: React.FC<StageSubmissionsDashboardProps> = ({ e
                                     />
                                 </td>
                                 <td className=\"px-6 py-4\">
-                                    <div className=\"font-bold\">{sub.participant_name}</div>
+                                    <div className=\"font-bold\">{sub.team_name || sub.participant_name}</div>
                                     <div className=\"text-xs text-slate-400\">{sub.participant_email}</div>
                                 </td>
                                 <td className=\"px-6 py-4 text-xs text-slate-500\">
@@ -170,8 +170,20 @@ const StageSubmissionsDashboard: React.FC<StageSubmissionsDashboardProps> = ({ e
                                     {sub.evaluation_score || '-'}
                                 </td>
                                 <td className=\"px-6 py-4\">
-                                    <div className=\"text-xs text-slate-600 max-w-sm truncate\">
-                                        {JSON.stringify(sub.data)}
+                                    <div className=\"text-xs text-slate-600 max-w-md space-y-1\">
+                                        {(sub.labeled_data || []).length > 0
+                                            ? sub.labeled_data.map((row: any) => (
+                                                <div key={row.field_id}>
+                                                    <span className=\"font-bold text-slate-700\">{row.label}: </span>
+                                                    <span>{String(row.value ?? '—')}</span>
+                                                </div>
+                                            ))
+                                            : Object.entries(sub.data || {}).map(([k, v]) => (
+                                                <div key={k}>
+                                                    <span className=\"font-bold text-slate-700\">{k}: </span>
+                                                    <span className=\"truncate\">{typeof v === 'string' && v.startsWith('data:') ? '[File]' : String(v)}</span>
+                                                </div>
+                                            ))}
                                     </div>
                                 </td>
                             </tr>

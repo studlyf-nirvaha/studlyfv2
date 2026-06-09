@@ -1,38 +1,44 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '../../AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Info, ChevronRight, Zap, Clock } from 'lucide-react';
+import { Building2, Info, Loader2 } from 'lucide-react';
 import Sidebar from '../../components/institution/Sidebar';
-
-import InviteAudit from './InviteAudit';
 import InstitutionNavbar from '../../components/institution/InstitutionNavbar';
-import StatsSection from '../../components/institution/StatsSection';
-import RecentListings from '../../components/institution/RecentListings';
-import AlertsPanel from '../../components/institution/AlertsPanel';
-import PostOpportunityModal from '../../components/institution/PostOpportunityModal';
-import PostSelectionModal from '../../components/institution/PostSelectionModal';
-import ContactConsultationDrawer from '../../components/institution/ContactConsultationDrawer';
-import CreditBalanceModal from '../../components/institution/CreditBalanceModal';
-import DashboardTour from '../../components/institution/DashboardTour';
-import PostJobModal from '../../components/institution/PostJobModal';
-import PostInternshipModal from '../../components/institution/PostInternshipModal';
-
-import EventsManagement from './EventsManagement';
-import OpportunitiesManagement from './OpportunitiesManagement';
-import EventDetails from './EventDetails';
-import SettingsPage from './SettingsPage';
-import SubmissionList from './submissions/SubmissionList';
-import JudgeManagement from './JudgeManagement';
-import ParticipantsManagement from './ParticipantsManagement';
-import TeamsManagement from './TeamsManagement';
-import LeaderboardPage from './LeaderboardPage';
-import ReportsPage from './ReportsPage';
-import CertificatesPage from './CertificatesPage';
-import DownloadsPage from './DownloadsPage';
-import Footer from '../../components/institution/Footer';
 import { institutionIdFromUser, hasInstitutionScope } from '../../utils/institutionScope';
+
+const InviteAudit = lazy(() => import('./InviteAudit'));
+const StatsSection = lazy(() => import('../../components/institution/StatsSection'));
+const RecentListings = lazy(() => import('../../components/institution/RecentListings'));
+const AlertsPanel = lazy(() => import('../../components/institution/AlertsPanel'));
+const PostOpportunityModal = lazy(() => import('../../components/institution/PostOpportunityModal'));
+const PostSelectionModal = lazy(() => import('../../components/institution/PostSelectionModal'));
+const ContactConsultationDrawer = lazy(() => import('../../components/institution/ContactConsultationDrawer'));
+const CreditBalanceModal = lazy(() => import('../../components/institution/CreditBalanceModal'));
+const DashboardTour = lazy(() => import('../../components/institution/DashboardTour'));
+const PostJobModal = lazy(() => import('../../components/institution/PostJobModal'));
+const PostInternshipModal = lazy(() => import('../../components/institution/PostInternshipModal'));
+const EventsManagement = lazy(() => import('./EventsManagement'));
+const OpportunitiesManagement = lazy(() => import('./OpportunitiesManagement'));
+const EventDetails = lazy(() => import('./EventDetails'));
+const SettingsPage = lazy(() => import('./SettingsPage'));
+const SubmissionList = lazy(() => import('./submissions/SubmissionList'));
+const JudgeManagement = lazy(() => import('./JudgeManagement'));
+const ParticipantsManagement = lazy(() => import('./ParticipantsManagement'));
+const TeamsManagement = lazy(() => import('./TeamsManagement'));
+const LeaderboardPage = lazy(() => import('./LeaderboardPage'));
+const ReportsPage = lazy(() => import('./ReportsPage'));
+const CertificatesPage = lazy(() => import('./CertificatesPage'));
+const DownloadsPage = lazy(() => import('./DownloadsPage'));
+const Footer = lazy(() => import('../../components/institution/Footer'));
+
+const TabLoader = () => (
+    <div className="flex items-center justify-center py-24 text-slate-400">
+        <Loader2 className="animate-spin mr-2" size={24} />
+        Loading…
+    </div>
+);
 
 const InstitutionDashboard: React.FC = () => {
     const location = useLocation();
@@ -327,7 +333,7 @@ const InstitutionDashboard: React.FC = () => {
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
                             >
-                                {renderContent()}
+                                <Suspense fallback={<TabLoader />}>{renderContent()}</Suspense>
                             </motion.div>
                         </AnimatePresence>
                     </div>
