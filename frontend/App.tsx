@@ -565,17 +565,19 @@ const AppWrapper: React.FC = () => {
         <AuthProvider>
           <DashboardDataProvider>
             <ScrollToTop />
-            {showSplash ? (
-              <SplashScreen duration={2000} onFinish={handleSplashFinish} />
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6 }}
-              >
-                <App />
-              </motion.div>
-            )}
+            <Suspense fallback={null}>
+              {showSplash ? (
+                <SplashScreen duration={2000} onFinish={handleSplashFinish} />
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <App />
+                </motion.div>
+              )}
+            </Suspense>
           </DashboardDataProvider>
         </AuthProvider>
       </Router>

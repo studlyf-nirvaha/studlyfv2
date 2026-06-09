@@ -19,13 +19,13 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     build: {
-      emptyOutDir: false,
+      emptyOutDir: true,
       chunkSizeWarningLimit: 1000, 
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-                if (id.includes('react') || id.includes('react-dom')) return 'vendor_react';
+                if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('object-assign')) return 'vendor_react';
                 if (id.includes('react-router-dom') || id.includes('react-router')) return 'vendor_router';
                 if (id.includes('framer-motion')) return 'vendor_framer-motion';
                 if (id.includes('lucide-react') || id.includes('react-icons')) return 'vendor_icons';
