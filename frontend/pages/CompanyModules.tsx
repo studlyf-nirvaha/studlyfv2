@@ -105,9 +105,12 @@ const CompanyModules: React.FC = () => {
   // HR Simulator State
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [simActive, setSimActive] = useState(false);
-  const [simQuestionIndex, setSimQuestionIndex] = useState(0);
+  const [simSessionId, setSimSessionId] = useState<string | null>(null);
+  const [simFeedback, setSimFeedback] = useState<any>(null);
   const [simUserText, setSimUserText] = useState('');
   const [simSpeaking, setSimSpeaking] = useState(false);
+  const [isSimLoading, setIsSimLoading] = useState(false);
+  const [groqApiKey, setGroqApiKey] = useState(localStorage.getItem('groq_api_key') || '');
 
   // --- Resume Portfolio States ---
   const [portfolioData, setPortfolioData] = useState({
@@ -569,43 +572,100 @@ const CompanyModules: React.FC = () => {
   };
 
   // --- HR Simulator Flow ---
-  const launchHrSimulator = () => {
+  const launchHrSimulator = async () => {
+    if (!selectedCompany) return;
     setSimActive(true);
-    setChatMessages([
-      {
-        sender: 'ai',
-        text: `Welcome to the ${selectedCompany?.name || 'Google'} Placement Simulator. I am your HR calibration agent. Let's begin. Tell me about a time you had to resolve a severe team conflict?`
-      }
-    ]);
-    setSimQuestionIndex(0);
+    setSimFeedback(null);
+    setChatMessages([]);
+    setIsSimLoading(true);
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/company-simulator/start`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Groq-Api-Key': groqApiKey
+        },
+        body: JSON.stringify({ company_name: selectedCompany.name })
+      });
+      if (!res.ok) throw new Error('Failed to start simulator');
+      const data = await res.json();
+      setSimSessionId(data.session_id);
+      setChatMessages([{ sender: 'ai', text: data.response }]);
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to start simulator.');
+      setSimActive(false);
+    } finally {
+      setIsSimLoading(false);
+    }
   };
 
-  const handleSimSubmit = () => {
-    if (!simUserText.trim()) return;
+  const handleSimSubmit = async () => {
+    if (!simUserText.trim() || !selectedCompany || !simSessionId) return;
 
     const userMsg = simUserText;
+    const history = chatMessages.map(msg => ({ role: msg.sender === 'ai' ? 'assistant' : 'user', content: msg.text }));
+    
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
     setSimUserText('');
-
-    // Simulated Bot Speaking
     setSimSpeaking(true);
-    setTimeout(() => {
-      const answersList = [
-        `That shows good resilience. Now, why should we hire you over other highly qualified engineering candidates for ${selectedCompany?.name || 'our company'}?`,
-        `Fascinating metrics. Describe a time you made a technical error. What did you learn and how did you communicate it?`,
-        `Perfect. Our simulation run is complete. Based on our communication algorithms, your confidence matrix is exceptionally calibrated. Let's export your analytics to your portfolio.`
-      ];
 
-      const nextIdx = simQuestionIndex + 1;
-      if (nextIdx < answersList.length) {
-        setChatMessages(prev => [...prev, { sender: 'ai', text: answersList[simQuestionIndex] }]);
-        setSimQuestionIndex(nextIdx);
-      } else {
-        setChatMessages(prev => [...prev, { sender: 'ai', text: 'All simulation queries answered. I am generating your placement readiness report in the Progress tab.', completed: true }]);
-        setStreaks(prev => prev + 1);
-      }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/company-simulator/chat`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Groq-Api-Key': groqApiKey
+        },
+        body: JSON.stringify({
+          company_name: selectedCompany.name,
+          user_message: userMsg,
+          chat_history: history
+        })
+      });
+      if (!res.ok) throw new Error('Failed to get response');
+      const data = await res.json();
+      setChatMessages(prev => [...prev, { sender: 'ai', text: data.response }]);
+    } catch (err) {
+      console.error(err);
+      triggerToast('Chat request failed.');
+    } finally {
       setSimSpeaking(false);
-    }, 1500);
+    }
+  };
+
+  const endHrSimulator = async () => {
+    if (!selectedCompany || chatMessages.length < 2) {
+      setSimActive(false);
+      return;
+    }
+    setSimSpeaking(true);
+    
+    try {
+      const history = chatMessages.map(msg => ({ role: msg.sender === 'ai' ? 'assistant' : 'user', content: msg.text }));
+      const res = await fetch(`${API_BASE_URL}/api/company-simulator/feedback`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Groq-Api-Key': groqApiKey
+        },
+        body: JSON.stringify({
+          company_name: selectedCompany.name,
+          chat_history: history
+        })
+      });
+      if (!res.ok) throw new Error('Failed to fetch feedback');
+      const data = await res.json();
+      setSimFeedback(data.feedback);
+      triggerToast('Placement readiness report generated.');
+      setStreaks(prev => prev + 1);
+    } catch (err) {
+      console.error(err);
+      triggerToast('Failed to generate feedback.');
+    } finally {
+      setSimSpeaking(false);
+    }
   };
 
   // --- Tech Round Quiz Logic ---
@@ -1904,17 +1964,34 @@ const CompanyModules: React.FC = () => {
                         {!simActive ? (
                           <div className="flex flex-col items-center justify-center text-center py-20 bg-gray-50/80 border border-gray-200 rounded-[2.5rem]">
                             <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mb-8 shadow-2xl relative">
-                              <Bot className="w-12 h-12 text-white animate-pulse" />
+                              <Bot className={`w-12 h-12 text-white ${isSimLoading ? 'animate-spin' : 'animate-pulse'}`} />
                             </div>
                             <h3 className="text-3xl font-black mb-4">Initialize {selectedCompany.name} Calibration</h3>
                             <p className="text-sm text-slate-400 max-w-lg mb-8 leading-relaxed font-medium">
                               Our neural pipeline calibrates questions dynamically based on current tech openings and behavioral rubrics.
                             </p>
+                            
+                            <div className="mb-8 w-full max-w-md">
+                              <label className="block text-left text-xs font-bold text-slate-600 mb-2">Groq API Key</label>
+                              <input 
+                                type="password" 
+                                value={groqApiKey}
+                                onChange={(e) => {
+                                  setGroqApiKey(e.target.value);
+                                  localStorage.setItem('groq_api_key', e.target.value);
+                                }}
+                                placeholder="gsk_..."
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-purple-500 focus:outline-none bg-white shadow-sm"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-2 text-left">Required to run the Neural Placement Simulator.</p>
+                            </div>
+
                             <button
                               onClick={launchHrSimulator}
-                              className="px-12 py-5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.25em] shadow-xl shadow-purple-100/40"
+                              disabled={isSimLoading || !groqApiKey.trim()}
+                              className="px-12 py-5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.25em] shadow-xl shadow-purple-100/40 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Initialize Neural Round
+                              {isSimLoading ? 'Initializing...' : 'Initialize Neural Round'}
                             </button>
                           </div>
                         ) : (
@@ -1930,10 +2007,10 @@ const CompanyModules: React.FC = () => {
                                     key={i}
                                     className={`flex gap-3 max-w-[85%] ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`}
                                   >
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${msg.sender === 'user' ? 'bg-purple-100 text-purple-300' : 'bg-gray-100 text-slate-400 border border-gray-200'}`}>
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${msg.sender === 'user' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-slate-400 border border-gray-200'}`}>
                                       {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                                     </div>
-                                    <div className={`p-4 rounded-2xl text-xs font-semibold leading-relaxed ${msg.sender === 'user' ? 'bg-purple-100 text-purple-200 rounded-tr-none' : 'bg-gray-100/80 text-slate-600 rounded-tl-none border border-white/[0.02]'}`}>
+                                    <div className={`p-4 rounded-2xl text-xs font-semibold leading-relaxed ${msg.sender === 'user' ? 'bg-purple-100 text-purple-900 rounded-tr-none' : 'bg-white text-slate-600 rounded-tl-none border border-gray-200 shadow-sm'}`}>
                                       {msg.text}
                                     </div>
                                   </div>
@@ -1943,26 +2020,28 @@ const CompanyModules: React.FC = () => {
                                     <div className="w-8 h-8 rounded-xl bg-gray-100 text-slate-400 border border-gray-200 flex items-center justify-center">
                                       <Bot className="w-4 h-4 animate-spin" />
                                     </div>
-                                    <div className="p-4 bg-gray-100/40 text-slate-400 rounded-2xl text-xs rounded-tl-none">
-                                      Generating next neural prompt...
+                                    <div className="p-4 bg-white border border-gray-200 shadow-sm text-slate-400 rounded-2xl text-xs rounded-tl-none">
+                                      Thinking...
                                     </div>
                                   </div>
                                 )}
                               </div>
 
                               {/* Input typing text area */}
-                              <div className="p-4 border-t border-gray-200 bg-gray-100 flex gap-3">
+                              <div className="p-4 border-t border-gray-200 bg-white flex gap-3">
                                 <input
                                   type="text"
                                   value={simUserText}
                                   onChange={(e) => setSimUserText(e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && handleSimSubmit()}
-                                  placeholder="Type your response to the interviewer..."
-                                  className="w-full bg-gray-100 border border-gray-200 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-purple-500 text-slate-700"
+                                  disabled={simSpeaking || !!simFeedback}
+                                  placeholder={simFeedback ? "Interview completed" : "Type your response to the interviewer..."}
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-purple-500 text-slate-700 disabled:opacity-50"
                                 />
                                 <button
                                   onClick={handleSimSubmit}
-                                  className="px-6 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-black text-xs uppercase"
+                                  disabled={simSpeaking || !!simFeedback}
+                                  className="px-6 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-black text-xs uppercase disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   Send
                                 </button>
@@ -1970,34 +2049,90 @@ const CompanyModules: React.FC = () => {
                             </div>
 
                             {/* Scoring details sidebar */}
-                            <div className="bg-gray-50/80 border border-gray-200 p-6 lg:p-8 rounded-[2rem] flex flex-col justify-between h-[500px]">
-                              <div>
-                                <h4 className="text-lg font-bold text-slate-700 mb-6">Simulation Status</h4>
-                                <div className="space-y-4">
-                                  <div className="p-4 bg-gray-100 rounded-xl border border-gray-100">
-                                    <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Session Target</span>
-                                    <span className="text-xs font-black text-slate-600">{selectedCompany.name} HR Calibration</span>
+                            <div className="bg-gray-50/80 border border-gray-200 p-6 lg:p-8 rounded-[2rem] flex flex-col justify-between h-[500px] overflow-y-auto">
+                              {!simFeedback ? (
+                                <>
+                                  <div>
+                                    <h4 className="text-lg font-bold text-slate-700 mb-6">Simulation Status</h4>
+                                    <div className="space-y-4">
+                                      <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                        <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Session Target</span>
+                                        <span className="text-xs font-black text-slate-600">{selectedCompany.name} HR Calibration</span>
+                                      </div>
+                                      <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                        <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Session ID</span>
+                                        <span className="text-xs font-black text-slate-600 truncate block">{simSessionId || 'Initializing...'}</span>
+                                      </div>
+                                      <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                                        <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Interaction Count</span>
+                                        <span className="text-xs font-black text-purple-600">{Math.floor(chatMessages.length / 2)} Exchanges</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <div className="p-4 bg-gray-100 rounded-xl border border-gray-100">
-                                    <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Speech Delivery</span>
-                                    <span className="text-xs font-black text-slate-600">Continuous typing evaluation</span>
-                                  </div>
-                                  <div className="p-4 bg-gray-100 rounded-xl border border-gray-100">
-                                    <span className="text-[8px] uppercase tracking-widest text-slate-400 block mb-1">Completed Rounds</span>
-                                    <span className="text-xs font-black text-purple-400">{simQuestionIndex} / 3 Challenges</span>
-                                  </div>
-                                </div>
-                              </div>
 
-                              <button
-                                onClick={() => {
-                                  setSimActive(false);
-                                  setChatMessages([]);
-                                }}
-                                className="w-full py-4 bg-gray-100 border border-gray-200 hover:border-red-500/30 text-slate-400 hover:text-red-400 rounded-xl font-black text-xs uppercase transition-all"
-                              >
-                                Abort Simulation Run
-                              </button>
+                                  <div className="space-y-3">
+                                    <button
+                                      onClick={endHrSimulator}
+                                      disabled={chatMessages.length < 2 || simSpeaking}
+                                      className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-black text-xs uppercase transition-all shadow-lg shadow-purple-200 disabled:opacity-50"
+                                    >
+                                      End Interview & Evaluate
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSimActive(false);
+                                        setChatMessages([]);
+                                        setSimFeedback(null);
+                                      }}
+                                      className="w-full py-4 bg-white border border-gray-200 hover:border-red-500/30 text-slate-400 hover:text-red-400 rounded-xl font-black text-xs uppercase transition-all"
+                                    >
+                                      Abort Session
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="space-y-6">
+                                  <h4 className="text-lg font-bold text-slate-700">Interview Evaluation</h4>
+                                  
+                                  <div className="space-y-2">
+                                    <h5 className="text-[10px] font-black uppercase text-green-600">Strengths</h5>
+                                    <ul className="space-y-2">
+                                      {simFeedback.strengths?.map((s: string, i: number) => (
+                                        <li key={i} className="text-xs text-slate-600 bg-green-50 border border-green-100 p-2.5 rounded-xl">{s}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <h5 className="text-[10px] font-black uppercase text-red-600">Areas for Improvement</h5>
+                                    <ul className="space-y-2">
+                                      {simFeedback.weaknesses?.map((w: string, i: number) => (
+                                        <li key={i} className="text-xs text-slate-600 bg-red-50 border border-red-100 p-2.5 rounded-xl">{w}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <h5 className="text-[10px] font-black uppercase text-purple-600">Actionable Advice</h5>
+                                    <ul className="space-y-2">
+                                      {simFeedback.improvements?.map((imp: string, i: number) => (
+                                        <li key={i} className="text-xs text-slate-600 bg-purple-50 border border-purple-100 p-2.5 rounded-xl">{imp}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <button
+                                    onClick={() => {
+                                      setSimActive(false);
+                                      setChatMessages([]);
+                                      setSimFeedback(null);
+                                    }}
+                                    className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-slate-700 rounded-xl font-black text-xs uppercase transition-all"
+                                  >
+                                    Close Report
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                           </div>
