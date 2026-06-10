@@ -10,6 +10,7 @@ import {
   Briefcase, GraduationCap, LayoutDashboard, BrainCircuit, Play, Globe, X
 } from 'lucide-react';
 import { GENERATIVE_AI_CURRICULUM } from '../data/courseCurriculum';
+import { AI_AUTOMATION_CURRICULUM } from '../data/aiAutomationCurriculum';
 import DashboardFooter from '../components/DashboardFooter';
 
 interface Course {
@@ -133,6 +134,7 @@ const CourseDetail: React.FC = () => {
 
   const extractCourseId = (slug: string | undefined) => {
     if (!slug) return '';
+    // If slug contains '--', the part after the last '--' is the course ID used in our data
     const parts = slug.split('--');
     return parts.length > 1 ? parts[parts.length - 1] : slug;
   };
@@ -150,11 +152,15 @@ const CourseDetail: React.FC = () => {
         setCourse(foundCourse);
 
         try {
-          // Force use of the rich curriculum instead of the backend's dummy data
-          setCourseModules(GENERATIVE_AI_CURRICULUM);
-        } catch (modErr) {
-          setCourseModules(GENERATIVE_AI_CURRICULUM);
-        }
+          // Load curriculum based on the specific course slug
+          if (foundCourse._id === 'ai-automation-mastery') {
+            // Import a dedicated curriculum for this course (fallback to generic if not available)
+            import('../data/aiAutomationCurriculum')
+              .then(mod => setCourseModules(mod.AI_AUTOMATION_CURRICULUM))
+              .catch(() => setCourseModules(GENERATIVE_AI_CURRICULUM));
+          } else {
+            setCourseModules(GENERATIVE_AI_CURRICULUM);
+          }
 
         if (userId) {
           const stateRes = await fetch(`${API_BASE_URL}/api/user-courses/${userId}`);
