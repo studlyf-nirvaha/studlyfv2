@@ -776,17 +776,19 @@ const CompanyModules: React.FC = () => {
                     <h3 className="text-2xl font-bold text-slate-800 group-hover:text-purple-400 transition-colors mb-2">{comp.name}</h3>
                     <p className="text-xs text-slate-400 mb-6 font-semibold">{comp.industry}</p>
 
-                    {/* Progress Bar */}
-                    <div className="space-y-3 mb-6">
-                      <div className="flex justify-between text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        <span>Preparation Complete</span>
-                        <span>{comp.completion}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden border border-gray-100">
-                        <div
-                          className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                          style={{ width: `${comp.completion}%` }}
-                        />
+                    {/* Status Indicator */}
+                    <div className="mb-6">
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        comp.completion === 100 
+                          ? 'bg-green-100/50 text-green-600 border border-green-200' 
+                          : comp.completion === 0 
+                            ? 'bg-gray-100/50 text-slate-500 border border-gray-200'
+                            : 'bg-purple-100/50 text-purple-600 border border-purple-200'
+                      }`}>
+                        {comp.completion === 100 && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                        {comp.completion > 0 && comp.completion < 100 && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />}
+                        {comp.completion === 0 && <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />}
+                        {comp.completion === 100 ? 'Completed' : comp.completion === 0 ? 'Not Started' : 'In Progress'}
                       </div>
                     </div>
 
@@ -872,14 +874,19 @@ const CompanyModules: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Micro Progress Tracker Ring */}
+                {/* Status Indicator */}
                 <div className="bg-[#130E26]/80 p-4 rounded-2xl border border-gray-100">
-                  <div className="flex justify-between text-[9px] uppercase font-black text-slate-400 mb-2">
-                    <span>Gate Readiness</span>
-                    <span>{selectedCompany.completion}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden border border-gray-100">
-                    <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse" style={{ width: `${selectedCompany.completion}%` }} />
+                  <div className="flex justify-between items-center text-[9px] uppercase font-black text-slate-400">
+                    <span>Gate Status</span>
+                    <span className={`px-2 py-0.5 rounded border ${
+                      selectedCompany.completion === 100 
+                        ? 'bg-green-950 text-green-400 border-green-500/30' 
+                        : selectedCompany.completion === 0 
+                          ? 'bg-gray-800 text-slate-300 border-gray-600'
+                          : 'bg-purple-950 text-purple-400 border-purple-500/30'
+                    }`}>
+                      {selectedCompany.completion === 100 ? 'Completed' : selectedCompany.completion === 0 ? 'Not Started' : 'In Progress'}
+                    </span>
                   </div>
                 </div>
 
