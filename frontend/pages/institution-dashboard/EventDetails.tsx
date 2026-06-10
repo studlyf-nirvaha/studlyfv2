@@ -958,14 +958,13 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify(payload),
         });
-        if (res.ok) {
-            setEvent((prev) => (prev ? { ...prev, evaluation_thresholds: payload.evaluation_thresholds } : prev));
-            applyEvaluationThresholds(payload.evaluation_thresholds);
-            if (eventId) invalidateEventDetailsCache(eventId);
-            setShowSaveSuccess(true);
-            setTimeout(() => setShowSaveSuccess(false), 2000);
-            fetchBundle();
-        } else {
+            if (res.ok) {
+                setEvent((prev) => (prev ? { ...prev, evaluation_thresholds: payload.evaluation_thresholds } : prev));
+                applyEvaluationThresholds(payload.evaluation_thresholds);
+                if (eventId) invalidateEventDetailsCache(eventId);
+                setShowSaveSuccess(true);
+                setTimeout(() => setShowSaveSuccess(false), 2000);
+            } else {
             const err = await res.json().catch(() => ({}));
             alert(err?.detail || 'Failed to save thresholds');
         }
@@ -1201,6 +1200,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 setEvent(prev => prev ? { ...prev, judging_criteria: criteria } : prev);
                 setHasUnsavedChanges(false);
                 setShowSaveSuccess(true);
+                if (eventId) invalidateEventDetailsCache(eventId);
             } else {
                 const err = await res.json().catch(() => ({}));
                 alert(`Failed to save rubrics: ${err.detail || 'Unknown error'}`);
@@ -1270,21 +1270,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 setEvent(updatedEvent);
                 setHasUnsavedChanges(false);
                 setShowSaveSuccess(true);
-                
-                // Background sync - update all opportunities without blocking UI
-                console.log('DIRECT SYNC: Triggering background synchronization for event:', eventId);
-                fetch(`${API_BASE_URL}/api/direct-sync/force-update/${eventId}`, {
-                    method: 'POST',
-                    headers: { ...authHeaders() }
-                }).then(syncRes => {
-                    if (syncRes.ok) {
-                        console.log('DIRECT SYNC: Background sync successful');
-                    } else {
-                        console.error('DIRECT SYNC: Background sync failed');
-                    }
-                }).catch(syncErr => {
-                    console.error('DIRECT SYNC: Background network error:', syncErr);
-                });
+                if (eventId) invalidateEventDetailsCache(eventId);
             } else {
                 const errorData = await res.json().catch(() => ({}));
                 alert(`Failed to save event: ${errorData.detail || 'Unknown error'}`);
@@ -5774,13 +5760,28 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                                 }
                                             }
                                             const fieldEntries = Object.entries(subData).filter(
-                                                ([k, v]) => typeof v === 'string' && v.trim()
+                                                ([k, v]) => (typeof v === 'string' && v.trim()) || (typeof v === 'object' && v && (v as any)._stored_file)
                                             );
                                             return (
                                                 <div className="divide-y divide-slate-100">
                                                     {fieldEntries.map(([key, value]) => {
                                                         const label = fieldConfigs[key]?.label || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                                                        if (value.startsWith('data:')) {
+                                                        if (typeof value === 'object' && value && (value as any)._stored_file) {
+                                                            const f = value as any;
+                                                            const ext = (f.filename || '').split('.').pop()?.toUpperCase() || 'FILE';
+                                                            const isPdf = (f.mime || '').includes('pdf') || ext === 'PDF';
+                                                            const isPpt = (f.mime || '').includes('presentation') || ext === 'PPT' || ext === 'PPTX';
+                                                            return (
+                                                                <div key={key} className="py-3 first:pt-0 last:pb-0">
+                                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</span>
+                                                                    <a href={f.url || '#'} target={f.url ? '_blank' : undefined} rel="noreferrer"
+                                                                        className="flex items-center gap-2 text-xs font-bold text-purple-600 hover:text-purple-800">
+                                                                        <FileText size={14} /> {isPdf ? 'View PDF' : isPpt ? 'View PPT' : f.filename || 'View File'}
+                                                                    </a>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        if (typeof value === 'string' && value.startsWith('data:')) {
                                                             const mime = value.split(';')[0].split(':')[1] || '';
                                                             const ext = mime.includes('pdf') ? '.pdf' : mime.includes('presentation') ? '.pptx' : mime.includes('image') ? '.png' : '.file';
                                                             return (
@@ -5793,7 +5794,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                                                 </div>
                                                             );
                                                         }
-                                                        if (value.startsWith('http://') || value.startsWith('https://')) {
+                                                        if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
                                                             return (
                                                                 <div key={key} className="py-3 first:pt-0 last:pb-0">
                                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">{label}</span>

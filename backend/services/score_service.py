@@ -27,21 +27,21 @@ async def submit_score(submission_id: str, judge_id: str, scores: dict, comments
         upsert=True
     )
     
-    # Update submission with the score
+    # Update submission with the score — only update the collection that actually has this document
     if team_id:
-        # Also update submission_data_col for stage deliverables
         try:
             from db import submission_data_col
             await submission_data_col.update_one(
                 {"_id": ObjectId(submission_id)},
-                {"$set": {"total_score": rubric_sum, "status": "Evaluated"}}
+                {"$set": {"total_score": rubric_sum, "status": "Evaluated", "assigned_judge_id": judge_id}}
             )
         except Exception:
             pass
-    await submissions_col.update_one(
-        {"_id": ObjectId(submission_id)},
-        {"$set": {"status": "Reviewed"}}
-    )
+    else:
+        await submissions_col.update_one(
+            {"_id": ObjectId(submission_id)},
+            {"$set": {"status": "Reviewed", "total_score": rubric_sum, "assigned_judge_id": judge_id}}
+        )
     
     # Retrieve the document to return the _id
     score_doc = await scores_col.find_one(

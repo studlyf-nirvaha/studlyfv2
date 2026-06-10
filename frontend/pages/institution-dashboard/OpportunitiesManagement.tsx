@@ -113,10 +113,10 @@ const mapSummaryToEvents = (data: any[]) => data
         if (rawStatus === 'live' || rawStatus === 'published' || rawStatus === 'active') displayStatus = 'Live';
         else if (rawStatus === 'completed') displayStatus = 'Completed';
         else if (rawStatus === 'upcoming') displayStatus = 'Upcoming';
-        const createdAt = e.created_at || e.createdAt;
+        const updatedAt = e.updated_at || e.updatedAt || e.created_at || e.createdAt;
         let lastSaved = 'Unknown';
-        if (createdAt) {
-            const diff = Date.now() - new Date(createdAt).getTime();
+        if (updatedAt) {
+            const diff = Date.now() - new Date(updatedAt).getTime();
             const mins = Math.floor(diff / 60000);
             const hrs = Math.floor(diff / 3600000);
             const days = Math.floor(diff / 86400000);

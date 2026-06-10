@@ -85,7 +85,7 @@ logger = logging.getLogger("main_service")
 
 # Configure CORS - Restricted to specific domains for security
 # Load allowed origins from environment or use defaults
-frontend_url = os.getenv("FRONTEND_URL", "")
+frontend_url = os.getenv("FRONTEND_URL", "https://studlyf-v2.vercel.app")
 backend_url = os.getenv("RENDER_EXTERNAL_URL", "")
 additional_origins = [origin.strip() for origin in os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",") if origin.strip()]
 
@@ -108,7 +108,7 @@ if os.getenv("ENVIRONMENT", "development").lower() == "development":
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:4173",
-        "http://127.0.0.1:4173",
+        "http://localhost:4173",
         "http://localhost:8000"
     ])
 
@@ -117,7 +117,7 @@ origins = [origin for origin in origins if origin]
 # Remove duplicates
 origins = list(set(origins))
 
-origin_regex = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):(3000|3001|3002|3003|5173|4173|8000)$"
+origin_regex = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):(3000|3001|3002|3003|5173|4173|8000)$|^https://[a-zA-Z0-9-]+\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,

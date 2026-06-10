@@ -1316,33 +1316,32 @@ async def get_qualified_bundle(
         if doc.get("submittedBy"):
             user_ids.add(str(doc.get("submittedBy")))
 
+    # Bulk-fetch teams instead of N+1 per team_id
     team_lookup = {}
-    for tid in team_ids:
-        team_doc = None
-        try:
-            if ObjectId.is_valid(tid):
-                team_doc = await teams_col.find_one({"_id": ObjectId(tid)})
-        except Exception:
-            team_doc = None
-        if not team_doc:
-            team_doc = await teams_col.find_one({"team_id": tid})
-        if team_doc:
-            team_lookup[tid] = team_doc
+    if team_ids:
+        valid_tids = [tid for tid in team_ids if ObjectId.is_valid(tid)]
+        if valid_tids:
+            oid_tids = [ObjectId(t) for t in valid_tids]
+            for td in await teams_col.find({"_id": {"$in": oid_tids}}).to_list(length=len(valid_tids)):
+                team_lookup[str(td["_id"])] = td
+        for tid in team_ids:
+            if tid not in team_lookup:
+                td = await teams_col.find_one({"team_id": tid})
+                if td:
+                    team_lookup[tid] = td
 
+    # Bulk-fetch users instead of N+1 per user_id
     user_lookup = {}
-    for uid in user_ids:
-        user_doc = None
-        try:
-            user_doc = await users_col.find_one({"user_id": uid})
-        except Exception:
-            user_doc = None
-        if not user_doc and ObjectId.is_valid(uid):
-            try:
-                user_doc = await users_col.find_one({"_id": ObjectId(uid)})
-            except Exception:
-                user_doc = None
-        if user_doc:
-            user_lookup[uid] = user_doc
+    if user_ids:
+        for uid in user_ids:
+            ud = await users_col.find_one({"user_id": uid})
+            if not ud and ObjectId.is_valid(uid):
+                try:
+                    ud = await users_col.find_one({"_id": ObjectId(uid)})
+                except Exception:
+                    pass
+            if ud:
+                user_lookup[uid] = ud
 
     def _collect_member_emails(team_id_value: str | None, user_id_value: str | None = None) -> list[str]:
         emails: list[str] = []
@@ -1396,54 +1395,6 @@ async def get_qualified_bundle(
             _push(user_id_value)
 
         return user_ids
-
-    # Build small lookup tables so the bundle can render names instead of IDs.
-    user_ids = set()
-    team_ids = set()
-    for doc in raw_subs:
-        if doc.get("user_id"):
-            user_ids.add(str(doc.get("user_id")))
-        if doc.get("submittedBy"):
-            user_ids.add(str(doc.get("submittedBy")))
-        if doc.get("team_id"):
-            team_ids.add(str(doc.get("team_id")))
-    for doc in raw_sd:
-        if doc.get("user_id"):
-            user_ids.add(str(doc.get("user_id")))
-        if doc.get("submittedBy"):
-            user_ids.add(str(doc.get("submittedBy")))
-        if doc.get("team_id"):
-            team_ids.add(str(doc.get("team_id")))
-
-    user_lookup = {}
-    for uid in user_ids:
-        user_doc = None
-        try:
-            user_doc = await users_col.find_one({"user_id": uid})
-        except Exception:
-            user_doc = None
-        if not user_doc and ObjectId.is_valid(uid):
-            try:
-                user_doc = await users_col.find_one({"_id": ObjectId(uid)})
-            except Exception:
-                user_doc = None
-        if user_doc:
-            user_lookup[uid] = user_doc
-
-    team_lookup = {}
-    for tid in team_ids:
-        team_doc = None
-        try:
-            team_doc = await teams_col.find_one({"_id": ObjectId(tid)})
-        except Exception:
-            team_doc = None
-        if not team_doc:
-            try:
-                team_doc = await teams_col.find_one({"team_id": tid})
-            except Exception:
-                team_doc = None
-        if team_doc:
-            team_lookup[tid] = team_doc
 
     def _resolve_candidate_name(doc: dict, fallback: str) -> str:
         candidates = [
@@ -4122,6 +4073,7 @@ async def update_event_details(event_id: str, update_data: dict, user: dict = De
             update_data["banner_url"] = payload_banner
             update_data["bannerUrl"] = payload_banner
 
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await events_col.update_one(_event_id_query(event_id), {"$set": update_data})
     
     # Sync stage config pass_mark to linked quiz documents
@@ -4775,6 +4727,74 @@ async def update_judging_criteria(event_id: str, request: Request, user: dict = 
     if isinstance(thresholds, dict):
         update_doc["evaluation_thresholds"] = thresholds
     await events_col.update_one({"_id": ObjectId(event_id)}, {"$set": update_doc})
+
+    # ── Auto-classify submissions based on thresholds ──
+    if isinstance(thresholds, dict) and criteria_data:
+        try:
+            shortlist_min = float(thresholds.get("shortlist_min", 80))
+            waitlist_min = float(thresholds.get("waitlist_min", max(shortlist_min * 0.75, shortlist_min - 15)))
+            reject_below = float(thresholds.get("reject_below", waitlist_min))
+            max_possible = sum(float(c.get("max_points") or 10) for c in criteria_data) or 100.0
+
+            event_id_variants = await collect_event_id_variants(event_id)
+            event_id_in: list = list(event_id_variants)
+            for vid in list(event_id_variants):
+                if ObjectId.is_valid(vid):
+                    try:
+                        event_id_in.append(ObjectId(vid))
+                    except Exception:
+                        pass
+
+            raw_scores = await scores_col.find({"event_id": {"$in": event_id_in}}).to_list(length=10000)
+
+            # Average scores per submission
+            scores_by_sub: dict[str, list[float]] = {}
+            for sc in raw_scores:
+                sid = str(sc.get("submission_id") or "")
+                if not sid:
+                    continue
+                scores_by_sub.setdefault(sid, []).append(_score_sum(sc))
+
+            now = datetime.utcnow()
+
+            def _classify_and_update(coll, query_filter, sub_doc):
+                sid = str(sub_doc["_id"])
+                score_list = scores_by_sub.get(sid, [])
+                if not score_list:
+                    return
+                avg_score = sum(score_list) / len(score_list)
+                if avg_score <= 0:
+                    return
+                pct = round((avg_score / max_possible) * 100, 1) if max_possible > 0 else avg_score
+
+                if pct >= shortlist_min:
+                    new_status = "Shortlisted"
+                elif pct >= waitlist_min:
+                    new_status = "Waitlisted"
+                elif pct < reject_below:
+                    new_status = "Rejected"
+                else:
+                    new_status = "Pending Review"
+
+                if str(sub_doc.get("status") or "") != new_status:
+                    return coll.update_one(
+                        query_filter,
+                        {"$set": {"status": new_status, "auto_classified": True, "classified_at": now}},
+                    )
+
+            # Classify submissions_col
+            raw_subs = await submissions_col.find({"event_id": {"$in": event_id_in}}).to_list(length=10000)
+            for sub in raw_subs:
+                await _classify_and_update(submissions_col, {"_id": sub["_id"]}, sub)
+
+            # Classify submission_data_col
+            raw_sd = await submission_data_col.find({"event_id": {"$in": event_id_in}}).to_list(length=10000)
+            for sd in raw_sd:
+                await _classify_and_update(submission_data_col, {"_id": sd["_id"]}, sd)
+
+        except Exception as e:
+            print(f"[ERROR] Auto-classification failed for event {event_id}: {e}")
+
     return {"status": "success"}
 
 

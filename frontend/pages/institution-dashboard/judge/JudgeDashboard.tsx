@@ -426,6 +426,61 @@ const JudgeDashboard: React.FC = () => {
                                                 )}
                                             </div>
                                         </div>
+                                        {/* Deliverable Files */}
+                                        {(() => {
+                                            const subData = selectedAssignment.data || {};
+                                            const fileEntries = Object.entries(subData).filter(([_, v]) =>
+                                                (typeof v === 'object' && v && (v as any)._stored_file) ||
+                                                (typeof v === 'string' && (v.startsWith('data:') || v.startsWith('http://') || v.startsWith('https://')) && !(v.includes('github.com') || v.includes('youtube.com') || v.includes('vimeo.com') || v.includes('drive.google.com')))
+                                            );
+                                            if (fileEntries.length === 0) return null;
+                                            return (
+                                                <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-3">
+                                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Deliverable Files</p>
+                                                    <div className="space-y-2">
+                                                        {fileEntries.map(([key, value]) => {
+                                                            const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                                                            if (typeof value === 'object' && value && (value as any)._stored_file) {
+                                                                const f = value as any;
+                                                                const ext = (f.filename || '').split('.').pop()?.toUpperCase() || 'FILE';
+                                                                const isPdf = (f.mime || '').includes('pdf') || ext === 'PDF';
+                                                                const isPpt = (f.mime || '').includes('presentation') || ext === 'PPT' || ext === 'PPTX';
+                                                                return (
+                                                                    <a key={key} href={f.url || '#'}
+                                                                        target={f.url ? '_blank' : undefined}
+                                                                        rel="noreferrer"
+                                                                        className="flex items-center gap-3 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors">
+                                                                        <FileText size={16} />
+                                                                        {isPdf ? 'View PDF' : isPpt ? 'View PPT' : f.filename || 'View File'}
+                                                                    </a>
+                                                                );
+                                                            }
+                                                            if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
+                                                                return (
+                                                                    <a key={key} href={value} target="_blank" rel="noreferrer"
+                                                                        className="flex items-center gap-3 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors">
+                                                                        <ExternalLink size={16} /> {label}
+                                                                    </a>
+                                                                );
+                                                            }
+                                                            if (typeof value === 'string' && value.startsWith('data:')) {
+                                                                const mime = value.split(';')[0].split(':')[1] || '';
+                                                                const isPdf = mime.includes('pdf');
+                                                                const isPpt = mime.includes('presentation');
+                                                                return (
+                                                                    <button key={key} onClick={() => window.open(value, '_blank')}
+                                                                        className="flex items-center gap-3 text-xs font-bold text-purple-400 hover:text-purple-300 transition-colors">
+                                                                        <FileText size={16} />
+                                                                        {isPdf ? 'View PDF' : isPpt ? 'View PPT' : 'View File'}
+                                                                    </button>
+                                                                );
+                                                            }
+                                                            return null;
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                         <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-3">
                                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Phase</p>
                                             <div className="flex items-center gap-2 text-white font-black text-sm">
