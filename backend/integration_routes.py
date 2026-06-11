@@ -1320,7 +1320,10 @@ async def get_qualified_bundle(
 
     stage_filter = str(stage_id).strip() if stage_id else ""
     raw_subs = await submissions_col.find({"event_id": {"$in": event_id_in}}).to_list(length=10000)
-    raw_scores = await scores_col.find({"event_id": {"$in": event_id_in}}).to_list(length=10000)
+    score_query: dict = {"event_id": {"$in": event_id_in}}
+    if stage_filter:
+        score_query["stage_id"] = stage_filter
+    raw_scores = await scores_col.find(score_query).to_list(length=10000)
     sd_query: dict = {"event_id": {"$in": event_id_in}}
     if stage_filter:
         sd_query["stage_id"] = stage_filter
@@ -1575,6 +1578,10 @@ async def get_qualified_bundle(
 
     shortlisted, approved, rejected, pending, waitlisted = [], [], [], [], []
     for sid, item in all_items.items():
+        # When filtering by a specific stage, skip items that aren't linked to that stage
+        # (legacy submissions_col items don't have stage_id, only submission_data_col items do)
+        if stage_filter and not item.get("stage_id"):
+            continue
         item_judges = score_judges_by_submission.get(sid, set())
         assigned = item.get("assigned_judges") or []
         item["judges_completed"] = len(item_judges)

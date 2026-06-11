@@ -812,11 +812,12 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         return () => { cancelled = true; };
     }, [eventId, activeTab, user]);
 
-    const fetchBundle = async (tVal: number) => {
-        console.log('[BUNDLE] fetchBundle called', { eventId, activeTab, tVal });
+    const fetchBundle = async (tVal: number, stageId?: string) => {
+        console.log('[BUNDLE] fetchBundle called', { eventId, activeTab, tVal, stageId });
         if (!eventId || activeTab !== 'submissions') { console.log('[BUNDLE] Skipped:', { eventId, activeTab }); return; }
         try {
-            const url = `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?threshold=${tVal}`;
+            let url = `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?threshold=${tVal}`;
+            if (stageId) url += `&stage_id=${encodeURIComponent(stageId)}`;
             console.log('[BUNDLE] Fetching:', url);
             const res = await fetch(url, {
                 headers: { ...authHeaders() }
@@ -937,9 +938,14 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
 
     useEffect(() => {
         if (eventId && activeTab === 'submissions') {
-            fetchBundle(debouncedThreshold);
+            const stageId = submissionSubTab === 'projects'
+                ? (selectedProjectStageId || undefined)
+                : submissionSubTab === 'assessments'
+                    ? (selectedSubTabQuizStageId || undefined)
+                    : undefined;
+            fetchBundle(debouncedThreshold, stageId);
         }
-    }, [eventId, activeTab, debouncedThreshold, refreshCounter]);
+    }, [eventId, activeTab, debouncedThreshold, refreshCounter, submissionSubTab, selectedProjectStageId, selectedSubTabQuizStageId]);
 
     useEffect(() => {
         if (activeTab !== 'assessments' || !eventId || quizzes.length === 0) return;
@@ -1622,7 +1628,12 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 setIsBulkMode(false);
                 // Refresh submissions
                 setRefreshCounter(prev => prev + 1);
-                fetchBundle(debouncedThreshold);
+                const currentStageId = submissionSubTab === 'projects'
+                    ? (selectedProjectStageId || undefined)
+                    : submissionSubTab === 'assessments'
+                        ? (selectedSubTabQuizStageId || undefined)
+                        : undefined;
+                fetchBundle(debouncedThreshold, currentStageId);
             } else {
                 const error = await res.json();
                 alert(error.detail || 'Failed to assign judge');
@@ -1782,6 +1793,17 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
 
     type SubmissionAsset = { type: 'file' | 'link'; url: string; mime?: string; domain?: string };
 
+    const dataUriToBlobUrl = (dataUri: string): string => {
+        try {
+            const [meta, b64] = dataUri.split(',');
+            const mime = meta.split(':')[1]?.split(';')[0] || '';
+            const raw = atob(b64);
+            const buf = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+            return URL.createObjectURL(new Blob([buf], { type: mime }));
+        } catch { return dataUri; }
+    };
+
     const collectSubmissionAssets = (sub: any, activeStage: any): SubmissionAsset[] => {
         const assets: SubmissionAsset[] = [];
         const seenUrls = new Set<string>();
@@ -1795,6 +1817,17 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 let domain = '';
                 try { domain = new URL(value).hostname; } catch { /* ignore */ }
                 assets.push({ type: 'link', url: value, domain });
+            } else if (value.startsWith('/api/')) {
+                const ext = value.match(/\.(\w+)(?:\?.*)?$/)?.[1]?.toLowerCase();
+                const extMime: Record<string, string> = {
+                    pdf: 'application/pdf',
+                    ppt: 'application/vnd.ms-powerpoint',
+                    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                    doc: 'application/msword',
+                    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+                };
+                assets.push({ type: 'file', url: value, mime: (ext && extMime[ext]) || '' });
             }
         };
 
@@ -1894,7 +1927,12 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                         <button
                             key={ai}
                             type="button"
-                            onClick={() => setPreviewAsset({ url: asset.url, filename: `Attachment.${(asset.mime || '').split('/')[1] || 'bin'}`, type: 'file' })}
+                            onClick={() => {
+                                const ext = asset.mime
+                                    ? (asset.mime.split('/')[1] || 'bin')
+                                    : (asset.url.match(/\.(\w+)(?:\?.*)?$/)?.[1] || 'bin');
+                                setPreviewAsset({ url: asset.url, filename: `Attachment.${ext}`, type: 'file' });
+                            }}
                             className="flex items-center gap-2 justify-center px-3 h-9 bg-amber-50 text-amber-600 rounded-xl border border-amber-100 hover:bg-amber-100 transition-colors cursor-pointer text-xs font-bold whitespace-nowrap"
                         >
                             {icon} {asset.mime?.includes('pdf') ? 'PDF' : asset.mime?.includes('presentation') ? 'PPT' : 'File'}
@@ -2466,7 +2504,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                         const stageData = sub._sourceType === 'stage' ? sub.data : null;
                         let value = stageData && typeof stageData === 'object' ? stageData[key] : '';
                         if (!value) value = '-';
-                        if (typeof value === 'string' && (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://'))) {
+                        if (typeof value === 'string' && (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/api/'))) {
                             return 'View in Files';
                         }
                         return value;
@@ -5183,7 +5221,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                                     {/* File Preview by type */}
                                     {previewAsset.filename.toLowerCase().match(/\.(pdf)$/) ? (
                                         <iframe
-                                            src={previewAsset.url}
+                                            src={previewAsset.url.startsWith('data:') ? dataUriToBlobUrl(previewAsset.url) : previewAsset.url}
                                             className="w-full h-full border-none"
                                             title="PDF Preview"
                                         />
