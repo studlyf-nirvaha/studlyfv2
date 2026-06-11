@@ -80,15 +80,15 @@ export default function AdsCarousel() {
     const [items] = useState<SpotlightItem[]>(SPOTLIGHT_DATA);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
-    
+
     // Auto progress
     useEffect(() => {
         if (isHovered || items.length === 0) return;
-        
+
         const timer = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % items.length);
         }, 5000);
-        
+
         return () => clearInterval(timer);
     }, [isHovered, items.length]);
 
@@ -108,7 +108,7 @@ export default function AdsCarousel() {
                 {/* Section Header */}
                 <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
-                        <motion.h2 
+                        <motion.h2
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -116,7 +116,7 @@ export default function AdsCarousel() {
                         >
                             Community <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#6C4DFF] via-[#EC4899] to-[#FF5B5B]">Spotlight</span>
                         </motion.h2>
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -128,7 +128,7 @@ export default function AdsCarousel() {
                     </div>
                 </div>
 
-                <div 
+                <div
                     className="flex flex-col lg:flex-row gap-6 lg:gap-8"
                     onMouseEnter={() => setIsHovered(true)}
                     onMouseLeave={() => setIsHovered(false)}
@@ -150,8 +150,8 @@ export default function AdsCarousel() {
                                         <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-2 p-2 bg-[#0B0F19]">
                                             {currentItem.image.map((imgSrc, i) => (
                                                 <div key={i} className="w-full h-full rounded-2xl overflow-hidden relative bg-gray-900">
-                                                    <img 
-                                                        src={imgSrc} 
+                                                    <img
+                                                        src={imgSrc}
                                                         alt={`${currentItem.title} ${i + 1}`}
                                                         loading="lazy"
                                                         className="w-full h-full object-cover object-center transition-transform duration-[10s] ease-out group-hover:scale-110"
@@ -160,8 +160,8 @@ export default function AdsCarousel() {
                                             ))}
                                         </div>
                                     ) : (
-                                        <img 
-                                            src={currentItem.image as string} 
+                                        <img
+                                            src={currentItem.image as string}
                                             alt={currentItem.title}
                                             loading="lazy"
                                             className="w-full h-full object-cover object-top transition-transform duration-[10s] ease-out group-hover:scale-110"
@@ -176,7 +176,7 @@ export default function AdsCarousel() {
                                 <div className="absolute inset-0 p-6 sm:p-10 md:p-12 flex flex-col justify-end">
                                     {/* Badges */}
                                     <div className="flex flex-wrap gap-3 mb-6">
-                                        <motion.div 
+                                        <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.2 }}
@@ -184,19 +184,19 @@ export default function AdsCarousel() {
                                         >
                                             {currentItem.type}
                                         </motion.div>
-                                        <motion.div 
+                                        <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.3 }}
                                             className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-white/20 backdrop-blur-xl border border-white/30 flex items-center gap-1.5"
                                         >
-                                            <Sparkles size={14} className="text-yellow-300" />
+
                                             {currentItem.community}
                                         </motion.div>
                                     </div>
 
                                     {/* Title */}
-                                    <motion.h3 
+                                    <motion.h3
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.4, duration: 0.5 }}
@@ -206,7 +206,7 @@ export default function AdsCarousel() {
                                     </motion.h3>
 
                                     {/* Description */}
-                                    <motion.p 
+                                    <motion.p
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.5, duration: 0.5 }}
@@ -216,7 +216,7 @@ export default function AdsCarousel() {
                                     </motion.p>
 
                                     {/* Footer Actions */}
-                                    <motion.div 
+                                    <motion.div
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.6, duration: 0.5 }}
@@ -226,7 +226,7 @@ export default function AdsCarousel() {
                                             {currentItem.cta}
                                             <ArrowRight size={18} />
                                         </a>
-                                        
+
                                         <div className="flex flex-col gap-1.5 border-l-2 border-white/20 pl-6 hidden sm:flex">
                                             <div className="flex items-center gap-2 text-sm text-gray-300 font-bold tracking-wide">
                                                 <Calendar size={16} className="text-white" />
@@ -244,7 +244,7 @@ export default function AdsCarousel() {
 
                         {/* Top Progress Bar */}
                         <div className="absolute top-0 left-0 right-0 h-1.5 bg-black/20 z-20 overflow-hidden">
-                            <motion.div 
+                            <motion.div
                                 key={currentIndex + (isHovered ? "-hover" : "-play")}
                                 initial={{ width: "0%" }}
                                 animate={{ width: isHovered ? "0%" : "100%" }}
@@ -259,15 +259,15 @@ export default function AdsCarousel() {
                         {items.map((item, idx) => {
                             const isActive = idx === currentIndex;
                             return (
-                                <motion.div 
+                                <motion.div
                                     key={item.id}
                                     onClick={() => setCurrentIndex(idx)}
                                     whileHover={{ scale: isActive ? 1 : 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     className={`
                                         relative p-3 sm:p-4 rounded-[1.5rem] cursor-pointer transition-all duration-300 flex gap-4 items-center group
-                                        ${isActive 
-                                            ? 'bg-white shadow-[0_10px_40px_rgba(108,77,255,0.15)] border-2 border-purple-400' 
+                                        ${isActive
+                                            ? 'bg-white shadow-[0_10px_40px_rgba(108,77,255,0.15)] border-2 border-purple-400'
                                             : 'bg-gray-50 border-2 border-transparent hover:bg-white hover:shadow-lg hover:border-purple-200'}
                                     `}
                                 >
@@ -283,7 +283,7 @@ export default function AdsCarousel() {
                                         )}
                                         <div className={`absolute inset-0 transition-colors duration-300 ${isActive ? 'bg-transparent' : 'bg-black/30 group-hover:bg-black/10'}`} />
                                     </div>
-                                    
+
                                     <div className="flex flex-col justify-center flex-grow py-1">
                                         <div className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-purple-600 mb-1.5">
                                             {item.type}
@@ -299,7 +299,7 @@ export default function AdsCarousel() {
 
                                     {/* Active Indicator Line */}
                                     {isActive && (
-                                        <motion.div 
+                                        <motion.div
                                             layoutId="activeIndicator"
                                             className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1/2 bg-gradient-to-b from-purple-500 to-pink-500 rounded-r-full"
                                         />
