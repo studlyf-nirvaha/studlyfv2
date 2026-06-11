@@ -868,6 +868,7 @@ async def check_stage_deadline(event_id: str, stage_index: int = None, stage_nam
         return target_stage
     
     # Check if now is within [start_date, end_date]
+    print(f"DEBUG: now={now}, start_date={start_date}, end_date={end_date}")
     if now < start_date:
         raise HTTPException(
             status_code=403,

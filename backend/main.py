@@ -902,8 +902,8 @@ app.include_router(event_certificate_routes.router)
 app.include_router(event_certificate_routes.verification_router)
 app.include_router(registration_flow_routes.router)
 app.include_router(stage_endpoints.router)
-from routes import company_simulator_routes
-app.include_router(company_simulator_routes.router, prefix="/api/company-simulator")
+from routes import company_simulator
+app.include_router(company_simulator.router, prefix="/api/company-simulator")
 
 
 

@@ -962,11 +962,11 @@ async def submit_event_registration(event_id: str, request: ApplyRegistrationReq
 
         # 0. STRICT DEADLINE ENFORCEMENT
         stages = event.get("stages", [])
-        if stages:
-            first_stage = stages[0]
-            if str(first_stage.get("type")).upper() == "REGISTRATION":
+        for stage in stages:
+            if str(stage.get("type")).upper() == "REGISTRATION":
                 # Check if registration stage deadline has passed using the core stage_access_control
-                await check_stage_deadline(event_id=str(event_id), stage_index=0)
+                await check_stage_deadline(event_id=str(event_id), stage_name=stage.get("name"))
+                break
         
         # 1. Validate required profile fields
         profile_data = request.profile_data
