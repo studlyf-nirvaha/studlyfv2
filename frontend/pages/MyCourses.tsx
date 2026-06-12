@@ -57,24 +57,6 @@ const MyCourses: React.FC = () => {
         const enrolled = filterAwsCourses(data.enrolled || []);
         const available = filterAwsCourses(data.available || []);
 
-        const masteryCourse = {
-          _id: 'ai-automation-mastery',
-          title: 'AI Automation Mastery',
-          description: 'Learn to build powerful AI-driven automation workflows and autonomous agents.',
-          role_tag: 'AI Automation',
-          difficulty: 'Advanced',
-          image: '/images/ai_automation_mastery_thumbnail_1780568107343.png',
-          price: 899,
-          rating: 4.9,
-          duration: '10.5 hrs'
-        };
-
-        const enrolledMastery = enrolled.find((c: any) => c._id === 'ai-automation-mastery');
-        if (enrolledMastery && !enrolledMastery.title) {
-          Object.assign(enrolledMastery, masteryCourse);
-        } else if (!enrolled.find((c: any) => c._id === 'ai-automation-mastery') && !available.find((c: any) => c._id === 'ai-automation-mastery')) {
-          available.push(masteryCourse);
-        }
 
         setEnrolledCourses(enrolled);
         setAvailableCourses(available);

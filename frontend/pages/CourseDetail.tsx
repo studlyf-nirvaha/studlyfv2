@@ -10,7 +10,6 @@ import {
   Briefcase, GraduationCap, LayoutDashboard, BrainCircuit, Play, Globe, X
 } from 'lucide-react';
 import { GENERATIVE_AI_CURRICULUM } from '../data/courseCurriculum';
-import { AI_AUTOMATION_CURRICULUM } from '../data/aiAutomationCurriculum';
 import DashboardFooter from '../components/DashboardFooter';
 
 interface Course {
@@ -147,23 +146,16 @@ const CourseDetail: React.FC = () => {
         const coursesDataFromApi = await courseRes.json();
         const allCourses = [...MOCK_COURSES, ...(coursesDataFromApi || [])];
         const courseIdFromSlug = extractCourseId(courseId);
-        const foundCourse = allCourses.find((c: Course) => c._id === courseIdFromSlug) || MOCK_COURSES[0];
+        const foundCourse = allCourses.find((c: Course) => c._id === courseIdFromSlug);
+
+        if (!foundCourse) {
+          navigate('/learn/courses', { replace: true });
+          return;
+        }
 
         setCourse(foundCourse);
 
-        try {
-          // Load curriculum based on the specific course slug
-          if (foundCourse._id === 'ai-automation-mastery') {
-            // Import a dedicated curriculum for this course (fallback to generic if not available)
-            import('../data/aiAutomationCurriculum')
-              .then(mod => setCourseModules(mod.AI_AUTOMATION_CURRICULUM))
-              .catch(() => setCourseModules(GENERATIVE_AI_CURRICULUM));
-          } else {
-            setCourseModules(GENERATIVE_AI_CURRICULUM);
-          }
-        } catch (modErr) {
-          setCourseModules(GENERATIVE_AI_CURRICULUM);
-        }
+        setCourseModules(GENERATIVE_AI_CURRICULUM);
 
         if (userId) {
           const stateRes = await fetch(`${API_BASE_URL}/api/user-courses/${userId}`);
@@ -173,8 +165,7 @@ const CourseDetail: React.FC = () => {
           else setUserState('NOT_PURCHASED');
         }
       } catch (err) {
-        setCourse(MOCK_COURSES[0]);
-        setCourseModules(GENERATIVE_AI_CURRICULUM);
+        navigate('/learn/courses', { replace: true });
       } finally {
         setLoading(false);
       }
@@ -234,8 +225,8 @@ const CourseDetail: React.FC = () => {
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#8B5CF6] to-[#D946EF]">AI Course</span>
               </h1>
 
-              <p className="text-lg text-gray-300 mb-8 max-w-2xl leading-relaxed">Your complete beginner-to-advanced roadmap to understand, build and apply AI in real-world scenarios using modern tools.</p>
-              <img loading="lazy" src="/images/ai_foundations_1779792498429.png" alt="AI Foundations" className="my-6 rounded-lg" />
+              <p className="text-lg text-gray-300 mb-8 max-w-2xl leading-relaxed">{course.description}</p>
+              <img loading="lazy" src="/images/ai_foundations_1779792498429.png" alt={course.title} className="my-6 rounded-lg" />
 
               <div className="flex flex-wrap gap-3 mb-10">
                 {(course.skills || []).map((skill, idx) => (

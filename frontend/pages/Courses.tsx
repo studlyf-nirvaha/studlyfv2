@@ -194,27 +194,8 @@ const Courses: React.FC = () => {
         console.log('✅ Courses data received:', coursesData);
         console.log('📊 Total courses:', coursesData?.length || 0);
         
-        const masteryCourse = {
-          _id: 'ai-automation-mastery',
-          title: 'AI Automation Mastery',
-          description: 'Learn to build powerful AI-driven automation workflows and autonomous agents.',
-          role_tag: 'AI Automation',
-          difficulty: 'Advanced',
-          skills: ['AI Automation', 'LangChain', 'OpenAI', 'Autonomous Agents', 'Workflow Building'],
-          duration: '10.5 hrs',
-          image: '/images/ai_automation_mastery_thumbnail_1780568107343.png',
-          price: 899,
-          rating: 4.9,
-          total_reviews: 1200,
-          total_hours: 10.5,
-          instructor: 'Adarsh Singh',
-          is_bestseller: true
-        };
-        
-        let allCourses = coursesData && Array.isArray(coursesData) ? coursesData : [];
-        if (!allCourses.find((c: any) => c._id === 'ai-automation-mastery')) {
-          allCourses.push(masteryCourse);
-        }
+        const allCourses = coursesData && Array.isArray(coursesData) ? coursesData : [];
+
 
         if (allCourses.length > 0) {
           setCourses(allCourses);
