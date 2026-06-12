@@ -7,33 +7,33 @@ import { ArrowRight } from 'lucide-react';
 const items = [
     {
         id: '01',
-        title: 'Practical Learning',
-        description: 'Learn through real-world problem solving and interactive challenges.',
-        image: '/templates/practicallearning.png',
+        title: 'Company-Specific Learning Paths',
+        description: 'Master placement preparation through structured learning modules tailored for top companies like Google, Amazon, and Microsoft.',
+        image: '/images/company-paths.png',
         bgColor: 'bg-[#0F0A1F]',
         borderColor: 'border-purple-500/30'
     },
     {
         id: '02',
-        title: 'Career-Focused Paths',
-        description: 'Structured journeys designed for tech and high-growth careers.',
-        image: '/templates/career.png',
+        title: 'AI Mock Interview Simulator',
+        description: 'Experience realistic mock interviews designed for top companies with adaptive questioning, behavioral scenarios, and placement-focused preparation.',
+        image: '/images/neural-simulator.png',
         bgColor: 'bg-[#0F0A1F]',
         borderColor: 'border-purple-500/30'
     },
     {
         id: '03',
-        title: 'Live Practice Modules',
-        description: 'Hands-on coding and skill-based assessments in real-time.',
-        image: '/templates/practice.png',
+        title: 'AI Career Dreamer',
+        description: 'Discover career paths based on your interests, skills, projects, and strengths with intelligent career recommendations and personalized guidance.',
+        image: '/images/career-dreamer.png',
         bgColor: 'bg-[#0F0A1F]',
         borderColor: 'border-purple-500/30'
     },
     {
         id: '04',
-        title: 'AI-Guided Feedback',
-        description: 'Smart evaluation and instant improvement suggestions.',
-        image: '/templates/feedback.png',
+        title: 'Complete Placement Ecosystem',
+        description: 'Everything you need for placements in one platform — learning, mock interviews, career guidance, and structured preparation.',
+        image: '/images/placement-ecosystem.png',
         bgColor: 'bg-[#0F0A1F]',
         borderColor: 'border-purple-500/30'
     }
@@ -145,7 +145,7 @@ const WhatIsStudlyf: React.FC = () => {
                                                 <h4 className="text-2xl md:text-3xl lg:text-4xl font-['Poppins'] font-black text-white tracking-tight leading-tight">
                                                     {item.title}
                                                 </h4>
-                                                <p className="text-base text-gray-400 max-w-sm font-['Poppins'] leading-relaxed">
+                                                <p className="text-xs md:text-sm lg:text-base text-gray-400 max-w-sm font-['Poppins'] leading-relaxed whitespace-pre-line">
                                                     {item.description}
                                                 </p>
                                             </div>

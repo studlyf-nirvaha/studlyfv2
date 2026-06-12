@@ -8,7 +8,6 @@ const testimonials = [
         college: "Sridevi women's engineering college",
         course: "UI / UX DESIGN",
         text: "The sessions felt practical and easy to follow, and I could see my confidence grow with every project.",
-        logo: "/images-optimized/pantham_bhavya.webp",
         rating: 5,
         bgColor: "bg-purple-50"
     },
@@ -17,7 +16,6 @@ const testimonials = [
         college: "Stanley women's college",
         course: "JAVA FULL STACK",
         text: "The guidance was consistent and the doubt-clearing support made the learning experience very smooth.",
-        logo: "/images-optimized/vadla_sudhasri.webp",
         rating: 5,
         bgColor: "bg-indigo-50"
     },
@@ -26,7 +24,6 @@ const testimonials = [
         college: "BVRIT",
         course: "DATA ANALYTICS",
         text: "I liked how the classes mixed concepts with hands-on work. It made every topic easy to understand.",
-        logo: "/images-optimized/ginuguntla_likhitha.webp",
         rating: 5,
         bgColor: "bg-blue-50"
     },
@@ -35,7 +32,6 @@ const testimonials = [
         college: "CBIT",
         course: "CLOUD COMPUTING",
         text: "The platform and mentor support helped me stay consistent and finish projects with confidence.",
-        logo: "/images-optimized/sajja_dhruwallika.webp",
         rating: 4,
         bgColor: "bg-rose-50"
     },
@@ -44,7 +40,6 @@ const testimonials = [
         college: "Vasavi college of Engineering",
         course: "AI / ML",
         text: "The training style was simple, effective, and very motivating. I could actually apply what I learned.",
-        logo: "/images-optimized/modaboina_tejaswi.webp",
         rating: 5,
         bgColor: "bg-emerald-50"
     },
@@ -53,7 +48,6 @@ const testimonials = [
         college: "Vasavi College of Engineering",
         course: "WEB DEVELOPMENT",
         text: "The training and project exposure here are top-notch. Trainer is really helpful and clearing the doubts till course end!",
-        logo: "/images-optimized/vishnu_vardhan.webp",
         rating: 5,
         bgColor: "bg-blue-50"
     },
@@ -62,7 +56,6 @@ const testimonials = [
         college: "JBIT",
         course: "AI Engineer",
         text: "Training and doubt clarification were excellent. Mic access during class would help clear doubts more effectively.",
-        logo: "/images-optimized/vivek_goud_adula.webp",
         rating: 5,
         bgColor: "bg-blue-50"
     },
@@ -70,7 +63,6 @@ const testimonials = [
         name: "Purushotham",
         course: "SERVICENOW",
         text: "Rakesh is teaching very well, patiently clearing every doubt. I also learned communication skills from him.",
-        logo: "/images-optimized/purushotham.webp",
         rating: 4,
         bgColor: "bg-rose-50"
     },
@@ -78,7 +70,6 @@ const testimonials = [
         name: "Anusha Goud",
         course: "FULL STACK DEVELOPMENT",
         text: "The curriculum is very industry-aligned. I feel much more confident in my coding skills now.",
-        logo: "/images-optimized/anusha_goud.webp",
         rating: 5,
         bgColor: "bg-emerald-50"
     },
@@ -86,7 +77,6 @@ const testimonials = [
         name: "Kiran Kumar",
         course: "CYBER SECURITY",
         text: "Excellent hands-on labs. The mentors really know their stuff and guide us through complex scenarios.",
-        logo: "/images-optimized/kiran_kumar.webp",
         rating: 4,
         bgColor: "bg-amber-50"
     }
@@ -157,7 +147,7 @@ const TestimonialCard = ({ testimonial, index }: { testimonial: typeof testimoni
             />
 
             <motion.div
-                className={`relative w-[280px] sm:w-80 md:w-96 min-h-[420px] md:min-h-[480px] flex flex-col p-6 md:p-8 rounded-[2rem] ${testimonial.bgColor || 'bg-white'} border border-gray-100 backdrop-blur-xl overflow-hidden shadow-2xl`}
+                className={`relative w-[280px] sm:w-80 md:w-96 min-h-[320px] md:min-h-[380px] flex flex-col p-6 md:p-8 rounded-[2rem] ${testimonial.bgColor || 'bg-white'} border border-gray-100 backdrop-blur-xl overflow-hidden shadow-2xl`}
                 style={{
                     rotateX,
                     rotateY,
@@ -166,19 +156,6 @@ const TestimonialCard = ({ testimonial, index }: { testimonial: typeof testimoni
             >
                 {/* Glow Border */}
                 <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#9D7CFF]/50 rounded-[2rem] transition-colors duration-500 pointer-events-none" />
-
-                {/* Top Logo */}
-                <div className="flex justify-center mb-6">
-                    <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl relative z-10 p-2">
-                        <div className="absolute inset-0 rounded-full border-2 border-gray-100 group-hover:border-[#9D7CFF] transition-colors duration-500 scale-110 shadow-sm" />
-                        <img
-                            src={testimonial.logo}
-                            alt="College Logo"
-                            loading="lazy"
-                            className="w-14 h-14 object-contain rounded-full"
-                        />
-                    </div>
-                </div>
 
                 {/* Rating */}
                 <div className="flex justify-center gap-1 mb-4">
