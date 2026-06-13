@@ -639,6 +639,7 @@ def _event_list_row(doc: dict, participant_count: int = 0) -> dict:
         "end_date": end_date,
         "created_at": doc.get("created_at") or doc.get("createdAt") or doc.get("deadline"),
         "participant_count": participant_count,
+        "stages": doc.get("stages", []),
         "logo_url": logo,
         "image_url": logo,
     }
@@ -734,70 +735,122 @@ async def get_events_summary(
 
 @router.get("/events/{institution_id}")
 async def get_all_events(institution_id: str, user: dict = Depends(get_auth_user)):
-    """Institution listings: events from `events` plus standalone opportunities (jobs/internships).
-
-    Rows mirrored from events (`event_link_id` → event `_id`) are omitted to avoid duplicate titles
-    and wrong IDs when opening Event Details (which expects an event id).
-    Registration counts combine `participants` and portal applications on the linked opportunity.
-    """
+    """Institution listings: events and standalone opportunities (Bulk Optimized)."""
+    import time
+    start_total = time.time()
     assert_institution_scope(institution_id, user)
-    from db import opportunity_applications_col
+    
+    # 1. Fetch Events via Aggregation (Optimized for counts)
+    pipeline = [
+        {"$match": {"institution_id": institution_id, "status": {"$ne": "DELETED"}}},
+        {
+            "$addFields": { "id_str": { "$toString": "$_id" } }
+        },
+        {
+            "$lookup": {"from": "participants", "localField": "_id", "foreignField": "event_id", "as": "event_participants"}
+        },
+        {
+            "$lookup": {"from": "opportunities", "localField": "id_str", "foreignField": "event_link_id", "as": "linked_opportunity"}
+        },
+        {
+            "$addFields": {
+                "participant_count": {"$size": {"$ifNull": ["$event_participants", []]}},
+                "linked_opp": {"$arrayElemAt": ["$linked_opportunity", 0]}
+            }
+        },
+        {
+            "$project": {
+                "_id": 1, "title": 1, "name": 1, "category": 1, "type": 1,
+                "status": 1, "visibility": 1, "updated_at": 1, "created_at": 1,
+                "updatedAt": 1, "createdAt": 1,
+                "start_date": 1, "end_date": 1, "startDate": 1, "endDate": 1,
+                "eventStartDate": 1, "eventEndDate": 1, "registrationStartDate": 1,
+                "registrationDeadline": 1, "deadline": 1, "festivalData": 1, "formData": 1,
+                "stages": 1,
+                "participant_count": 1, "linked_opp": 1
+            }
+        }
+    ]
 
-    events_list = []
+    events_cursor = events_col.aggregate(pipeline)
+    events_list = await events_cursor.to_list(length=1000)
+    
     event_ids = set()
-
-    e_cursor = events_col.find({"institution_id": institution_id, "status": {"$ne": "DELETED"}})
-    async for event in e_cursor:
+    final_list = []
+    
+    for event in events_list:
         eid = str(event["_id"])
         event_ids.add(eid)
         event["_id"] = eid
-
-        booth = await participants_col.count_documents({"event_id": eid})
-        linked = await opportunities_col.find_one({"event_link_id": eid})
-        portal = 0
-        if linked:
-            portal = await opportunity_applications_col.count_documents({"opportunity_id": str(linked["_id"])})
-        event["participant_count"] = booth + portal
+        event["stages"] = event.get("stages", [])
         
-        # Resolve dynamic dates
+        # Link opportunity counts if applicable
+        if event.get("linked_opp"):
+            opp_id = str(event["linked_opp"]["_id"])
+            portal_count = await opportunity_applications_col.count_documents({"opportunity_id": opp_id})
+            event["participant_count"] = (event.get("participant_count") or 0) + portal_count
+            del event["linked_opp"]
+        
         start, end = _resolve_event_dates(event)
         event["start_date"] = start
         event["end_date"] = end
-        
-        events_list.append(event)
+        event["registration_count"] = event.get("participant_count", 0)
+        final_list.append(event)
 
-    o_cursor = opportunities_col.find({
-        "$or": [{"institution_id": institution_id}, {"createdBy": institution_id}]
+    # 2. Fetch Standalone Opportunities
+    opp_cursor = opportunities_col.find({
+        "$or": [{"institution_id": institution_id}, {"createdBy": institution_id}],
+        "status": {"$ne": "DELETED"}
+    }, {
+        "_id": 1, "title": 1, "name": 1, "category": 1, "type": 1,
+        "status": 1, "visibility": 1, "updated_at": 1, "created_at": 1,
+        "updatedAt": 1, "createdAt": 1,
+        "start_date": 1, "end_date": 1, "startDate": 1, "endDate": 1,
+        "eventStartDate": 1, "eventEndDate": 1, "registrationStartDate": 1,
+        "registrationDeadline": 1, "deadline": 1, "festivalData": 1, "formData": 1,
+        "stages": { "$slice": ["$stages", 1] },
+        "event_link_id": 1
     })
-    async for opp in o_cursor:
+    
+    async for opp in opp_cursor:
+        opp_id = str(opp["_id"])
         link = opp.get("event_link_id")
         if link and str(link) in event_ids:
             continue
-
-        opp_id = str(opp["_id"])
+            
         opp["_id"] = opp_id
-        opp["organisation"] = opp.get("organisation") or opp.get("organization") or ""
         opp["participant_count"] = await opportunity_applications_col.count_documents({"opportunity_id": opp_id})
-        opp["status"] = opp.get("status", "Active").upper()
-        opp["category"] = opp.get("type", "Opportunity")
+        opp["registration_count"] = opp["participant_count"]
         
-        # Resolve dynamic dates
         start, end = _resolve_event_dates(opp)
         opp["start_date"] = start
         opp["end_date"] = end
+        opp["category"] = opp.get("type") or opp.get("category") or "Opportunity"
         
-        events_list.append(opp)
+        final_list.append(opp)
 
     def _sort_key(x):
-        val = x.get("created_at") or x.get("createdAt") or x.get("deadline") or ""
-        # Normalize datetime objects to ISO string so str/datetime comparison never occurs
-        if hasattr(val, "isoformat"):
-            return val.isoformat()
+        val = x.get("updated_at") or x.get("created_at") or x.get("updatedAt") or x.get("createdAt") or ""
         return str(val)
 
-    events_list.sort(key=_sort_key, reverse=True)
-
-    return events_list
+    final_list.sort(key=_sort_key, reverse=True)
+    
+    # Final deep-clean for any remaining ObjectIds (e.g. in stages or other fields)
+    from bson import ObjectId
+    for item in final_list:
+        for k, v in item.items():
+            if isinstance(v, ObjectId):
+                item[k] = str(v)
+        
+        if "stages" in item and isinstance(item["stages"], list):
+            for s in item["stages"]:
+                if isinstance(s, dict):
+                    for sk, sv in s.items():
+                        if isinstance(sv, ObjectId):
+                            s[sk] = str(sv)
+    
+    print(f"PERF: get_all_events took {time.time() - start_total:.4f}s for {len(final_list)} items")
+    return final_list
 
 @router.delete("/events/{event_id}")
 async def delete_institution_listing(event_id: str, user: dict = Depends(get_auth_user)):
@@ -1628,10 +1681,10 @@ async def get_qualified_bundle(
 
     shortlisted, approved, rejected, pending, waitlisted = [], [], [], [], []
     for sid, item in all_items.items():
-        # When filtering by a specific stage, skip items that aren't linked to that stage
-        # (legacy submissions_col items don't have stage_id, only submission_data_col items do)
-        if stage_filter and not item.get("stage_id"):
+        # When filtering by a specific stage, skip items that are explicitly linked to a DIFFERENT stage
+        if stage_filter and item.get("stage_id") and str(item.get("stage_id")) != stage_filter:
             continue
+            
         item_judges = score_judges_by_submission.get(sid, set())
         assigned = item.get("assigned_judges") or []
         item["judges_completed"] = len(item_judges)
@@ -1698,6 +1751,248 @@ async def get_qualified_bundle(
             "all_items_count": len(all_items),
         },
     }
+
+@router.get("/leaderboard/{event_id}/integrated")
+async def get_integrated_institution_leaderboard(
+    event_id: str,
+    stage_id: Optional[str] = None,
+    user: dict = Depends(get_auth_user),
+):
+    """
+    Consolidated leaderboard for institution admin view.
+    Derived from: Submissions + Evaluations + Classification Status.
+    """
+    # Reuse the logic from get_qualified_bundle or query submission_data_col directly
+    from db import submission_data_col, submissions_col as legacy_submissions_col
+    
+    # Build query — try matching stage_id as both string and ObjectId
+    event_id_str = str(event_id)
+    base_query: dict = {"event_id": event_id_str}
+    stage_query: dict | None = None
+    if stage_id:
+        try:
+            from bson import ObjectId
+            stage_oid = ObjectId(stage_id)
+            stage_query = {"$or": [{"stage_id": stage_id}, {"stage_id": stage_oid}]}
+        except Exception:
+            stage_query = {"stage_id": stage_id}
+    
+    seen_ids: set = set()
+    all_submissions: list[dict] = []
+    counts: dict[str, int] = {"Total": 0, "Approved": 0, "Shortlisted": 0, "Waitlisted": 0, "Rejected": 0, "Pending": 0}
+    
+    # Pre-fetch stage field config and event-level evaluation thresholds
+    stage_fields: list[dict] = []
+    evaluation_thresholds: dict = {}
+    event_title: str = ""
+    try:
+        ev = await events_col.find_one({"_id": ObjectId(event_id_str)})
+        if ev:
+            event_title = ev.get("title") or ""
+            evaluation_thresholds = ev.get("evaluation_thresholds") or {}
+            stages = ev.get("stages") or []
+            for st in stages:
+                if st.get("id") == stage_id:
+                    stage_fields = st.get("fields") or (st.get("config") or {}).get("fields", [])
+                    break
+    except Exception:
+        pass
+
+    # ---- DEBUG ----
+    print(f"[LEADERBOARD DEBUG] event_id={event_id_str}, stage_id={stage_id}")
+    print(f"[LEADERBOARD DEBUG] base_query={base_query}")
+    print(f"[LEADERBOARD DEBUG] stage_query={stage_query}")
+
+    def extract_title_from_data(data: dict) -> str:
+        if not data:
+            return ""
+        title_keys = ["project_title", "idea_title", "project_name", "idea", "title",
+                      "project", "idea_abstract", "project_idea", "abstract"]
+        for k in title_keys:
+            raw = data.get(k) or data.get(k.lower()) or data.get(k.replace("_", " ")) or data.get(k.replace("_", " ").title())
+            if raw and isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        for v in data.values():
+            if isinstance(v, str) and len(v.strip()) > 5:
+                return v.strip()
+        return ""
+
+    def is_valid_text(val: any) -> bool:
+        if not isinstance(val, str) or not val.strip():
+            return False
+        # Reject anything that looks like a data URI or a file path/base64
+        if val.startswith("data:") or val.startswith("http") or val.endswith((".pdf", ".ppt", ".docx", ".zip")):
+            return False
+        return True
+
+    def extract_description_from_data(data: dict) -> str:
+        if not data:
+            return ""
+        
+        # User requested fields: Idea Abstract, Proposed Solution Description
+        desc_keys = ["idea_abstract", "proposed_solution_description", "solution_description", "proposed_solution", "description", "solution",
+                     "problem_statement", "approach", "abstract", "description_abstract",
+                     "idea_description", "detailed_description"]
+                     
+        for k in desc_keys:
+            # Check for keys in all casing formats
+            raw = data.get(k) or data.get(k.lower()) or data.get(k.replace("_", " ")) or data.get(k.replace("_", " ").title())
+            if is_valid_text(raw):
+                return raw.strip()
+        
+        # If no explicit keys match, try to find any text field that isn't a PDF/base64
+        for v in data.values():
+            if is_valid_text(v):
+                return v.strip()
+        
+        return ""
+
+    async def ingest_from_collection(collection, query_field_overrides: dict | None = None):
+        """Pull submissions from a collection, normalise fields, and populate all_submissions + counts."""
+        q = {**base_query}
+        if stage_query:
+            q.update(stage_query)
+        if query_field_overrides:
+            q.update(query_field_overrides)
+        
+        print(f"[LEADERBOARD DEBUG] query={q}")
+        try:
+            cnt = await collection.count_documents(q)
+            print(f"[LEADERBOARD DEBUG] count={cnt}")
+        except Exception as e:
+            print(f"[LEADERBOARD DEBUG] count error={e}")
+        
+        cursor = collection.find(q).sort("submitted_at", -1)
+        doc_count = 0
+        async for sub in cursor:
+            doc_count += 1
+            sub_id = str(sub.get("_id"))
+            if sub_id in seen_ids:
+                continue
+            seen_ids.add(sub_id)
+            
+            counts["Total"] += 1
+            status = str(sub.get("status") or "Pending").capitalize()
+            if status in counts:
+                counts[status] += 1
+            else:
+                counts["Pending"] += 1
+            
+            team_id = sub.get("team_id")
+            team_name = sub.get("team_name") or sub.get("teamName") or "Solo Entry"
+            team_members = []
+            if team_id:
+                try:
+                    team = await teams_col.find_one({"_id": ObjectId(team_id)})
+                    if team:
+                        team_name = team.get("team_name") or team_name
+                        team_members = team.get("members", [])
+                except Exception:
+                    pass
+            
+            sub_oid = sub.get("_id")
+            score = 0
+            feedback = "—"
+            if sub_oid:
+                try:
+                    score_doc = await scores_col.find_one({"submission_id": sub_oid})
+                except Exception:
+                    score_doc = None
+                if score_doc:
+                    score = score_doc.get("total_score") or 0
+                    feedback = score_doc.get("feedback") or "—"
+                else:
+                    score = sub.get("evaluation_score") or sub.get("total_score") or sub.get("score") or 0
+            
+            form_data = sub.get("data") or {}
+            project_title = (sub.get("project_title") or sub.get("projectName") or sub.get("project_name") or
+                             extract_title_from_data(form_data) or "Untitled Project")
+            
+            # Prioritize text-based solution/idea fields and ignore PDF/base64 strings
+            potential_desc = (sub.get("solution_description") or sub.get("description") or
+                              extract_description_from_data(form_data) or "")
+            if isinstance(potential_desc, str) and potential_desc.startswith("data:"):
+                solution_description = extract_description_from_data(form_data) or "No text description available"
+            else:
+                solution_description = potential_desc
+            
+            # Get score directly from submission fields
+            score = sub.get("total_score") or sub.get("score") or sub.get("evaluation_score") or 0
+            feedback = sub.get("evaluator_feedback") or sub.get("feedback") or "—"
+            
+            all_submissions.append({
+                "team_id": team_id,
+                "display_name": team_name,
+                "project_title": project_title,
+                "solution_description": solution_description,
+                "score": float(score),
+                "status": status,
+                "recommendation": feedback,
+                "member_count": len(team_members) or (sub.get("member_count") or 0),
+                "members": team_members,
+                "email": sub.get("email") or sub.get("participant_email") or "",
+                "submission_id": sub_id,
+                "submitted_at": str(sub.get("submitted_at") or "") if sub.get("submitted_at") else None,
+                "data": form_data,
+            })
+        print(f"[LEADERBOARD DEBUG] docs iterated: {doc_count}")
+    
+    # 1. Ingest from submission_data_col (stage-level dynamic submissions)
+    print(f"[LEADERBOARD DEBUG] --- querying submission_data_col ---")
+    await ingest_from_collection(submission_data_col)
+    
+    # 2. Also ingest from legacy submissions_col (traditional project submissions)
+    print(f"[LEADERBOARD DEBUG] --- querying legacy submissions_col ---")
+    await ingest_from_collection(legacy_submissions_col)
+    
+    print(f"[LEADERBOARD DEBUG] total submissions found: {len(all_submissions)}")
+    
+    # Sort by score descending
+    all_submissions.sort(key=lambda x: float(x.get("score") or 0), reverse=True)
+    
+    for idx, sub in enumerate(all_submissions):
+        sub["rank"] = idx + 1
+    
+    return {
+        "status": "success",
+        "event_id": event_id_str,
+        "stage_id": stage_id,
+        "counts": counts,
+        "total_submissions": counts["Total"],
+        "submissions": all_submissions,
+        "stage_fields": stage_fields,
+        "evaluation_thresholds": evaluation_thresholds,
+        "event_title": event_title,
+    }
+
+@router.post("/events/{event_id}/leaderboard/verify")
+async def verify_leaderboard_results(
+    event_id: str,
+    payload: dict = Body(...),
+    user: dict = Depends(get_auth_user)
+):
+    """
+    Institution action: Verifies and locks the current leaderboard for a stage.
+    """
+    await assert_institution_owns_event(event_id, user)
+    stage_id = payload.get("stage_id")
+    
+    # Log the verification action
+    admin_email = user.get("email") or "admin@institution.com"
+    details = f"Verified leaderboard results for event {event_id}"
+    if stage_id:
+        details += f" stage {stage_id}"
+        
+    await log_admin_action(admin_email, "LEADERBOARD_VERIFIED", details)
+    
+    # Optionally, we could set a flag on the event stages
+    if stage_id:
+        await events_col.update_one(
+            {"_id": ObjectId(event_id), "stages.id": stage_id},
+            {"$set": {"stages.$.results_verified": True, "stages.$.verified_at": datetime.utcnow()}}
+        )
+    
+    return {"status": "success", "message": "Leaderboard results verified successfully."}
 
 @router.post("/participants/add")
 async def admin_add_participant(data: dict = Body(...), user: dict = Depends(get_auth_user)):
@@ -2296,14 +2591,22 @@ async def get_public_events():
     return events_list
 
 @router.post("/leaderboard/{event_id}/refresh")
-async def refresh_leaderboard(event_id: str, user: dict = Depends(get_auth_user)):
-    """Triggers dynamic recalculation of rankings based on latest scores."""
+async def refresh_leaderboard(
+    event_id: str,
+    stage_id: Optional[str] = Query(None),
+    user: dict = Depends(get_auth_user)
+):
+    """Triggers dynamic recalculation of rankings based on latest scores, optionally filtered by stage."""
     await assert_institution_owns_event(event_id, user)
-    return await leaderboard_service.calculate_event_leaderboard(event_id)
+    return await leaderboard_service.calculate_event_leaderboard(event_id, stage_id=stage_id)
 
 @router.get("/leaderboard/{event_id}")
-async def fetch_leaderboard(event_id: str, user: dict = Depends(get_auth_user)):
-    """Retrieves live event standings based on dynamic judge scoring."""
+async def fetch_leaderboard(
+    event_id: str,
+    stage_id: Optional[str] = Query(None),
+    user: dict = Depends(get_auth_user)
+):
+    """Retrieves live event standings based on dynamic judge scoring, optionally filtered by stage."""
     if event_id == "active_event":
         # Resolve to latest event
         event = await events_col.find_one({"status": "Live"}, sort=[("created_at", -1)])
@@ -2313,12 +2616,15 @@ async def fetch_leaderboard(event_id: str, user: dict = Depends(get_auth_user)):
     # Check authorization to view leaderboard
     await assert_institution_owns_event(event_id, user)
 
+    # If stage_id is provided, we recalculate on the fly for freshness
+    if stage_id:
+        return await leaderboard_service.calculate_event_leaderboard(event_id, stage_id=stage_id)
+
     # Robustly fetch all variants of the event_id to ensure we get correct leaderboard data
     event_id_variants = await collect_event_id_variants(event_id)
     
     rankings = await leaderboard_col.find({"event_id": {"$in": event_id_variants}}).sort("rank", 1).to_list(length=2000)
     if not rankings:
-        from services.leaderboard_service import leaderboard_service
         rankings = await leaderboard_service.calculate_event_leaderboard(event_id)
 
     for r in rankings: r["_id"] = str(r["_id"])
@@ -2394,9 +2700,13 @@ async def fetch_event_results(event_id: str):
     }
 
 @router.get("/leaderboard/{event_id}/export-pdf")
-async def export_leaderboard_pdf(event_id: str):
+async def export_leaderboard_pdf(
+    event_id: str,
+    stage_id: Optional[str] = Query(None),
+    user: dict = Depends(get_auth_user)
+):
     """
-    Generates a professional PDF report with ranked results 
+    Generates a professional PDF report with ranked results
     and detailed dimension-based breakdowns.
     """
     from reportlab.lib import colors
@@ -2404,77 +2714,71 @@ async def export_leaderboard_pdf(event_id: str):
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from io import BytesIO
-    from db import leaderboard_col, events_col
-    
+    from db import events_col
+    from fastapi.responses import Response
+
+    await assert_institution_owns_event(event_id, user)
+
     if event_id == "active_event":
         event = await events_col.find_one({"status": "Live"}, sort=[("created_at", -1)])
         if not event: event = await events_col.find_one({}, sort=[("created_at", -1)])
         if event: event_id = str(event["_id"])
 
-    # 1. Fetch Data
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
-    rankings = await leaderboard_col.find({"event_id": event_id}).sort("rank", 1).to_list(length=2000)
-    
-    # 2. Create PDF Buffer
+    # Get the integrated leaderboard data
+    lb_data = await get_integrated_institution_leaderboard(event_id, stage_id, user)
+    rankings = lb_data.get("submissions", [])
+
+    event_doc = await events_col.find_one({"_id": ObjectId(event_id)})
+    event_title = event_doc.get("title", "Event Leaderboard")
+    if stage_id:
+        stage_name = next((s.get("name") for s in event_doc.get("stages", []) if s.get("id") == stage_id), "Selected Stage")
+        event_title += f" - {stage_name}"
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
     elements = []
-    
-    # 3. Header
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#6C3BFF'),
-        spaceAfter=20,
-        alignment=1 # Center
-    )
-    elements.append(Paragraph(f"{event.get('title', 'Event Results')}", title_style))
-    elements.append(Paragraph(f"Official Leaderboard & Performance Report", styles['Heading3']))
+
+    # Title
+    elements.append(Paragraph(f"Official Results: {event_title}", styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    # Summary
+    counts = lb_data.get("counts", {})
+    summary_text = f"Total Teams: {counts.get('Total', 0)} | Shortlisted: {counts.get('Shortlisted', 0)} | Approved: {counts.get('Approved', 0)}"
+    elements.append(Paragraph(summary_text, styles['Normal']))
     elements.append(Spacer(1, 20))
-    
-    # 4. Table Data
-    data = [["Rank", "Team Name", "Score Breakdown", "Final Score"]]
+
+    # Table Header
+    data = [["Rank", "Team / Participant", "Score", "Status"]]
     for r in rankings:
-        # Format criteria breakdown as a string
-        breakdown_str = ""
-        if r.get("criteria_scores"):
-            breakdown_str = "\n".join([f"{k}: {v}" for k, v in r["criteria_scores"].items()])
-        else:
-            breakdown_str = "Verified Overall Score"
-        
         data.append([
-            f"#{r['rank']}",
-            r['team_name'],
-            breakdown_str,
-            str(r['total_score'])
+            f"#{r.get('rank')}",
+            r.get('display_name') or r.get('participant_name', 'N/A'),
+            str(r.get('score', r.get('evaluation_score', 0))),
+            r.get('status', 'Pending')
         ])
-    
-    # 5. Table Styling
-    t = Table(data, colWidths=[50, 150, 200, 80])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6C3BFF')),
+
+    table = Table(data, colWidths=[50, 250, 100, 100])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
-    elements.append(t)
-    
-    # 6. Build
+    elements.append(table)
+
     doc.build(elements)
-    
-    # 7. Return PDF
-    buffer.seek(0)
+    pdf_content = buffer.getvalue()
+    buffer.close()
+
     return Response(
-        content=buffer.getvalue(),
+        content=pdf_content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=results.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=leaderboard_{event_id}.pdf"}
     )
 
 @router.post("/finalize-event/{event_id}")
@@ -2547,6 +2851,7 @@ async def issue_ranked_certificates(
 
     Supported payload fields:
     - template_id: optional certificate template id
+    - stage_id: optional stage id to filter rankings
     - limit: optional top-N cutoff
     - min_score: optional minimum score cutoff
     - bands: optional list of { label, achievement_type, min_score, max_score }
@@ -2559,12 +2864,13 @@ async def issue_ranked_certificates(
         raise HTTPException(status_code=404, detail="Event not found")
 
     template_id = payload.get("template_id")
+    stage_id = payload.get("stage_id")
     limit = payload.get("limit")
     min_score = payload.get("min_score")
     bands = payload.get("bands") or []
     send_email = bool(payload.get("send_email", True))
 
-    final_rankings = await leaderboard_service.calculate_event_leaderboard(event_id)
+    final_rankings = await leaderboard_service.calculate_event_leaderboard(event_id, stage_id=stage_id)
     if not final_rankings:
         raise HTTPException(status_code=404, detail="No rankings found for this event")
 
@@ -4242,6 +4548,9 @@ async def update_event_details(event_id: str, update_data: dict, user: dict = De
                     "new_deadline": new_dl,
                     "old_deadline": old_dl,
                 })
+                # Clear stored_status when deadline changes so date-based computation takes effect
+                if "stored_status" not in new_s or new_s.get("stored_status"):
+                    new_s["stored_status"] = ""
     new_status = update_data.get("status", old_status)
     just_published = old_status != "LIVE" and new_status == "LIVE"
 
@@ -4539,13 +4848,35 @@ async def update_event_stage(event_id: str, stage_id: str, stage_update: dict, u
         {"stages.$": 1}
     )
     existing_stage = event["stages"][0] if event and event.get("stages") else {}
+    
+    old_dl = str(existing_stage.get("end_date") or existing_stage.get("endDate") or existing_stage.get("deadline") or "")
+    new_dl = str(stage_update.get("end_date") or stage_update.get("endDate") or stage_update.get("deadline") or "")
+    
     merged_stage = {**existing_stage, **stage_update}
     
+    # Clean up duplicate date keys so older keys don't shadow the new ones
+    if "end_date" in stage_update:
+        merged_stage.pop("endDate", None)
+        merged_stage.pop("deadline", None)
+    elif "endDate" in stage_update:
+        merged_stage.pop("end_date", None)
+        merged_stage.pop("deadline", None)
+    elif "deadline" in stage_update:
+        merged_stage.pop("end_date", None)
+        merged_stage.pop("endDate", None)
+        
+    if "start_date" in stage_update:
+        merged_stage.pop("startDate", None)
+    elif "startDate" in stage_update:
+        merged_stage.pop("start_date", None)
+        
+    if old_dl and new_dl and old_dl != new_dl:
+        merged_stage["stored_status"] = ""
+
     # [FIX] Validate stage separation
     new_type = str(merged_stage.get("type", "")).upper()
+    event_full = await events_col.find_one({"_id": ObjectId(event_id)})
     if new_type in ["REGISTRATION", "TEAM_FORMATION"]:
-        # Check if other stages already have this type
-        event_full = await events_col.find_one({"_id": ObjectId(event_id)})
         for s in (event_full.get("stages") or []):
             if s.get("id") != stage_id and str(s.get("type", "")).upper() == new_type:
                 raise HTTPException(status_code=400, detail=f"An event can only have one {new_type} stage.")
@@ -4554,6 +4885,14 @@ async def update_event_stage(event_id: str, stage_id: str, stage_update: dict, u
         {"_id": ObjectId(event_id), "stages.id": stage_id},
         {"$set": {"stages.$": merged_stage}}
     )
+    
+    event_updated = await events_col.find_one({"_id": ObjectId(event_id)})
+    if event_updated:
+        from db import opportunities_col
+        await opportunities_col.update_many(
+            {"event_link_id": str(event_id)},
+            {"$set": {"stages": event_updated.get("stages", [])}}
+        )
     
     # Audit log recording
     from services.audit_service import log_admin_action
@@ -5652,6 +5991,28 @@ async def extend_participant_deadline(
         },
     )
 
+    # Also update the stage end_date on the event so date-based status computation works
+    old_end = stage.get("end_date") or stage.get("endDate") or stage.get("deadline")
+    if old_end:
+        try:
+            old_dt = datetime.fromisoformat(str(old_end).replace("Z", "+00:00"))
+            if old_dt.tzinfo is None:
+                old_dt = old_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            old_dt = None
+        if old_dt and new_deadline > old_dt:
+            stage_key = f"stages.{stage_index}.end_date"
+            await events_col.update_one(
+                {"_id": ObjectId(resolved_eid)},
+                {
+                    "$set": {
+                        stage_key: new_deadline.isoformat(),
+                        f"stages.{stage_index}.stored_status": "",
+                        "updated_at": datetime.utcnow(),
+                    }
+                }
+            )
+
     # Send email notification
     email = str(p.get("email") or "").strip()
     if email:
@@ -6471,72 +6832,81 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
 # Removed duplicate unscoped export route
 
 @router.get("/leaderboard/{event_id}/export-pdf")
-async def export_leaderboard_pdf(event_id: str):
-    """Generates a PDF export of the leaderboard for a specific event."""
-    from fastapi.responses import FileResponse
-    from db import scores_col, submissions_col, teams_col
-    import os
+async def export_leaderboard_pdf(
+    event_id: str,
+    stage_id: Optional[str] = Query(None),
+    user: dict = Depends(get_auth_user)
+):
+    """
+    Generates a professional PDF report with ranked results
+    and detailed dimension-based breakdowns.
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from io import BytesIO
+    from db import events_col
+    from fastapi.responses import Response
 
-    # Resolve placeholders
-    if event_id in ["active_event", "ALL"]:
-        event = await events_col.find_one({"status": "Live"}, sort=[("created_at", -1)])
-        if not event: event = await events_col.find_one({}, sort=[("created_at", -1)])
-        if event: 
-            event_id = str(event["_id"])
-            event_title = event.get("title", "Event") if event_id != "ALL" else "All Events Master Leaderboard"
-        else: 
-            raise HTTPException(status_code=404, detail="No events found to export.")
-    else:
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
-        event_title = event.get("title", "Event")
+    await assert_institution_owns_event(event_id, user)
+
+    # Get the integrated leaderboard data
+    lb_data = await get_integrated_institution_leaderboard(event_id, stage_id, user)
+    rankings = lb_data.get("submissions", [])
     
-    # Aggregate scores (if ALL, we match all scores, otherwise just the specific event)
-    match_query = {} if event_id == "ALL" else {"event_id": event_id}
-    pipeline = [
-        {"$match": match_query},
-        {"$group": {"_id": "$submission_id", "avg_score": {"$avg": "$total_score"}}},
-        {"$sort": {"avg_score": -1}}
-    ]
-    results = await scores_col.aggregate(pipeline).to_list(100)
+    event_doc = await events_col.find_one({"_id": ObjectId(event_id)})
+    event_title = event_doc.get("title", "Event Leaderboard")
+    if stage_id:
+        stage_name = next((s.get("name") for s in event_doc.get("stages", []) if s.get("id") == stage_id), "Selected Stage")
+        event_title += f" - {stage_name}"
 
-    # Build simple HTML table for PDF
-    rows_html = ""
-    for rank, r in enumerate(results, 1):
-        sub = await submissions_col.find_one({"_id": ObjectId(r["_id"])}) if r.get("_id") else None
-        team_name = "Individual"
-        if sub and sub.get("team_id"):
-            team = await teams_col.find_one({"_id": ObjectId(sub["team_id"])})
-            team_name = team.get("team_name", "Team") if team else "Team"
-        project = sub.get("project_title", "N/A") if sub else "N/A"
-        rows_html += f"<tr><td>{rank}</td><td>{team_name}</td><td>{project}</td><td>{round(r['avg_score'], 2)}</td></tr>"
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
 
-    html_content = f"""
-    <html><head><style>
-        body {{ font-family: 'Poppins', sans-serif; padding: 40px; }}
-        h1 {{ color: #1e293b; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-        th, td {{ border: 1px solid #e2e8f0; padding: 12px; text-align: left; }}
-        th {{ background: #1e293b; color: white; }}
-        tr:nth-child(even) {{ background: #f8fafc; }}
-    </style></head><body>
-        <h1>{event_title} — Final Leaderboard</h1>
-        <p>Generated: {datetime.utcnow().strftime('%B %d, %Y')}</p>
-        <table><tr><th>Rank</th><th>Team</th><th>Project</th><th>Score</th></tr>{rows_html}</table>
-    </body></html>"""
+    # Title
+    elements.append(Paragraph(f"Official Results: {event_title}", styles['Title']))
+    elements.append(Spacer(1, 12))
 
-    os.makedirs("artifacts/exports", exist_ok=True)
-    pdf_path = f"artifacts/exports/leaderboard_{event_id}.pdf"
-    try:
-        from weasyprint import HTML as WPHTML
-        WPHTML(string=html_content).write_pdf(pdf_path)
-    except ImportError:
-        # Fallback: return HTML if weasyprint not available
-        html_path = f"artifacts/exports/leaderboard_{event_id}.html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-        return FileResponse(html_path, media_type="text/html", filename=f"leaderboard_{event_title}.html")
+    # Summary
+    counts = lb_data.get("counts", {})
+    summary_text = f"Total Teams: {counts.get('Total', 0)} | Shortlisted: {counts.get('Shortlisted', 0)} | Approved: {counts.get('Approved', 0)}"
+    elements.append(Paragraph(summary_text, styles['Normal']))
+    elements.append(Spacer(1, 20))
 
-    return FileResponse(pdf_path, media_type="application/pdf", filename=f"leaderboard_{event_title}.pdf")
+    # Table Header
+    data = [["Rank", "Team / Participant", "Score", "Status"]]
+    for r in rankings:
+        data.append([
+            f"#{r.get('rank')}",
+            r.get('display_name') or r.get('participant_name', 'N/A'),
+            str(r.get('score', r.get('evaluation_score', 0))),
+            r.get('status', 'Pending')
+        ])
+
+    table = Table(data, colWidths=[50, 250, 100, 100])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+
+    doc.build(elements)
+    pdf_content = buffer.getvalue()
+    buffer.close()
+
+    return Response(
+        content=pdf_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=leaderboard_{event_id}.pdf"}
+    )
 
 # Removed duplicate unscoped analytics routes
 @router.get("/export-participants/{institution_id}")
@@ -7303,8 +7673,9 @@ async def get_institution_events_db_only(institution_id: str, user: dict = Depen
     assert_institution_scope(institution_id, user)
     try:
         # Use events_col instead of db.events for consistency
+        # And ensure we do NOT filter out stages
         cursor = events_col.find({"institution_id": institution_id})
-        # Simplified async list comprehension
+        
         events = []
         async for e in cursor:
             # Handle MongoDB _id conversion manually

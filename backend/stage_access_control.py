@@ -322,10 +322,11 @@ async def check_stage_submission_access(
         stage_visibility = str((stage and (stage.get("visibility") or (stage.get("config") or {}).get("visibility"))) or "").lower().strip()
         requires_shortlist = "shortlist" in stage_visibility
 
-        allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered"]
+        allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered", "shortlisted", "accepted", "approved"]
         # Allow registered if event explicitly allows individual progress without team
         if allow_individual:
-            allowed_statuses.append("registered")
+            if "registered" not in allowed_statuses:
+                allowed_statuses.append("registered")
         
         if current_status not in allowed_statuses:
             raise HTTPException(
@@ -538,7 +539,7 @@ async def check_stage_access(event_id: str, user_id: str, stage_index: int = Non
     if stage_type not in ("REGISTRATION", "TEAM_FORMATION") and "regist" not in stage_name_lower:
         stage_visibility = str(stage.get("visibility") or (stage.get("config") or {}).get("visibility") or "").lower().strip()
         requires_shortlist = "shortlist" in stage_visibility
-        allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered"]
+        allowed_statuses = ["shortlisted", "accepted", "approved"] if requires_shortlist else ["registered", "shortlisted", "accepted", "approved"]
         if current_status not in allowed_statuses:
             raise HTTPException(
                 status_code=403,

@@ -25,17 +25,17 @@ if REDIS_AVAILABLE:
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", 6379)),
             db=int(os.getenv("REDIS_DB", 0)),
+            socket_connect_timeout=2,
+            socket_timeout=2,
             decode_responses=True
         )
-        redis_client.ping()  # Test connection
+        redis_client.ping()
         limiter = Limiter(key_func=get_remote_address, storage_uri=f"redis://{redis_client.host}:{redis_client.port}/{redis_client.db}")
         USE_REDIS = True
     except Exception:
-        # Fallback to memory-based rate limiting
         limiter = Limiter(key_func=get_remote_address)
         USE_REDIS = False
 else:
-    # Fallback to memory-based rate limiting
     limiter = Limiter(key_func=get_remote_address)
 
 # Rate limit configurations

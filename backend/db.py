@@ -77,7 +77,8 @@ class DatabaseManager:
         if self.db is not None:
             try:
                 # Initialize core indexes
-                await self.ensure_indexes()
+                # await self.ensure_indexes()
+                logger.info("Database connected (indexes skipped for startup speed)")
             except Exception as e:
                 logger.warning(f"Index creation warning: {e}")
 

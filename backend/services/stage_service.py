@@ -5,7 +5,7 @@ Handles: Registration, Team Formation, Submissions, Final stages with dynamic fi
 
 from db import db, events_col, participants_col, teams_col, submission_data_col, users_col
 from bson import ObjectId
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -173,6 +173,17 @@ async def get_event_stages(event_id: str) -> List[dict]:
                 return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
             return None
 
+        # Look up subscription-based deadline extension
+        inst_id = event.get("institution_id")
+        access_days = 0
+        if inst_id:
+            try:
+                from services.subscription_service import get_current_plan_rules
+                rules = await get_current_plan_rules(inst_id)
+                access_days = int(rules.get("access_days_after_deadline") or 0)
+            except Exception:
+                pass
+
         # Enrich stages with type info and a computed live status
         enriched = []
         now = datetime.now(timezone.utc)
@@ -187,7 +198,20 @@ async def get_event_stages(event_id: str) -> List[dict]:
             result_time = _parse_dt(stage.get("result_time"))
 
             stored_status = stage.get("stored_status", "")
-            if stored_status:
+            # Apply subscription extension to deadline if available
+            effective_end = end_date
+            if access_days and end_date:
+                effective_end = end_date + timedelta(days=access_days)
+
+            # Compute from dates first — dates are the source of truth.
+            # stored_status only applies when dates are absent or ambiguous.
+            if start_date and now < start_date:
+                computed_status = "Upcoming"
+            elif effective_end and now > effective_end:
+                computed_status = "Completed"
+            elif start_date or end_date:
+                computed_status = "Active"
+            elif stored_status:
                 computed_status = {
                     "draft": "Upcoming",
                     "scheduled": "Upcoming",
@@ -196,12 +220,7 @@ async def get_event_stages(event_id: str) -> List[dict]:
                     "cancelled": "Completed",
                 }.get(stored_status, "Upcoming")
             else:
-                if start_date and now < start_date:
-                    computed_status = "Upcoming"
-                elif end_date and now > end_date:
-                    computed_status = "Completed"
-                else:
-                    computed_status = "Active"
+                computed_status = "Active"
 
             # Compute locked state from unlock rules
             depends_on = stage.get("depends_on", [])
@@ -390,9 +409,8 @@ async def get_participant_stage_progress(event_id: str, user_id: str) -> dict:
         
         stored_current_stage = participant.get("current_stage")
         
-        # Determine current stage: prefer stored value, fallback to date-based
+        # Determine current stage: prefer stored value, fallback to computed status
         current_stage_idx = 0
-        current_time = datetime.now(timezone.utc)
         
         current_stage = None
         upcoming_stages = []
@@ -410,28 +428,6 @@ async def get_participant_stage_progress(event_id: str, user_id: str) -> dict:
         
         # Classify stages based on stored_current_stage or date computation
         for stage in stages:
-            end_date = stage.get("end_date")
-            if isinstance(end_date, str):
-                try:
-                    end_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-                    if end_date.tzinfo is None:
-                        end_date = end_date.replace(tzinfo=timezone.utc)
-                except:
-                    end_date = None
-            elif isinstance(end_date, datetime) and end_date.tzinfo is None:
-                end_date = end_date.replace(tzinfo=timezone.utc)
-            
-            start_date = stage.get("start_date")
-            if isinstance(start_date, str):
-                try:
-                    start_date = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
-                    if start_date.tzinfo is None:
-                        start_date = start_date.replace(tzinfo=timezone.utc)
-                except:
-                    start_date = None
-            elif isinstance(start_date, datetime) and start_date.tzinfo is None:
-                start_date = start_date.replace(tzinfo=timezone.utc)
-            
             # If we found a stored current_stage match, use ordering for classification
             if current_stage:
                 if stage["order"] < current_stage_idx:
@@ -440,9 +436,10 @@ async def get_participant_stage_progress(event_id: str, user_id: str) -> dict:
                     upcoming_stages.append(stage)
                 # stage at current_stage_idx stays as current_stage
             else:
-                # Fallback: date-based computation
-                stage_started = not start_date or current_time >= start_date
-                stage_passed = end_date and current_time > end_date
+                # Fallback: use get_event_stages computed status (accounts for subscription extensions)
+                stage_status = stage.get("status", "Upcoming")
+                stage_passed = stage_status == "Completed"
+                stage_started = stage_status in ("Active", "Completed")
                 
                 if current_stage is None and not stage_passed and stage_started:
                     current_stage = stage

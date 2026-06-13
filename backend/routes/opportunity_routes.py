@@ -98,6 +98,8 @@ async def my_overview(user: dict = Depends(get_auth_user), limit: int = 8):
     try:
         return await get_learner_opportunity_overview(user["user_id"], limit=limit)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

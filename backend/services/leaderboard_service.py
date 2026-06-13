@@ -1,12 +1,12 @@
 from datetime import datetime
+from typing import Optional
 from bson import ObjectId
 from db import scores_col, submissions_col, submission_data_col, leaderboard_col, events_col
 
 class LeaderboardService:
-    async def calculate_event_leaderboard(self, event_id: str, max_entries: int = 5000):
+    async def calculate_event_leaderboard(self, event_id: str, stage_id: Optional[str] = None, max_entries: int = 5000):
         """
-        Dynamically calculates rankings by aggregating judge scores.
-        Handles both individual and team participation across submission types.
+        Dynamically calculates rankings by aggregating judge scores, optionally filtered by stage_id.
         """
         # Local imports to avoid circular reference
         from integration_routes import collect_event_id_variants
@@ -20,14 +20,19 @@ class LeaderboardService:
                 except Exception:
                     pass
 
+        # 1. Base query for event
+        query = {"event_id": {"$in": event_id_in}}
+        if stage_id:
+            query["stage_id"] = stage_id
+
         # 1. Get submissions for the event from both collections (with limits to prevent OOM)
         submissions = await submissions_col.find(
-            {"event_id": {"$in": event_id_in}},
-            {"_id": 1, "team_id": 1, "user_id": 1, "participant_id": 1, "team_name": 1, "project_name": 1, "project_title": 1}
+            query,
+            {"_id": 1, "team_id": 1, "user_id": 1, "participant_id": 1, "team_name": 1, "project_name": 1, "project_title": 1, "stage_id": 1}
         ).to_list(length=max_entries)
         stage_submissions = await submission_data_col.find(
-            {"event_id": {"$in": event_id_in}},
-            {"_id": 1, "team_id": 1, "user_id": 1, "participant_id": 1, "team_name": 1, "data.project_name": 1, "data.project_title": 1}
+            query,
+            {"_id": 1, "team_id": 1, "user_id": 1, "participant_id": 1, "team_name": 1, "data.project_name": 1, "data.project_title": 1, "stage_id": 1}
         ).to_list(length=max_entries)
         
         # Combine submissions (ensure we don't have duplicates if id overlaps)
@@ -37,8 +42,11 @@ class LeaderboardService:
 
         from db import teams_col, participants_col, users_col
 
-        # Batch query all scores for the event up front (limit to prevent OOM)
-        scores_list = await scores_col.find({"event_id": {"$in": event_id_in}}).to_list(length=100000)
+        # Batch query all scores for the event/stage up front
+        score_query = {"event_id": {"$in": event_id_in}}
+        if stage_id:
+            score_query["stage_id"] = stage_id
+        scores_list = await scores_col.find(score_query).to_list(length=100000)
         
         # Build maps for O(1) in-memory lookups
         scores_by_sub = {}

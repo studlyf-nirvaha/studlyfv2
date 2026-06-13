@@ -9,8 +9,9 @@ router = APIRouter(prefix="/api/direct-sync", tags=["Direct Sync"])
 
 @router.post("/force-update/{event_id}")
 async def force_update_all_opportunities(event_id: str):
-    """Force update all opportunities with event stages - simple direct approach"""
+    """Force update all opportunities with event stages - optimized bulk approach"""
     from bson import ObjectId
+    from pymongo import UpdateOne
     try:
         print(f"DIRECT SYNC: Force updating all opportunities for event: {event_id}")
         
@@ -29,9 +30,12 @@ async def force_update_all_opportunities(event_id: str):
                 deadline = s.get("end_date") or s.get("endDate") or s.get("deadline") or deadline
 
         # Update opportunities LINKED to this event
-        all_opportunities = await opportunities_col.find({"event_link_id": event_id}).to_list(length=100)
+        all_opportunities = await opportunities_col.find({"event_link_id": event_id}).to_list(length=1000)
         
-        updated_count = 0
+        if not all_opportunities:
+            return {"success": True, "message": "No opportunities to update", "updated_count": 0}
+
+        bulk_operations = []
         for opportunity in all_opportunities:
             update_data = {
                 "stages": event_stages,
@@ -45,14 +49,16 @@ async def force_update_all_opportunities(event_id: str):
             if event.get("banner_url"):
                 update_data["banner_url"] = event["banner_url"]
 
-            result = await opportunities_col.update_one(
-                {"_id": opportunity["_id"]},
-                {"$set": update_data}
+            bulk_operations.append(
+                UpdateOne(
+                    {"_id": opportunity["_id"]},
+                    {"$set": update_data}
+                )
             )
             
-            if result.modified_count > 0:
-                updated_count += 1
-                print(f"DIRECT SYNC: Updated opportunity: {opportunity.get('title', 'Unknown')}")
+        result = await opportunities_col.bulk_write(bulk_operations)
+        updated_count = result.modified_count
+        print(f"DIRECT SYNC: Updated {updated_count} opportunities via bulk write")
         
         return {
             "success": True,

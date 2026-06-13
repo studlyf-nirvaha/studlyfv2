@@ -840,14 +840,33 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         if (bundleLoading) return;
         setBundleLoading(true);
         try {
-            let url = `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?threshold=${shortlistThreshold}&waitlist_min=${waitlistThreshold}&reject_below=${rejectThreshold}`;
-            if (stageId) url += `&stage_id=${encodeURIComponent(stageId)}`;
+            // New endpoint for stage-specific submissions and counts
+            const url = stageId 
+                ? `${API_BASE_URL}/api/submissions/admin/events/${eventId}/stage/${encodeURIComponent(stageId)}/submissions`
+                : `${API_BASE_URL}/api/v1/institution/events/${eventId}/qualified-bundle?threshold=${shortlistThreshold}&waitlist_min=${waitlistThreshold}&reject_below=${rejectThreshold}`;
+                
             const res = await fetch(url, {
                 headers: { ...authHeaders() }
             });
             if (res.ok) {
                 const data = await res.json();
-                setBundleData(data);
+                if (stageId) {
+                    // Map new endpoint response structure to bundleData structure
+                    setBundleData({
+                        shortlisted: data.submissions.filter((s: any) => String(s.status).toLowerCase() === 'shortlisted'),
+                        waitlisted: data.submissions.filter((s: any) => String(s.status).toLowerCase() === 'waitlisted'),
+                        rejected: data.submissions.filter((s: any) => String(s.status).toLowerCase() === 'rejected'),
+                        pending: data.submissions.filter((s: any) => String(s.status).toLowerCase() === 'pending'),
+                        summary: {
+                            shortlisted: data.counts['Shortlisted'] || 0,
+                            waitlisted: data.counts['Waitlisted'] || 0,
+                            rejected: data.counts['Rejected'] || 0,
+                            pending: data.counts['Pending'] || 0,
+                        }
+                    });
+                } else {
+                    setBundleData(data);
+                }
             }
         } catch (e) {
             console.error('[BUNDLE] Failed to fetch evaluation bundle:', e);
@@ -1445,9 +1464,6 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     if (!event) return <div>Event not found</div>;
 
     const getStageStatus = (stage: any) => {
-        const explicit = String(stage?.status || '').trim().toLowerCase();
-        if (explicit) return explicit;
-
         const normalizeDate = (value: any, endOfDay = false) => {
             if (!value) return null;
             const raw = String(value).trim();
@@ -1467,11 +1483,17 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             return parsed;
         };
 
+        // Dates are the source of truth — compute from them first
         const now = new Date();
         const start = normalizeDate(stage?.start_date || stage?.startDate, false);
         const end = normalizeDate(stage?.end_date || stage?.endDate, true);
         if (start && now < start) return 'upcoming';
         if (end && now > end) return 'completed';
+        if (start || end) return 'active';
+
+        // Only fall back to explicit status when no dates exist
+        const explicit = String(stage?.status || '').trim().toLowerCase();
+        if (explicit) return explicit;
         return 'active';
     };
 

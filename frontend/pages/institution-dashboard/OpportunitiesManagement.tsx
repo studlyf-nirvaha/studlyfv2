@@ -165,7 +165,10 @@ const OpportunitiesManagement: React.FC<OpportunitiesManagementProps> = ({ insti
                 
                 const data = await response.json();
                 
-                const filteredData = data.filter((e: any) => 
+                // Safety check to ensure data is an array
+                const eventsArray = Array.isArray(data) ? data : [];
+                
+                const filteredData = eventsArray.filter((e: any) => 
                     e.category !== 'Job' && e.category !== 'Internship'
                 );
 

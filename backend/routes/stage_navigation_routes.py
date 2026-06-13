@@ -452,6 +452,13 @@ async def configure_stages(
         {"$set": {"stages": stages, "updated_at": datetime.now(timezone.utc)}}
     )
     
+    # Sync stages to opportunities mirror
+    from db import opportunities_col
+    await opportunities_col.update_many(
+        {"event_link_id": str(event_id)},
+        {"$set": {"stages": stages, "updated_at": datetime.now(timezone.utc)}}
+    )
+    
     return {
         "status": "success",
         "message": f"Configured {len(stages)} stages for event",

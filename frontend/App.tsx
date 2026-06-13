@@ -71,6 +71,7 @@ const StudentDiscounts = lazy(() => import('./pages/StudentDiscounts'));
 const StudentSchemes = lazy(() => import('./pages/StudentSchemes'));
 const FeaturePreview = lazy(() => import('./pages/FeaturePreview'));
 const InstitutionDashboard = lazy(() => import('./pages/institution-dashboard/InstitutionDashboard'));
+const AchievementRegistry = lazy(() => import('./pages/institution-dashboard/AchievementRegistry'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));

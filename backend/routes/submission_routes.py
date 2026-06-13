@@ -303,11 +303,7 @@ async def admin_view_stage_submissions(
     stage_id: str,
     user: dict = Depends(get_current_user)
 ):
-    """Admin endpoint: View all submissions for a specific stage of an event.
-    
-    Requires: User is institution owner of the event
-    Returns: Paginated submission list with participant details
-    """
+    """Admin endpoint: View all submissions for a specific stage with classification counts."""
     from db import submission_data_col as submissions_col, events_col, users_col, teams_col
     from bson import ObjectId
     
@@ -336,11 +332,24 @@ async def admin_view_stage_submissions(
                 break
         
         # Fetch submissions for this stage
-        query = {"event_id": str(event_id), "stage_id": stage_id}
+        try:
+            st_id = ObjectId(stage_id)
+        except Exception:
+            st_id = stage_id
+            
+        query = {"event_id": str(event_id), "stage_id": st_id}
         cursor = submissions_col.find(query).sort("submitted_at", -1)
         
         submissions = []
+        counts = {"Shortlisted": 0, "Waitlisted": 0, "Rejected": 0, "Pending": 0}
+        
         async for sub in cursor:
+            status = str(sub.get("status") or "Pending").capitalize()
+            if status in counts:
+                counts[status] += 1
+            else:
+                counts["Pending"] += 1
+            
             sub_user_id = sub.get("user_id")
             sub_team_id = sub.get("team_id")
             
@@ -375,6 +384,7 @@ async def admin_view_stage_submissions(
             "event_title": event.get("title"),
             "stage_id": stage_id,
             "stage_name": stage_name,
+            "counts": counts,
             "total_submissions": len(submissions),
             "submissions": submissions
         }

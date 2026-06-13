@@ -288,7 +288,7 @@ async def _hydrate_opportunity_list_from_events(docs: List[dict]) -> List[dict]:
     return docs
 
 
-def _all_stages_completed(event: dict) -> bool:
+def _all_stages_completed(event: dict, access_days_after_deadline: int = 0) -> bool:
     """Check if all stages in an event are completed (end_date past or stored_status completed/cancelled)."""
     stages = event.get("stages", [])
     if not isinstance(stages, list) or not stages:
@@ -304,8 +304,15 @@ def _all_stages_completed(event: dict) -> bool:
         if not end_raw:
             return False  # Stage with no end date → cannot confirm completion
         end_dt = _safe_dt(end_raw)
-        if end_dt is None or now <= end_dt:
-            return False  # Stage still active or date unparseable
+        if end_dt is None:
+            return False
+        # Apply subscription extension
+        if access_days_after_deadline and now > end_dt:
+            max_visible_until = end_dt + timedelta(days=int(access_days_after_deadline))
+            if now <= max_visible_until:
+                continue
+        if now <= end_dt:
+            return False  # Stage still active
     return True
 
 
@@ -328,30 +335,47 @@ async def _filter_public_opportunities(docs: List[dict]) -> List[dict]:
             event_by_id[str(ev["_id"])] = ev
 
     out = []
+    # Cache plan rules per institution to avoid duplicate lookups
+    plan_rules_cache = {}
     for d in docs:
         eid = d.get("event_link_id")
         if not eid:
             out.append(d)
             continue
         ev = event_by_id.get(str(eid))
-        if ev and _event_status_listable(ev.get("status")) and not _all_stages_completed(ev):
-            # Check plan-based listing access duration after deadline
-            inst_id = ev.get("institution_id")
-            deadline = d.get("deadline")
-            if inst_id and deadline:
+        if not ev or not _event_status_listable(ev.get("status")):
+            continue
+
+        # Look up subscription extension once per event
+        inst_id = ev.get("institution_id")
+        access_days = 0
+        if inst_id:
+            if inst_id not in plan_rules_cache:
                 try:
                     from services.subscription_service import get_current_plan_rules
                     rules = await get_current_plan_rules(inst_id)
-                    access_days = rules.get("access_days_after_deadline")
-                    if access_days is not None:
-                        if isinstance(deadline, str):
-                            deadline = datetime.fromisoformat(deadline.replace("Z", "+00:00"))
-                        max_visible_until = deadline + timedelta(days=int(access_days))
-                        if datetime.now(timezone.utc) > max_visible_until:
-                            continue
+                    plan_rules_cache[inst_id] = int(rules.get("access_days_after_deadline") or 0)
                 except Exception:
-                    pass
-            out.append(d)
+                    plan_rules_cache[inst_id] = 0
+            access_days = plan_rules_cache[inst_id]
+
+        if _all_stages_completed(ev, access_days):
+            continue
+
+        # Enforce deadline (with optional subscription-based extension)
+        deadline = d.get("deadline")
+        if isinstance(deadline, str):
+            deadline = datetime.fromisoformat(deadline.replace("Z", "+00:00"))
+        if isinstance(deadline, datetime) and deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        
+        if deadline:
+            now = datetime.now(timezone.utc)
+            if now > deadline:
+                max_visible_until = deadline + timedelta(days=int(access_days))
+                if now > max_visible_until:
+                    continue
+        out.append(d)
     return out
 
 async def create_opportunity(data: dict) -> dict:
@@ -371,28 +395,34 @@ async def create_opportunity(data: dict) -> dict:
 
 async def get_all_opportunities(filters: dict = None) -> List[dict]:
     """Retrieves all opportunities from the database with optional filtering."""
-    # Performance Optimized: Removed automated sync loop which caused 30s+ latency.
-    # Regular Fetching
-    query = {"status": "active"}
-    if filters:
-        if filters.get("type"):
-            query["type"] = filters["type"]
-        if filters.get("institution_id"):
-            query["createdBy"] = filters["institution_id"]
+    try:
+        # Performance Optimized: Removed automated sync loop which caused 30s+ latency.
+        # Regular Fetching
+        query = {"status": "active"}
+        if filters:
+            if filters.get("type"):
+                query["type"] = filters["type"]
+            if filters.get("institution_id"):
+                query["createdBy"] = filters["institution_id"]
 
-    # Use projection to exclude massive fields for list view
-    projection = {
-        "description": 0,
-        "logo_url": 0
-    }
+        # Use projection to exclude massive fields for list view
+        projection = {
+            "description": 0,
+            "logo_url": 0
+        }
 
-    cursor = opportunities_col.find(query, projection).sort("createdAt", -1)
-    opportunities = []
-    async for doc in cursor:
-        doc["_id"] = str(doc["_id"])
-        opportunities.append(doc)
-    filtered = await _filter_public_opportunities(opportunities)
-    return await _hydrate_opportunity_list_from_events(filtered)
+        cursor = opportunities_col.find(query, projection).sort("createdAt", -1)
+        opportunities = []
+        async for doc in cursor:
+            doc["_id"] = str(doc["_id"])
+            opportunities.append(doc)
+        filtered = await _filter_public_opportunities(opportunities)
+        return await _hydrate_opportunity_list_from_events(filtered)
+    except Exception as e:
+        print(f"[CRITICAL] get_all_opportunities failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise e
 
 async def get_opportunity_by_id(
     opportunity_id: str, applicant_user_id: Optional[str] = None
@@ -667,8 +697,15 @@ async def get_user_applications(user_id: str) -> List[dict]:
     for doc in applications:
         doc["_id"] = str(doc["_id"])
         oid = doc.get("opportunity_id")
-        if oid and ObjectId.is_valid(oid):
-            opp_ids.append(ObjectId(oid))
+        if oid:
+            try:
+                if ObjectId.is_valid(oid):
+                    opp_ids.append(ObjectId(oid))
+                else:
+                    print(f"Invalid ObjectId found for opportunity_id: {oid}")
+            except Exception as e:
+                print(f"Error processing ObjectId {oid}: {e}")
+                continue
             
     opp_map = {}
     if opp_ids:
@@ -756,8 +793,15 @@ async def get_learner_opportunity_overview(user_id: str, limit: int = 8) -> dict
     opp_ids = []
     for a in apps:
         oid = a.get("opportunity_id")
-        if oid and ObjectId.is_valid(oid):
-            opp_ids.append(ObjectId(oid))
+        if oid:
+            try:
+                if ObjectId.is_valid(oid):
+                    opp_ids.append(ObjectId(oid))
+                else:
+                    print(f"Invalid ObjectId found for opportunity_id: {oid}")
+            except Exception as e:
+                print(f"Error processing ObjectId {oid}: {e}")
+                continue
 
     opp_map = {}
     if opp_ids:
@@ -776,7 +820,7 @@ async def get_learner_opportunity_overview(user_id: str, limit: int = 8) -> dict
         event_map = {str(ev["_id"]): ev for ev in event_list}
 
     upcoming = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for a in apps:
         oid = str(a.get("opportunity_id") or "")
         opp = opp_map.get(oid)

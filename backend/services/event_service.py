@@ -62,6 +62,9 @@ async def _create_opportunity_for_event(event_data: dict, opportunities_col):
             "updated_at": datetime.utcnow()
         }
         
+        if "stages" in event_data:
+            opp_data["stages"] = event_data["stages"]
+        
         if existing_opp:
             # Update existing opportunity
             await opportunities_col.update_one(
@@ -175,7 +178,11 @@ async def update_event(event_id: str, update_data: dict):
         {"_id": ObjectId(event_id)},
         {"$set": update_data}
     )
-    return await get_event_by_id(event_id)
+    updated_event = await get_event_by_id(event_id)
+    if updated_event and str(updated_event.get("status", "")).upper() in ("LIVE", "PUBLISHED", "ACTIVE", "UPCOMING"):
+        from db import opportunities_col
+        asyncio.create_task(_create_opportunity_for_event(updated_event, opportunities_col))
+    return updated_event
 
 async def delete_event(event_id: str):
     # Soft-delete: mark event as DELETED and hide from students/institution views

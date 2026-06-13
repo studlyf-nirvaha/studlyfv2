@@ -1068,9 +1068,7 @@ const OpportunityDetails: React.FC = () => {
 
         // Progression-based authorization (Strict)
         // 1. Must be the current stage or a previous stage
-        if (isAuthorized && participantStageIndex < stageIndex) {
-            isAuthorized = false;
-        }
+        // Removed `if (isAuthorized && participantStageIndex < stageIndex)` to allow status and depends_on to govern unlocks correctly
 
         // 2. Depends on rules (if provided by DB)
         const dependsOn = s.depends_on || s.config?.depends_on || [];

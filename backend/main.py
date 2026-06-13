@@ -24,11 +24,143 @@ import asyncio
 from services.email_service import send_notification_email, get_registration_template, get_announcement_template
 from datetime import datetime, timezone
 import secrets
- 
+from contextlib import asynccontextmanager
 
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Try connecting to MongoDB with a short timeout so server starts regardless
+    db_connected = False
+    try:
+        await asyncio.wait_for(db.connect(), timeout=5)
+        db_connected = True
+    except Exception:
+        logger.warning("MongoDB not available — running without database")
+
+    # Spawn background stage email queue worker
+    try:
+        from services.email_queue_service import start_email_queue_worker
+        asyncio.create_task(start_email_queue_worker())
+        logger.info("Background Stage Email Queue Worker spawned successfully")
+    except Exception as e:
+        logger.error(f"Failed to start background stage email queue worker: {e}")
+
+    logger.info("Application startup completed successfully")
+
+    if db_connected:
+        # DB diagnostics dump
+        try:
+            from db import events_col, opportunities_col
+            events_cursor = events_col.find({})
+            events = await events_cursor.to_list(length=100)
+            opps_cursor = opportunities_col.find({})
+            opps = await opps_cursor.to_list(length=100)
+
+            diag_path = os.path.join(os.path.dirname(__file__), "db_diagnostics.txt")
+            with open(diag_path, "w", encoding="utf-8") as f:
+                f.write(f"=== DB DIAGNOSTICS ===\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n\n")
+                f.write(f"--- EVENTS ({len(events)}) ---\n")
+                for e in events:
+                    f.write(f"ID: {e.get('_id')}\n")
+                    f.write(f"Title: {e.get('title')}\n")
+                    f.write(f"Logo URL: {e.get('logo_url')}\n")
+                    f.write(f"Banner URL: {e.get('banner_url')}\n")
+                    f.write(f"Status: {e.get('status')}\n")
+                    f.write("-" * 20 + "\n")
+
+                f.write(f"\n--- OPPORTUNITIES ({len(opps)}) ---\n")
+                for o in opps:
+                    f.write(f"ID: {o.get('_id')}\n")
+                    f.write(f"Title: {o.get('title')}\n")
+                    f.write(f"Logo URL: {o.get('logo_url')}\n")
+                    f.write(f"Banner URL: {o.get('banner_url')}\n")
+                    f.write(f"Event Link ID: {o.get('event_link_id')}\n")
+                    f.write("-" * 20 + "\n")
+            logger.info(f"DB diagnostics written to {diag_path}")
+        except Exception as e:
+            logger.error(f"Failed to write DB diagnostics: {e}")
+
+        # Ensure career assessment templates exist (seed defaults if empty)
+        try:
+            from db import career_assessment_templates_col
+            count = await career_assessment_templates_col.count_documents({})
+            if count == 0:
+                default_templates = [
+                    {"step": 1, "title": "Problem Space", "question": "Which engineering context excites you most?", "options": [
+                        {"label": "Distributed Systems", "value": "distributed"},
+                        {"label": "Data Orchestration", "value": "data"},
+                        {"label": "User Interaction", "value": "frontend"},
+                        {"label": "ML Lifecycle", "value": "ml"}
+                    ]},
+                    {"step": 2, "title": "Mental Model", "question": "How do you approach problem-solving?", "options": [
+                        {"label": "First Principles", "value": "first_principles"},
+                        {"label": "Pattern Recognition", "value": "patterns"},
+                        {"label": "Iterative Experimentation", "value": "iterative"},
+                        {"label": "Design Thinking", "value": "design"}
+                    ]},
+                    {"step": 3, "title": "Tool Preference", "question": "What defines your ideal development loop?", "options": [
+                        {"label": "Go / Rust / Kafka / k8s", "value": "infra"},
+                        {"label": "Python / SQL / Spark", "value": "data"},
+                        {"label": "TypeScript / React", "value": "frontend"},
+                        {"label": "Python / PyTorch / LangChain", "value": "ai"}
+                    ]}
+                ]
+                await career_assessment_templates_col.insert_many(default_templates)
+                logger.info("Seeded default career assessment templates")
+        except Exception as e:
+            logger.warning(f"Could not seed career assessment templates: {e}")
+
+    # Start background scheduler for reminders (non-fatal)
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from services.reminder_service import reminder_service
+
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(reminder_service.send_judge_reminders, 'interval', hours=12)
+        scheduler.add_job(reminder_service.send_participant_reminders, 'interval', hours=6)
+        scheduler.add_job(reminder_service.send_24h_participant_reminders, 'interval', hours=2)
+        scheduler.add_job(reminder_service.send_1h_participant_reminders, 'interval', minutes=30)
+        scheduler.start()
+        logger.info("Background reminder scheduler started")
+    except ImportError as e:
+        logger.warning(f"Scheduler not available - {e}")
+        logger.info("Application running without background reminders")
+
+    # Launch certificate background worker
+    try:
+        from services.institutional_certificate_service import process_certificate_jobs
+        asyncio.create_task(process_certificate_jobs())
+        logger.info("Certificate generation background worker started")
+    except Exception as e:
+        logger.warning(f"Could not start certificate worker: {e}")
+
+    # Mount artifacts/certs as static for PDF downloads
+    try:
+        certs_dir = os.path.join(os.path.dirname(__file__), "artifacts", "certs")
+        os.makedirs(certs_dir, exist_ok=True)
+        app.mount("/certificates", StaticFiles(directory=certs_dir), name="certificates")
+        logger.info(f"Mounted certificates directory at {certs_dir}")
+    except Exception as e:
+        logger.warning(f"Could not mount certificates directory: {e}")
+    # Mount uploads directory for temporary images
+    try:
+        uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+        logger.info(f"Mounted uploads directory at {uploads_dir}")
+    except Exception as e:
+        logger.warning(f"Could not mount uploads directory: {e}")
+
+    yield
+
+    if db_connected:
+        await db.disconnect()
+    from services.redis_pubsub import close as close_redis
+    await close_redis()
+
+app = FastAPI(lifespan=lifespan)
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -48,8 +180,6 @@ if sentry_dsn:
 
 from routes.skill_assessment_controller import router as skill_assessment_router
 app.include_router(skill_assessment_router)
-# Touch file to trigger uvicorn reload when env changes during local dev
-# reload trigger
 
 # Jinja2 templates environment (templates are placed in backend/templates)
 templates_env = Environment(loader=FileSystemLoader('templates'))
@@ -189,98 +319,6 @@ async def rate_limit_middleware(request: Request, call_next):
         pass  # Fail open if rate limiter errors
     return await call_next(request)
 
-
-@app.on_event("startup")
-async def startup_event():
-    """Handle startup tasks including database connection and scheduler."""
-    # Attempt database connection; allow failures to propagate so the
-    # process fails fast when no real MongoDB is available.
-    await db.connect()
-    
-    # Spawn background stage email queue worker
-    try:
-        from services.email_queue_service import start_email_queue_worker
-        asyncio.create_task(start_email_queue_worker())
-        logger.info("Background Stage Email Queue Worker spawned successfully")
-    except Exception as e:
-        logger.error(f"Failed to start background stage email queue worker: {e}")
-
-    logger.info("Application startup completed successfully")
-
-    # DB diagnostics dump
-    try:
-        from db import events_col, opportunities_col
-        events_cursor = events_col.find({})
-        events = await events_cursor.to_list(length=100)
-        opps_cursor = opportunities_col.find({})
-        opps = await opps_cursor.to_list(length=100)
-        
-        diag_path = os.path.join(os.path.dirname(__file__), "db_diagnostics.txt")
-        with open(diag_path, "w", encoding="utf-8") as f:
-            f.write(f"=== DB DIAGNOSTICS ===\n")
-            f.write(f"Timestamp: {datetime.now().isoformat()}\n\n")
-            f.write(f"--- EVENTS ({len(events)}) ---\n")
-            for e in events:
-                f.write(f"ID: {e.get('_id')}\n")
-                f.write(f"Title: {e.get('title')}\n")
-                f.write(f"Logo URL: {e.get('logo_url')}\n")
-                f.write(f"Banner URL: {e.get('banner_url')}\n")
-                f.write(f"Status: {e.get('status')}\n")
-                f.write("-" * 20 + "\n")
-                
-            f.write(f"\n--- OPPORTUNITIES ({len(opps)}) ---\n")
-            for o in opps:
-                f.write(f"ID: {o.get('_id')}\n")
-                f.write(f"Title: {o.get('title')}\n")
-                f.write(f"Logo URL: {o.get('logo_url')}\n")
-                f.write(f"Banner URL: {o.get('banner_url')}\n")
-                f.write(f"Event Link ID: {o.get('event_link_id')}\n")
-                f.write("-" * 20 + "\n")
-        logger.info(f"DB diagnostics written to {diag_path}")
-    except Exception as e:
-        logger.error(f"Failed to write DB diagnostics: {e}")
-
-    # Start background scheduler for reminders (non-fatal)
-    try:
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        from services.reminder_service import reminder_service
-
-        scheduler = AsyncIOScheduler()
-        scheduler.add_job(reminder_service.send_judge_reminders, 'interval', hours=12)
-        scheduler.add_job(reminder_service.send_participant_reminders, 'interval', hours=6)
-        scheduler.add_job(reminder_service.send_24h_participant_reminders, 'interval', hours=2)
-        scheduler.add_job(reminder_service.send_1h_participant_reminders, 'interval', minutes=30)
-        scheduler.start()
-        logger.info("Background reminder scheduler started")
-    except ImportError as e:
-        logger.warning(f"Scheduler not available - {e}")
-        logger.info("Application running without background reminders")
-
-    # Launch certificate background worker
-    try:
-        from services.institutional_certificate_service import process_certificate_jobs
-        asyncio.create_task(process_certificate_jobs())
-        logger.info("Certificate generation background worker started")
-    except Exception as e:
-        logger.warning(f"Could not start certificate worker: {e}")
-
-    # Mount artifacts/certs as static for PDF downloads
-    try:
-        from fastapi.staticfiles import StaticFiles
-        certs_dir = os.path.join(os.path.dirname(__file__), "artifacts", "certs")
-        os.makedirs(certs_dir, exist_ok=True)
-        app.mount("/certificates", StaticFiles(directory=certs_dir), name="certificates")
-        logger.info(f"Mounted certificates directory at {certs_dir}")
-    except Exception as e:
-        logger.warning(f"Could not mount certificates directory: {e}")
-    # Mount uploads directory for temporary images
-    try:
-        uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
-        os.makedirs(uploads_dir, exist_ok=True)
-        app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
-        logger.info(f"Mounted uploads directory at {uploads_dir}")
-    except Exception as e:
-        logger.warning(f"Could not mount uploads directory: {e}")
 
 @app.get("/")
 async def root():
@@ -617,7 +655,7 @@ async def upload_temp_image(request: Request, file: UploadFile = File(...), publ
 from models import Institution, Event, Participant, Team, Submission, Judge, Score, Notification, LeaderboardEntry, Certificate
 from services.email_service import send_notification_email, get_registration_template, get_email_verification_template
 from auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token
-# from routes import upgrade_routes
+
 import integration_routes
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -820,53 +858,12 @@ from routes import auth
 from routes import evaluation_criteria_routes, quiz_visibility_routes, notification_routes, evaluation_routes, team_formation_routes, stage_sync_routes, direct_sync_routes, hackathon_submission_routes
 from routes import stage_navigation_routes, team_join_request_routes, hackathon_public_routes
 from routes import student_features_routes
-from routes import event_certificate_routes, registration_flow_routes
+from routes import event_certificate_routes, registration_flow_routes, achievement_registry_routes
 
 import hackathon_integration_routes
 import participant_card_routes
 from rate_limiter import rate_limit, check_rate_limit
 
-
-@app.on_event("startup")
-async def startup_db_client():
-    from db import db
-    await db.connect()
-    # Ensure career assessment templates exist (seed defaults if empty)
-    try:
-        from db import career_assessment_templates_col
-        count = await career_assessment_templates_col.count_documents({})
-        if count == 0:
-            default_templates = [
-                {"step": 1, "title": "Problem Space", "question": "Which engineering context excites you most?", "options": [
-                    {"label": "Distributed Systems", "value": "distributed"},
-                    {"label": "Data Orchestration", "value": "data"},
-                    {"label": "User Interaction", "value": "frontend"},
-                    {"label": "ML Lifecycle", "value": "ml"}
-                ]},
-                {"step": 2, "title": "Mental Model", "question": "How do you approach problem-solving?", "options": [
-                    {"label": "First Principles", "value": "first_principles"},
-                    {"label": "Pattern Recognition", "value": "patterns"},
-                    {"label": "Iterative Experimentation", "value": "iterative"},
-                    {"label": "Design Thinking", "value": "design"}
-                ]},
-                {"step": 3, "title": "Tool Preference", "question": "What defines your ideal development loop?", "options": [
-                    {"label": "Go / Rust / Kafka / k8s", "value": "infra"},
-                    {"label": "Python / SQL / Spark", "value": "data"},
-                    {"label": "TypeScript / React", "value": "frontend"},
-                    {"label": "Python / PyTorch / LangChain", "value": "ai"}
-                ]}
-            ]
-            await career_assessment_templates_col.insert_many(default_templates)
-            logger.info("Seeded default career assessment templates")
-    except Exception as e:
-        logger.warning(f"Could not seed career assessment templates: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    from db import db
-    await db.disconnect()
-    from services.redis_pubsub import close as close_redis
-    await close_redis()
 
 # --- Activate Rate Limiting ---
 app.state.limiter = limiter
@@ -897,6 +894,7 @@ app.include_router(hackathon_integration_routes.router)
 app.include_router(hackathon_public_routes.router)
 app.include_router(participant_card_routes.router)
 app.include_router(event_certificate_routes.router)
+app.include_router(achievement_registry_routes.router)
 app.include_router(event_certificate_routes.verification_router)
 app.include_router(registration_flow_routes.router)
 app.include_router(stage_endpoints.router)
@@ -6350,7 +6348,13 @@ async def signup(user_data: UserSignup, request: Request):
     """
     # Ensure unique email and consistent casing
     email_clean = user_data.email.strip().lower()
-    existing_user = await users_col.find_one({"email": email_clean})
+    
+    # Use optimized, indexed lookup with collation
+    existing_user = await users_col.find_one(
+        {"email": email_clean},
+        collation={"locale": "en", "strength": 2}
+    )
+    
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -6513,16 +6517,24 @@ async def login(credentials: UserLogin, request: Request):
     if not password_clean:
         raise HTTPException(status_code=400, detail="Password is required")
     
-    # Use an optimized, indexable case-insensitive search
+    # Use an optimized, indexed lookup with collation
     try:
-        matching_users = await users_col.find({"email": {"$regex": f"^{re.escape(email_clean)}$", "$options": "i"}}).to_list(length=10)
-        user = None
-        if matching_users:
-            verified_users = [u for u in matching_users if bool(u.get("email_verified"))]
-            user = verified_users[0] if verified_users else matching_users[0]
+        user = await users_col.find_one(
+            {"email": email_clean},
+            collation={"locale": "en", "strength": 2}
+        )
+        
+        if not user or not bool(user.get("email_verified")):
+            # Fallback for old records without email_verified or case-insensitive index
+            # This handles users who may not have been indexed correctly yet
+            matching_users = await users_col.find({"email": {"$regex": f"^{re.escape(email_clean)}$", "$options": "i"}}).to_list(length=10)
+            user = None
+            if matching_users:
+                verified_users = [u for u in matching_users if bool(u.get("email_verified"))]
+                user = verified_users[0] if verified_users else matching_users[0]
         
         if not user:
-            logger.warning(f"Login attempt with non-existent email: {email_clean}")
+            logger.warning(f"Login attempt with non-existent or unverified email: {email_clean}")
             raise HTTPException(status_code=401, detail="Invalid email or password")
     except HTTPException:
         raise
@@ -7475,6 +7487,7 @@ async def enroll_course(req: EnrollRequest, current_user: dict = Depends(get_cur
             }))
             
         return {"status": "success", "message": "Enrolled successfully"}
+
 
 if __name__ == "__main__":
     import uvicorn
