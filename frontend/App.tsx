@@ -155,8 +155,6 @@ const App: React.FC = () => {
     if (loading) return;
     if (!pathname) return;
 
-    console.log('[AuthDebug] Role:', role, 'Path:', pathname);
-
     // Public evaluation + judge invitation (no role redirect)
     if (pathname.startsWith('/evaluate/') || pathname.startsWith('/judge-invitation')) {
       return;

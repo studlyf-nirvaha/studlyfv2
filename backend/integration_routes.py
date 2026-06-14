@@ -8,6 +8,7 @@ import json
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Request, Form, File, UploadFile, Body, Depends, Query, Response
 from auth_institution import get_auth_user, get_auth_user_optional, assert_institution_scope, assert_institution_owns_event
+from main import get_current_user, require_role
 from services.email_service import (
     send_notification_email,
     get_certificate_template,
@@ -3071,8 +3072,8 @@ async def get_all_submissions(institution_id: str, user: dict = Depends(get_auth
         "all": list(all_items.values())
     }
 
-@router.post("/submissions")
-async def create_submission(submission_data: dict):
+@router.post("/create_submission", dependencies=[Depends(get_current_user)])
+async def create_submission(submission_data: dict, user: dict = Depends(get_current_user)):
     """
     Creates a new project submission record.
     Fulfills Nithya's core backend responsibility.
@@ -6381,8 +6382,8 @@ async def export_institution_participants(institution_id: str, user: dict = Depe
         headers={"Content-Disposition": f"attachment; filename=participants_{institution_id}.csv"}
     )
 
-@router.post("/members/bulk")
-async def bulk_onboard_members(data: dict):
+@router.post("/members/bulk", dependencies=[Depends(require_role(['admin', 'super_admin']))])
+async def bulk_onboard_members(data: dict, user: dict = Depends(get_current_user)):
     """
     Professional Bulk Onboarding Engine.
     Handles bulk insertion of Judges or Participants with automated duplicate detection.

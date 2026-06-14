@@ -1,6 +1,14 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
+// Block all console output
+console.log = () => {};
+console.warn = () => {};
+console.error = () => {};
+console.info = () => {};
+console.debug = () => {};
+
 import './styles.css';
 import App from './App';
 

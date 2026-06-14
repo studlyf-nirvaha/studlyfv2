@@ -15,7 +15,7 @@ import uuid
 import asyncio
 from db import events_col
 from datetime import datetime
-
+ 
 router = APIRouter(prefix="/api/v1/events", tags=["Events"])
 
 @router.post("/")

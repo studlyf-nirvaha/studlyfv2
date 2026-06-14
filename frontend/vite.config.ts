@@ -3,81 +3,89 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
+  // Load env from repo root (.env, .env.production, .env.development etc.)
   const env = loadEnv(mode, '../', '');
+  const isProd = mode === 'production';
+
+  // In production (Hostinger static), the browser hits the Render API directly.
+  // Set VITE_API_BASE_URL in .env.production to your Render URL.
+  // In development, leave blank — Vite proxy handles /api/* → localhost:8000.
+  const apiBaseUrl = env.VITE_API_BASE_URL || '';
+
   return {
     envDir: '../',
+
+    // ── Dev Server ──────────────────────────────────────────────────────────
     server: {
       port: 3000,
       host: '0.0.0.0',
+      // Proxy only active in local dev; no effect on production build
       proxy: {
         '^/(api/.*|generate-portfolio(?:/.*)?|generate-resume(?:/.*)?|update-portfolio(?:/.*)?|generate-summary(?:/.*)?)': {
           target: env.VITE_API_PROXY || 'http://localhost:8000',
           changeOrigin: true,
           secure: false,
-        }
-      }
+        },
+      },
     },
+
     plugins: [react()],
+
+    // ── Production Build ────────────────────────────────────────────────────
     build: {
+      outDir: 'dist',
       emptyOutDir: true,
-      chunkSizeWarningLimit: 1000, 
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-                if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler') || id.includes('object-assign')) return 'vendor_react';
-                if (id.includes('react-router-dom') || id.includes('react-router')) return 'vendor_router';
-                if (id.includes('framer-motion')) return 'vendor_framer-motion';
-                if (id.includes('lucide-react') || id.includes('react-icons')) return 'vendor_icons';
-                if (id.includes('@heroui')) return 'vendor_heroui';
-                if (id.includes('html2pdf.js') || id.includes('html2canvas') || id.includes('jspdf')) return 'vendor_pdf';
-                if (id.includes('pdfjs-dist')) return 'vendor_pdfjs';
-                if (id.includes('react-markdown') || id.includes('remark-gfm') || id.includes('rehype-raw')) return 'vendor_markdown';
-                if (id.includes('lottie-react')) return 'vendor_lottie';
-                if (id.includes('qrcode')) return 'vendor_qrcode';
-                if (id.includes('react-syntax-highlighter')) return 'vendor_syntax';
-                if (id.includes('react-helmet-async')) return 'vendor_helmet';
-            }
-
-            // Keep react ecosystem together to avoid circular chunk deps
-            if (
-              id.includes('node_modules/react/') ||
-              id.includes('node_modules/react-dom/') ||
-              id.includes('node_modules/scheduler/') ||
-              id.includes('node_modules/use-sync-external-store/')
-            ) return 'vendor_react';
-            if (id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-router')) return 'vendor_router';
-            if (id.includes('node_modules/framer-motion')) return 'vendor_framer-motion';
-            if (id.includes('node_modules/lucide-react') || id.includes('node_modules/react-icons')) return 'vendor_icons';
-            if (id.includes('node_modules/@heroui')) return 'vendor_heroui';
-            if (id.includes('node_modules/html2pdf.js') || id.includes('node_modules/html2canvas') || id.includes('node_modules/jspdf')) return 'vendor_pdf';
-            if (id.includes('node_modules/pdfjs-dist')) return 'vendor_pdfjs';
-            if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark-gfm') || id.includes('node_modules/rehype-raw')) return 'vendor_markdown';
-            if (id.includes('node_modules/lottie-react')) return 'vendor_lottie';
-            if (id.includes('node_modules/qrcode')) return 'vendor_qrcode';
-            if (id.includes('node_modules/react-syntax-highlighter')) return 'vendor_syntax';
-            if (id.includes('node_modules/react-helmet-async')) return 'vendor_helmet';
-            if (id.includes('node_modules/three') || id.includes('node_modules/@react-three')) return 'vendor_three';
-            if (id.includes('node_modules/@google/genai')) return 'vendor_genai';
-
-            // Let Rollup split remaining deps — a catch-all vendor_misc caused
-            // circular chunk warnings (vendor_misc <-> vendor_react) and TDZ errors in prod.
-            return undefined;
-          }
-        }
-      }
+          // Split vendor chunks for better browser caching
+          manualChunks: {
+            react:    ['react', 'react-dom', 'react-router-dom'],
+            ui:       ['framer-motion', 'lucide-react', 'react-icons'],
+            three:    ['three', '@react-three/fiber', '@react-three/drei'],
+            pdf:      ['jspdf', 'html2canvas', 'pdfjs-dist'],
+            markdown: ['react-markdown', 'remark-gfm', 'rehype-raw'],
+          },
+        },
+      },
     },
+
+    // ── Compile-time Env Injection ──────────────────────────────────────────
     define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ''),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ''),
-      'import.meta.env.FRONTEND_URL': JSON.stringify(env.FRONTEND_URL || process.env.FRONTEND_URL || 'https://studlyfhub.vercel.app'),
-      'import.meta.env.RENDER_EXTERNAL_URL': JSON.stringify(env.RENDER_EXTERNAL_URL || process.env.RENDER_EXTERNAL_URL || 'https://studlyf-tlkk.onrender.com'),
-      'import.meta.env.ADDITIONAL_CORS_ORIGINS': JSON.stringify(env.ADDITIONAL_CORS_ORIGINS || process.env.ADDITIONAL_CORS_ORIGINS || 'https://studlyf-tlkk.onrender.com')
+      // SECURITY: No API keys here — all secrets live server-side only.
+
+      // The frontend origin (Hostinger domain)
+      'import.meta.env.FRONTEND_URL': JSON.stringify(
+        env.FRONTEND_URL || 'https://www.studlyf.in'
+      ),
+
+      // Render backend base URL (baked in at build time from .env.production)
+      // Update VITE_API_BASE_URL in .env.production once Render URL is known.
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(apiBaseUrl),
+      'import.meta.env.RENDER_EXTERNAL_URL': JSON.stringify(
+        env.RENDER_EXTERNAL_URL || apiBaseUrl || ''
+      ),
+
+      'import.meta.env.VITE_ENABLE_ANALYTICS': JSON.stringify(
+        env.VITE_ENABLE_ANALYTICS || 'true'
+      ),
+      'import.meta.env.VITE_ENABLE_SENTRY': JSON.stringify(
+        env.VITE_ENABLE_SENTRY || 'true'
+      ),
+      'import.meta.env.VITE_SUPPORT_EMAIL': JSON.stringify(
+        env.VITE_SUPPORT_EMAIL || 'studlyf21@gmail.com'
+      ),
     },
+
+    // ── esbuild: strip logs/debugger in production only ─────────────────────
+    esbuild: {
+      drop: isProd ? ['console', 'debugger'] : [],
+    },
+
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
-      }
-    }
+      },
+    },
   };
 });

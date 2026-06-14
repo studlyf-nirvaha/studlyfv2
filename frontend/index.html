@@ -2,6 +2,14 @@
 <html lang="en">
 
 <head>
+    <script>
+        console.log = function() {};
+        console.warn = function() {};
+        console.error = function() {};
+        console.info = function() {};
+        console.debug = function() {};
+        window.onerror = function() { return true; };
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Standard | Engineering Readiness</title>

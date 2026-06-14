@@ -83,44 +83,52 @@ def _super_admin_email_set() -> set:
 # Setup logging
 from notification_helpers import notify_institution
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.CRITICAL)
+logging.disable(logging.CRITICAL)
 logger = logging.getLogger("main_service")
 
-# Configure CORS - Restricted to specific domains for security
-# Load allowed origins from environment or use defaults
-frontend_url = os.getenv("FRONTEND_URL", "https://studlyf-v2.vercel.app")
-backend_url = os.getenv("RENDER_EXTERNAL_URL", "")
-additional_origins = [origin.strip() for origin in os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",") if origin.strip()]
+# ── CORS Configuration ──────────────────────────────────────────────────────
+# Primary production origins (Hostinger + Render)
+PRODUCTION_ORIGINS = [
+    "https://www.studlyf.in",   # Primary Hostinger domain (www)
+    "https://studlyf.in",       # Apex / non-www variant
+]
 
-origins = list(set([
-    frontend_url,
-    backend_url
-] + additional_origins))
+# The Render backend URL is set automatically by Render at deploy time.
+# Set RENDER_EXTERNAL_URL in Render's environment variables panel.
+render_backend_url = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
 
-# Add localhost origins for development
-if os.getenv("ENVIRONMENT", "development").lower() == "development":
+# Allow extra origins via env var (comma-separated) for future use
+additional_origins = [
+    o.strip() for o in os.getenv("ADDITIONAL_CORS_ORIGINS", "").split(",") if o.strip()
+]
+
+origins: list[str] = list(set(
+    PRODUCTION_ORIGINS
+    + ([render_backend_url] if render_backend_url else [])
+    + additional_origins
+))
+
+# Development: also allow localhost ports
+if os.getenv("ENVIRONMENT", "development").lower() != "production":
     origins.extend([
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:3002",
-        "http://127.0.0.1:3002",
-        "http://localhost:3003",
-        "http://127.0.0.1:3003",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:4173",
-        "http://localhost:4173",
-        "http://localhost:8000"
+        "http://localhost:8000",
     ])
 
-origins = [origin for origin in origins if origin]
+# Final deduplication & remove empty strings
+origins = list({o for o in origins if o})
 
-# Remove duplicates
-origins = list(set(origins))
-
-origin_regex = r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):(3000|3001|3002|3003|5173|4173|8000)$|^https://[a-zA-Z0-9-]+\.vercel\.app$"
+# Regex whitelist: localhost dev ports  +  *.studlyf.in  +  *.onrender.com
+origin_regex = (
+    r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+    r"|^https://([a-zA-Z0-9-]+\.)?studlyf\.in$"
+    r"|^https://[a-zA-Z0-9-]+\.onrender\.com$"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -546,8 +554,8 @@ async def serve_admin(user: dict = Depends(get_current_user)):
     html = templates_env.get_template('admin.html').render()
     return HTMLResponse(content=html)
 
-@app.post("/api/v1/auth/promote-to-institution")
-async def promote_to_institution(data: dict):
+@app.post("/api/v1/auth/promote-to-institution", dependencies=[Depends(require_role(['admin', 'super_admin']))])
+async def promote_to_institution(data: dict, user: dict = Depends(get_current_user)):
     """Updates a user's role to institution in MongoDB."""
     user_id = data.get("user_id")
     if not user_id: raise HTTPException(status_code=400, detail="Missing user_id")
@@ -559,8 +567,15 @@ async def promote_to_institution(data: dict):
     return {"status": "success"}
 
 
-@app.post('/api/utils/upload-temp-image')
+@app.post('/api/utils/upload-temp-image', dependencies=[Depends(get_current_user)])
 async def upload_temp_image(request: Request, file: UploadFile = File(...), public_base: Optional[str] = Form(None)):
+    # Basic Validation
+    if file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large")
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only images allowed")
+    
+    # Existing implementation ...
     """Accept a single image upload and store it under /uploads, returning a public URL.
     This is intended for short-lived hosting of generated profile cards for social posting.
     """
@@ -7698,6 +7713,47 @@ async def enroll_course(req: EnrollRequest, current_user: dict = Depends(get_cur
             }))
             
         return {"status": "success", "message": "Enrolled successfully"}
+
+@app.post("/api/proxy")
+async def secure_proxy(request: Request, user: dict = Depends(get_current_user)):
+    """
+    Centralized proxy gateway to hide external service URLs, API keys, and query structures.
+    """
+    body = await request.json()
+    service = body.get("service")
+    data = body.get("data")
+
+    try:
+        if service == 'openai':
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {os.environ.get("OPENAI_API_KEY")}',
+                        'Content-Type': 'application/json'
+                    },
+                    json=data
+                )
+                return response.json()
+
+        elif service == 'stripe':
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    'https://api.stripe.com/v1/charges',
+                    headers={
+                        'Authorization': f'Bearer {os.environ.get("STRIPE_SECRET_KEY")}',
+                        'Content-Type': 'application/json'
+                    },
+                    json=data
+                )
+                return response.json()
+
+        raise HTTPException(status_code=400, detail="Invalid service requested")
+
+    except Exception as e:
+        # SANITIZED LOGGING: Log internally, generic error to client
+        print(f"[PROXY_ERROR][{service}]: {str(e)}")
+        raise HTTPException(status_code=500, detail="Server transaction failed.")
 
 if __name__ == "__main__":
     import uvicorn

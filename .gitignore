@@ -1,54 +1,21 @@
-# Environment variables and secrets (NEVER COMMIT)
+# =============================================================================
+#  Studlyf V2 — .gitignore
+#  Hostinger (frontend) + Render (backend) deployment
+# =============================================================================
+
+# ── Secrets & Environment Variables (NEVER COMMIT) ───────────────────────────
 .env
 .env.local
 .env.*.local
 .env.production
-.env.*.example
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-env/
-venv/
-backend/venv/
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Firebase & Secrets (CRITICAL - NEVER COMMIT)
+.env.development.local
+*.apikey
+api_keys.txt
 service-account.json
 serviceAccountKey.json
 firebase-key.json
 secrets/
+credentials.json
 *.pem
 *.key
 *.crt
@@ -56,52 +23,116 @@ secrets/
 *.p12
 .aws/
 .credentials
-credentials.json
 
-# API Keys (NEVER COMMIT)
-*.apikey
-api_keys.txt
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.Python
+.installed.cfg
+backend/.venv/
+backend/venv/
+venv/
+env/
 
-# Test Files
-backend/test_*.py
-backend/debug_*.py
-backend/check_*.py
-backend/test_*.pdf
-backend/cloud_test*.pdf
-test_grid/
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
 
-# Build outputs
+# ── Build Outputs ─────────────────────────────────────────────────────────────
 dist/
 build/
+frontend/dist/
+frontend/build/
 
-# Temporary files
-*.tmp
+# ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
+backend/backend.log
+backend/db_diagnostics.txt
+
+# ── Uploads & Generated Files ─────────────────────────────────────────────────
 backend/uploads/
 uploads/
-scratch/
-brain/
-.gemini/
-backend/scratch/
+backend/generated_portfolios/
+backend/artifacts/certs/
+frontend/public/images-optimized/
+
+# ── IDE & Editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.aider*
 .windsurf/
 
-# Cache
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Cache ─────────────────────────────────────────────────────────────────────
 .cache/
 .pytest_cache/
 *.cache
+.pip-audit-cache/
 
-# ==========================================
-# ONE-OFF SCRIPTS, DIAGNOSTICS & CLUTTER (ADDED FOR CLEANUP)
-# ==========================================
-script.py
-script_profile.py
-script_update.py
-PRODUCTION_FIXES.py
-migrate_gridfs_files.py
-
-# Backend Scratch & Diagnostic files
-backend/scratch_*.py
+# ── Test / Debug / One-off Scripts ────────────────────────────────────────────
+backend/test_*.py
+backend/debug_*.py
 backend/check_*.py
+backend/scratch_*.py
+backend/test_*.pdf
+backend/local_test.pdf
+backend/get_test.pdf
+test_gridfs_check.py
+test_pdf_serving.py
+test_upload.py
+debug_events.py
+check_opp.py
+comprehensive_security_testing.py
+comprehensive_tests.py
+audit_script.py
+audit_runtime.py
+
+# ── Root-level Temp / Clutter ─────────────────────────────────────────────────
+DEPLOYMENT_COMMANDS.sh
+DEPLOYMENT_SUMMARY.txt
+FINAL_SUMMARY.txt
+READY_TO_DEPLOY.txt
+READY_TO_DEPLOY_NOW.txt
+DO_THIS_NOW.md
+deploy.sh
+vulnerability_scanner.py
+api_delete_helper.py
+repair_event.py
+fix_participant.py
+fix_status.py
+find_opp.py
+count_apps.py
+create_app.py
+check_reg_final.py
+sync_event_opportunity.py
+cleanup_codeforge_event.py
+dump_avatars.py
+fixall.py
+inspect_submissions.py
+temp_opp.tsx
+unsquash.py
+verify.py
+
+# ── Backend One-off Scripts ────────────────────────────────────────────────────
+backend/fix_event_status.py
+backend/production_sync_events.py
+backend/update_draft_opportunities.py
 backend/verify_seed.py
 backend/add_missing_courses.py
 backend/audit_db.py
@@ -113,87 +144,29 @@ backend/migrate_modules.py
 backend/update_courses.py
 backend/update_videos.py
 backend/upgrade_routes.py
-
-# Inactive Clean Architecture proposed structure
-backend/app/
-
-# Local Audit Documentation Reports
-*_AUDIT.md
-*AUDIT_REPORT.md
-*_SUMMARY.md
-*_CHECKLIST.md
-AUDIT_COMPLETE.md
-EXECUTIVE_SUMMARY.md
-IMPLEMENTATION_CHECKLIST.md
-PRODUCTION_AUDIT_REPORT.md
-README_AUDIT.md
-SECURITY_AUDIT.md
-backend/ARCHITECTURE_MIGRATION_GUIDE.md
-backend/DOCUMENTATION_INDEX.md
-backend/IMPLEMENTATION_SUMMARY.md
-backend/QUICK_REFERENCE.md
-backend/VERIFICATION_CHECKLIST.md
-
-# Local Test Files
-test_gridfs_check.py
-test_pdf_serving.py
-test_upload.py
-backend/test.pdf
-backend/get_test.pdf
-backend/local_test.pdf
-.aider*
-.pip-audit-cache/
-
-# One-off scripts & temp docs (root)
-EVENT_VISIBILITY_FIX.md
-IMPLEMENTATION_COMPLETE.md
-QUICK_START.md
-REGISTRATION_AUTO_FILL_IMPLEMENTATION.md
-STAGE_NAVIGATION_GUIDE.md
-SYSTEM_ARCHITECTURE.md
-TESTING_GUIDE.md
-debug_events.py
-sync_event_opportunity.py
-
-# Backend one-off scripts & readme txts
-backend/fix_event_status.py
-backend/production_sync_events.py
-backend/update_draft_opportunities.py
+backend/tmp_admin_event_submissions.json
 backend/STAGE_ACCESS_CONTROL_README.txt
 backend/STAGE_DEADLINE_README.txt
-
-# Debug and experimental routes
-backend/routes/debug_routes.py
-backend/routes/enhanced_features_routes.py
-backend/routes/websocket_routes.py
-
-# Test scripts
 backend/scripts/db_integration_test.py
 
-# Frontend build output (should never be committed)
-frontend/dist/
+# ── Duplicate / Fixed-suffix Backend Files ────────────────────────────────────
+backend/db_FIXED.py
+backend/main_FIXED.py
+backend/main_production.py
+backend/requirements_FIXED.txt
+backend/requirements_production.txt
+backend/requirements_utf8.txt
+backend/requirements_enhanced.txt
 
-# Standalone mini-projects (separate from main app)
-hackathon-admin/
-participant-card/
+# ── CI / Infra (Not used in this deployment) ──────────────────────────────────
+github-actions-pipeline.yml
+github/
+kubernetes/
+docker-compose.yml
+Dockerfile
+Dockerfile.production
 
-# Backend diagnostic and user-generated files
-backend/db_diagnostics.txt
-backend/generated_portfolios/
-backend/tmp_admin_event_submissions.json
-
-# Generated/optimized asset files
-frontend/public/images-optimized/
-frontend/public/avatars/catalog.webp
-
-# Root-level temp scripts & audit files
-assets_audit.txt
-assets_map.txt
-check_opp.py
-cleanup_codeforge_event.py
-dump_avatars.py
-fixall.py
-inspect_submissions.py
-temp_opp.tsx
-unsquash.py
-verify.py
+# ── Scratch / Brain ────────────────────────────────────────────────────────────
+scratch/
+brain/
+.gemini/

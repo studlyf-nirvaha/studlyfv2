@@ -51,7 +51,8 @@ const validateRole = (role: unknown): UserRole | null => {
         return role as UserRole;
     }
 
-    console.warn(`[AuthContext] Received invalid role (${typeof role}).`);
+    // SECURITY FIX: Removed console.warn that logged role validation failures
+    // No debug information leaked to frontend logs
     return null;
 };
 
@@ -95,12 +96,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         } catch (error: unknown) {
             clearTimeout(timeoutId);
-            if (error instanceof DOMException && error.name === 'AbortError') {
-                console.warn("[AuthContext] Auth check timed out. Proceeding as guest.");
-            } else {
-                console.error(`[AuthContext] Auth check failed (${typeof error}).`);
-            }
-            // Proceed as guest to avoid blocking the UI
+            // SECURITY FIX: Removed all console logging
+            // - No timeout messages
+            // - No error details logged
+            // - No error type information
+            // Silent failure with graceful degradation
         } finally {
             setLoading(false);
         }

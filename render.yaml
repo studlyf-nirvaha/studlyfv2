@@ -4,31 +4,78 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: gunicorn main:app -c gunicorn.conf.py
     plan: free
+    healthCheckPath: /health
     envVars:
+      # ── Database ────────────────────────────────────────────────────────────
       - key: MONGO_URL
+        sync: false          # Set manually in Render dashboard (secret)
+      - key: DB_NAME
+        value: studlyf_db
+
+      # ── JWT / Auth ────────────────────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false          # Set manually in Render dashboard (secret)
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+
+      # ── Deployment Environment ────────────────────────────────────────────
+      - key: ENVIRONMENT
+        value: production
+      - key: FRONTEND_URL
+        value: https://www.studlyf.in
+      - key: ADDITIONAL_CORS_ORIGINS
+        value: ""
+
+      # ── Admin ─────────────────────────────────────────────────────────────
+      - key: SUPER_ADMIN_EMAILS
         sync: false
+      - key: ADMIN_ENCRYPTION_KEY
+        sync: false
+
+      # ── Email (SMTP) ──────────────────────────────────────────────────────
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: "Studlyf"
+      - key: SMART_EMAIL_PROVIDER
+        value: smtp
+      - key: VERIFIED_DOMAIN_EMAIL
+        sync: false
+
+      # ── AI (Groq) ─────────────────────────────────────────────────────────
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_API_KEY_CAREER
         sync: false
-      - key: JWT_SECRET_KEY
+
+      # ── Payments (Razorpay) ───────────────────────────────────────────────
+      - key: RAZORPAY_KEY_ID
         sync: false
-      - key: JWT_ALGORITHM
-        value: HS256
-      - key: FRONTEND_URL
+      - key: RAZORPAY_KEY_SECRET
         sync: false
-      - key: ENVIRONMENT
-        value: production
-      - key: SUPER_ADMIN_EMAILS
+
+      # ── Error Tracking (Sentry) ───────────────────────────────────────────
+      - key: SENTRY_DSN
         sync: false
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: "1440"
-      - key: DB_NAME
-        value: studlyf
-    healthCheckPath: /health
+
+      # ── Logging ────────────────────────────────────────────────────────────
+      - key: LOG_LEVEL
+        value: info
+      - key: GUNICORN_WORKERS
+        value: "2"            # Render free tier: keep at 2
