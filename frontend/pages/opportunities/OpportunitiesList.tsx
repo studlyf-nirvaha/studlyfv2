@@ -363,8 +363,8 @@ const OpportunitiesList: React.FC = () => {
                                         >
                                             <div className="flex items-center gap-3 mb-3">
                                                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 border border-purple-200 flex shrink-0 items-center justify-center overflow-hidden">
-                                                    {opp.organization_logo ? (
-                                                        <img src={opp.organization_logo} alt={opp.organization} className="w-full h-full object-cover" />
+                                                    {opp.logo_url || opp.institution_logo_url || opp.image_url ? (
+                                                        <img src={opp.logo_url || opp.institution_logo_url || opp.image_url} alt={opp.organization} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-xs">
                                                             {opp.organization?.charAt(0).toUpperCase()}
@@ -547,8 +547,9 @@ const OpportunitiesList: React.FC = () => {
                                         <div className="flex items-start justify-between mb-5 gap-4">
                                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                                 <div className="w-14 h-14 bg-white rounded-2xl border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm shrink-0 overflow-hidden group-hover:shadow-md transition-shadow">
-                                                    {/* Placeholder for company logo, using initials or icon */}
-                                                    {opp.organization ? (
+                                                    {opp.logo_url || opp.image_url || opp.institution_logo_url ? (
+                                                        <img src={opp.logo_url || opp.image_url || opp.institution_logo_url} alt={opp.organization} className="w-full h-full object-cover" />
+                                                    ) : opp.organization ? (
                                                         <span className="text-xl font-black text-slate-300">{opp.organization.charAt(0).toUpperCase()}</span>
                                                     ) : (
                                                         <Building2 size={24} strokeWidth={1.5} />

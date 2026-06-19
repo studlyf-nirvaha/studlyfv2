@@ -309,9 +309,6 @@ class InstitutionalCertificateService:
         if not event:
             return []
 
-        if not _event_has_final_terminal_stage(event):
-            return []
-
         event_title = event.get("title", "Untitled Event")
         org_name = event.get("organisation") or event.get("organization") or "Unknown"
         event_date = event.get("eventDate") or event.get("start_date") or datetime.utcnow().strftime("%B %d, %Y")

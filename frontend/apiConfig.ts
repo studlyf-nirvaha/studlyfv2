@@ -48,6 +48,11 @@ export function authHeaders(): Record<string, string> {
     return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
+/** Get raw JWT token for use in query parameters (file download URLs etc). */
+export function getAuthToken(): string {
+    return localStorage.getItem('auth_token') || '';
+}
+
 // SECURITY FIX: Removed all console.log and console.warn statements
 // Console logs are visible in production and leak sensitive infrastructure information
 // Console output removed to prevent information disclosure

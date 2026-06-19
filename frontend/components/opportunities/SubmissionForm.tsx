@@ -75,6 +75,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [submitted, setSubmitted] = useState(false);
     const [canEditSubmission, setCanEditSubmission] = useState(true);
     const [mirrorNotice, setMirrorNotice] = useState<string | null>(null);
@@ -244,6 +245,14 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                     return;
                 }
             }
+            if (field.type === 'email' && value && typeof value === 'string' && !value.includes('@')) {
+                setError(`${field.label}: invalid email address`);
+                return;
+            }
+            if (field.type === 'url' && value && typeof value === 'string' && !value.startsWith('http://') && !value.startsWith('https://')) {
+                setError(`${field.label}: URL must start with http:// or https://`);
+                return;
+            }
             if (field.maxLength && typeof value === 'string' && value.length > field.maxLength) {
                 setError(`${field.label} cannot exceed ${field.maxLength} characters`);
                 return;
@@ -252,6 +261,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
 
         setSaving(true);
         setError(null);
+        setFieldErrors({});
 
         try {
             const submitData = isSolo ? { ...formValues, team_display_name: teamDisplayName } : formValues;
@@ -266,7 +276,12 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
 
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
-                throw new Error(err.detail || err.error || 'Failed to save submission.');
+                const detail = err.detail || {};
+                if (typeof detail === 'object' && detail.errors) {
+                    setFieldErrors(detail.errors);
+                    throw new Error(detail.message || 'Please fix the errors and try again');
+                }
+                throw new Error(typeof detail === 'string' ? detail : detail.message || detail.error || 'Failed to save submission.');
             }
 
             const saved = await response.json();
@@ -429,6 +444,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                     const inputClass =
                         'mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm';
 
+                    const fieldErr = fieldErrors[field.id];
                     return (
                         <div key={field.id}>
                             <label htmlFor={field.id} className="block text-sm font-medium text-gray-700">
@@ -517,6 +533,7 @@ const SubmissionForm: React.FC<SubmissionFormProps> = ({ eventId, stage, partici
                                     readOnly={readOnly}
                                 />
                             )}
+                            {fieldErr && <p className="text-xs text-red-600 mt-1 font-medium">{fieldErr}</p>}
                             {field.helpText && <p className="text-xs text-gray-500 mt-1">{field.helpText}</p>}
                         </div>
                     );

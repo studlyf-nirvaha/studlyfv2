@@ -4,6 +4,10 @@ Handles manual evaluation workflow for coding challenges and programming assignm
 """
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+import os
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 from bson import ObjectId
 from db import submissions_col, scores_col, judges_col, events_col, users_col, notifications_col
 from services.email_service import send_notification_email

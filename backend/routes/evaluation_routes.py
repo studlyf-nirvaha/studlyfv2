@@ -7,23 +7,7 @@ from auth_institution import get_auth_user_optional
 router = APIRouter(prefix="/api/evaluation", tags=["Evaluation"])
 
 
-_META_PROJECTION = {
-    "data": 0,
-    "title": 1,
-    "team_name": 1,
-    "team_id": 1,
-    "user_id": 1,
-    "user_name": 1,
-    "stage_name": 1,
-    "project_name": 1,
-    "event_id": 1,
-    "stage_id": 1,
-    "submitted_at": 1,
-    "created_at": 1,
-    "assigned_judges": 1,
-    "evaluation_token": 1,
-    "evaluation_token_expires": 1,
-}
+_META_PROJECTION = {"data": 0}
 
 
 async def _find_submission_by_token(token: str, *, include_data: bool = True) -> Tuple[Optional[dict], Optional[dict]]:
@@ -58,9 +42,19 @@ async def _resolve_event(event_id: str):
         return await events_col.find_one({"event_id": str(event_id)}) or await events_col.find_one({"event_link_id": str(event_id)})
 
 
-def _event_criteria(event: Optional[dict]) -> list:
+def _event_criteria(event: Optional[dict], stage_id: str = None) -> list:
     if not event:
         return []
+    if stage_id and event.get("stages"):
+        for s in event.get("stages"):
+            if str(s.get("id")) == str(stage_id):
+                criteria = s.get("judging_criteria") or s.get("evaluation_criteria")
+                if not criteria and s.get("rubric"):
+                    rubric = s.get("rubric")
+                    if isinstance(rubric, dict):
+                        criteria = rubric.get("criteria")
+                if criteria:
+                    return criteria
     criteria = event.get("judging_criteria") or event.get("evaluation_criteria") or []
     if criteria:
         return criteria
@@ -124,12 +118,19 @@ def _format_submitted_at(raw) -> str:
     return str(raw)
 
 
-def _thresholds_from_event(event: Optional[dict]) -> dict:
-    t = (event or {}).get("evaluation_thresholds") or {}
+def _thresholds_from_event(event: Optional[dict], stage_id: str = None) -> dict:
+    t = None
+    if stage_id and event and event.get("stages"):
+        for s in event.get("stages"):
+            if str(s.get("id")) == str(stage_id):
+                t = s.get("evaluation_thresholds")
+                break
+    if not t:
+        t = (event or {}).get("evaluation_thresholds") or {}
     shortlist = float(t.get("shortlist_min") or 80)
     waitlist = float(t.get("waitlist_min") or max(shortlist - 15, shortlist * 0.75))
     reject = float(t.get("reject_below") or waitlist)
-    criteria = _event_criteria(event)
+    criteria = _event_criteria(event, stage_id)
     max_pts = sum(float(c.get("max_points") or 10) for c in criteria) or 100.0
     return {"shortlist_min": shortlist, "waitlist_min": waitlist, "reject_below": reject, "max_possible": max_pts}
 
@@ -150,81 +151,90 @@ def _recommendation_from_score(total_pts: float, thresholds: dict) -> str:
 async def get_evaluation_submission(token_or_id: str, user: Optional[dict] = Depends(get_auth_user_optional)):
     """Load submission for judge evaluation via secure token link or authenticated id."""
     from db import submission_data_col, scores_col
+    import traceback
 
-    submission = None
-    judge_entry = None
-    submission_id = None
+    try:
+        submission = None
+        judge_entry = None
+        submission_id = None
 
-    is_object_id = len(token_or_id) == 24
-    if is_object_id:
-        try:
-            ObjectId(token_or_id)
-        except Exception:
-            is_object_id = False
+        is_object_id = len(token_or_id) == 24
+        if is_object_id:
+            try:
+                ObjectId(token_or_id)
+            except Exception:
+                is_object_id = False
 
-    if is_object_id and user:
-        judge_id = str(user.get("user_id") or user.get("id") or "")
-        submission = await submission_data_col.find_one({
-            "_id": ObjectId(token_or_id),
-            "assigned_judges.judge_id": judge_id,
-        })
-        submission_id = token_or_id
-        if submission and isinstance(submission.get("data"), dict):
-            submission["data"] = _sanitize_submission_data(submission["data"])
-    else:
-        submission, judge_entry = await _find_submission_by_token(token_or_id, include_data=False)
-        if submission:
-            submission_id = str(submission["_id"])
+        if is_object_id and user:
+            judge_id = str(user.get("user_id") or user.get("id") or "")
+            submission = await submission_data_col.find_one({
+                "_id": ObjectId(token_or_id),
+                "assigned_judges.judge_id": judge_id,
+            })
+            submission_id = token_or_id
+            if submission and isinstance(submission.get("data"), dict):
+                submission["data"] = _sanitize_submission_data(submission["data"])
+        else:
+            submission, judge_entry = await _find_submission_by_token(token_or_id, include_data=False)
+            if submission:
+                submission_id = str(submission["_id"])
 
-    if not submission or not submission_id:
-        raise HTTPException(status_code=404, detail="Invalid or expired evaluation link")
+        if not submission or not submission_id:
+            raise HTTPException(status_code=404, detail="Invalid or expired evaluation link")
 
-    expires = submission.get("evaluation_token_expires")
-    if expires and isinstance(expires, datetime):
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expires:
-            raise HTTPException(status_code=410, detail="This evaluation link has expired")
+        expires = submission.get("evaluation_token_expires")
+        if expires and isinstance(expires, datetime):
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) > expires:
+                raise HTTPException(status_code=410, detail="This evaluation link has expired")
 
-    event = await _resolve_event(submission.get("event_id"))
-    criteria = _event_criteria(event)
-    thresholds = _thresholds_from_event(event)
-    team_name = await _resolve_team_name(submission)
-    title = (
-        submission.get("title")
-        or submission.get("project_name")
-        or submission.get("stage_name")
-        or team_name
-        or "Submission"
-    )
+        event = await _resolve_event(submission.get("event_id"))
+        stage_id = submission.get("stage_id")
+        criteria = _event_criteria(event, stage_id)
+        thresholds = _thresholds_from_event(event, stage_id)
+        team_name = await _resolve_team_name(submission)
+        title = (
+            submission.get("title")
+            or submission.get("project_name")
+            or submission.get("stage_name")
+            or team_name
+            or "Submission"
+        )
 
-    judge_id = (judge_entry or {}).get("judge_id") or ""
-    judge_email = (judge_entry or {}).get("email") or ""
-    score_filter: Dict[str, Any] = {"submission_id": submission_id}
-    if judge_id:
-        score_filter["judge_id"] = judge_id
-    elif judge_email:
-        score_filter["judge_email"] = judge_email
-    existing_evaluation = await scores_col.find_one(score_filter)
+        judge_id = (judge_entry or {}).get("judge_id") or ""
+        judge_email = (judge_entry or {}).get("email") or ""
+        score_filter: Dict[str, Any] = {"submission_id": submission_id}
+        if judge_id:
+            score_filter["judge_id"] = judge_id
+        elif judge_email:
+            score_filter["judge_email"] = judge_email
+        existing_evaluation = await scores_col.find_one(score_filter)
 
-    return {
-        "_id": submission_id,
-        "event_id": submission.get("event_id"),
-        "stage_id": submission.get("stage_id"),
-        "title": title,
-        "team_name": team_name,
-        "submitted_at": _format_submitted_at(submission.get("submitted_at") or submission.get("created_at")),
-        "data": _sanitize_submission_data(submission.get("data") or {}),
-        "criteria": criteria,
-        "thresholds": thresholds,
-        "judge_name": (judge_entry or {}).get("name") or "",
-        "existing_evaluation": {
-            "score": existing_evaluation.get("total_score"),
-            "criteria_scores": existing_evaluation.get("criteria_scores") or existing_evaluation.get("scores") or {},
-            "recommendation": existing_evaluation.get("recommendation"),
-            "comments": existing_evaluation.get("comments") or existing_evaluation.get("feedback"),
-        } if existing_evaluation else None,
-    }
+        return {
+            "_id": submission_id,
+            "event_id": submission.get("event_id"),
+            "stage_id": submission.get("stage_id"),
+            "title": title,
+            "team_name": team_name,
+            "submitted_at": _format_submitted_at(submission.get("submitted_at") or submission.get("created_at")),
+            "data": _sanitize_submission_data(submission.get("data") or {}),
+            "criteria": criteria,
+            "thresholds": thresholds,
+            "judge_name": (judge_entry or {}).get("name") or "",
+            "existing_evaluation": {
+                "score": existing_evaluation.get("total_score"),
+                "criteria_scores": existing_evaluation.get("criteria_scores") or existing_evaluation.get("scores") or {},
+                "recommendation": existing_evaluation.get("recommendation"),
+                "comments": existing_evaluation.get("comments") or existing_evaluation.get("feedback"),
+            } if existing_evaluation else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in get_evaluation_submission: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to load evaluation data")
 
 
 @router.post("/{token_or_id}")
@@ -276,14 +286,15 @@ async def submit_evaluation(
         total = float(score or 0)
 
     event = await _resolve_event(submission.get("event_id"))
-    thresholds = _thresholds_from_event(event)
+    stage_id = submission.get("stage_id")
+    thresholds = _thresholds_from_event(event, stage_id)
     max_pts = thresholds.get("max_possible") or 100.0
+    recommendation = _recommendation_from_score(float(score), thresholds)
     if score is None:
         raise HTTPException(status_code=400, detail="Invalid score.")
     if float(score) > max_pts * 1.05:
         raise HTTPException(status_code=400, detail=f"Score exceeds rubric maximum ({max_pts}).")
 
-    recommendation = _recommendation_from_score(float(score), thresholds)
     comments = evaluation_data.get("comments", "")
     status_label = {
         "shortlist": "Shortlisted",

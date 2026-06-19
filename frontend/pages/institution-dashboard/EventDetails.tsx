@@ -1900,11 +1900,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
 
 
     const isSubmissionFileField = (f: any) => {
-        const t = (f.type || '').toLowerCase();
-        const l = (f.label || f.key || '').toLowerCase();
-        if (['file', 'document', 'link', 'upload', 'url', 'image', 'video', 'audio'].includes(t)) return true;
-        return l.includes('pdf') || l.includes('ppt') || l.includes('file') || l.includes('upload')
-            || l.includes('document') || l.includes('link') || l.includes('presentation') || l.includes('video');
+        const t = (f.field_type || f.type || '').toLowerCase();
+        return t === 'file';
     };
 
     const getStageTextFields = (stage: any) => {
@@ -1953,7 +1950,9 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             } else if (value.startsWith('http://') || value.startsWith('https://')) {
                 let domain = '';
                 try { domain = new URL(value).hostname; } catch { /* ignore */ }
-                assets.push({ type: 'link', url: value, domain });
+                if (!domain.includes('github.com') && !domain.includes('youtube.com') && !domain.includes('vimeo.com')) {
+                    assets.push({ type: 'link', url: value, domain });
+                }
             } else if (value.startsWith('/api/')) {
                 const ext = value.match(/\.(\w+)(?:\?.*)?$/)?.[1]?.toLowerCase();
                 const extMime: Record<string, string> = {
@@ -1968,20 +1967,42 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
             }
         };
 
-        if (sub.pptLink) pushAsset(sub.pptLink);
-        if (sub.githubLink) pushAsset(sub.githubLink);
+        // Check both camelCase and snake_case variants
+        const pptValue = sub.pptLink || sub.ppt_link || '';
+        if (pptValue && !pptValue.includes('github.com') && !pptValue.includes('youtube.com') && !pptValue.includes('vimeo.com')) {
+            pushAsset(pptValue);
+        }
 
-        const stageData = sub._sourceType === 'stage' ? sub.data : null;
+        const stageData = sub.data && typeof sub.data === 'object' ? sub.data : null;
         const fields = activeStage?.fields || activeStage?.config?.fields || [];
-        if (stageData && typeof stageData === 'object') {
+        if (stageData) {
             for (const f of fields) {
-                const key = f.id || f.key;
+                const key = f.field_id || f.id || f.key;
+                if (!key) continue;
                 const value = stageData[key];
-                if (typeof value === 'string') pushAsset(value);
+                if (!value) continue;
+                if (typeof value === 'string') {
+                    if (value.startsWith('data:') || value.startsWith('/api/')) pushAsset(value);
+                } else if (typeof value === 'object' && value && value._stored_file) {
+                    if (value.data_uri) {
+                        pushAsset(value.data_uri);
+                    } else {
+                        const subId = sub._id || sub.submission_id;
+                        if (eventId && subId && key) {
+                            const mime = value.mime || value.mime_type || value.content_type || '';
+                            const dlUrl = `${API_BASE_URL}/api/v1/institution/events/${eventId}/stage-submissions/${subId}/file/${key}`;
+                            assets.push({ type: 'file', url: dlUrl, mime });
+                        }
+                    }
+                }
+            }
+            // Also check for uploaded files stored under file_url / file path keys
+            if (stageData.file_url && typeof stageData.file_url === 'string' && stageData.file_url.startsWith('/api/')) {
+                pushAsset(stageData.file_url);
             }
             if (fields.length === 0) {
                 Object.values(stageData).forEach((value) => {
-                    if (typeof value === 'string') pushAsset(value);
+                    if (typeof value === 'string' && !value.startsWith('http://') && !value.startsWith('https://')) pushAsset(value);
                 });
             }
         }
@@ -2641,8 +2662,26 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                         const stageData = sub._sourceType === 'stage' ? sub.data : null;
                         let value = stageData && typeof stageData === 'object' ? stageData[key] : '';
                         if (!value) value = '-';
-                        if (typeof value === 'string' && (value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/api/'))) {
+                        if (typeof value === 'string' && value.startsWith('data:')) {
                             return 'View in Files';
+                        }
+                        if (typeof value === 'string' && (value.startsWith('http://') || value.startsWith('https://'))) {
+                            let linkIcon = <Globe size={16} />;
+                            try {
+                                const host = new URL(value).hostname.toLowerCase();
+                                if (host.includes('github.com')) linkIcon = <Github size={16} />;
+                                else if (host.includes('youtube') || host.includes('youtu.be')) linkIcon = <LinkIcon size={16} />;
+                                else if (host.includes('drive.google')) linkIcon = <FileText size={16} />;
+                            } catch {}
+                            return (
+                                <a href={value} target="_blank" rel="noopener noreferrer"
+                                   className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-200 transition-colors text-xs font-bold whitespace-nowrap">
+                                    {linkIcon}
+                                    {(() => {
+                                        try { return new URL(value).hostname; } catch { return 'Link'; }
+                                    })()}
+                                </a>
+                            );
                         }
                         return value;
                     };

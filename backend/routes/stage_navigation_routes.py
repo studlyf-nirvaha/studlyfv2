@@ -433,7 +433,15 @@ async def submit_stage(
         form_data=form_data,
         team_id=team_id,
     )
-    if "error" in result or result.get("status") in ("validation_error", "deadline_passed", "not_registered"):
+    if result.get("status") == "validation_error":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": result.get("message", "Please fix the errors and try again"),
+                "errors": result.get("errors", {})
+            }
+        )
+    if "error" in result or result.get("status") in ("deadline_passed", "not_registered"):
         raise HTTPException(status_code=400, detail=result.get("error") or result.get("message"))
     return result
 

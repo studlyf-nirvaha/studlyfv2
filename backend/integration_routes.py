@@ -1756,7 +1756,7 @@ async def send_bulk_selection_emails(event_id: str, data: dict, user: dict = Dep
     skip_stage_update = data.get("skip_stage_update", False)  # Opt-in: don't advance stage
     
     event = await events_col.find_one({"_id": ObjectId(event_id)})
-    event_title = event.get("title", "the event") if event else "the event"
+    event_title = event.get("title") or event.get("name") or "the event" if event else "the event"
     institution_id = event.get("institution_id", "") if event else ""
     
     from db import teams_col, users_col, notifications_col
@@ -2294,11 +2294,20 @@ async def get_integrated_leaderboard(
     if not event:
         event = await events_col.find_one({"event_id": event_id})
 
-    thresholds = (event or {}).get("evaluation_thresholds") or {
-        "shortlist_min": 70,
-        "waitlist_min": 50,
-        "reject_below": 50
-    }
+    # Resolve thresholds: prefer stage-level, fall back to event-level
+    thresholds = None
+    if stage_id and event:
+        stages = event.get("stages") or []
+        for s in stages:
+            if str(s.get("id") or "") == str(stage_id):
+                thresholds = s.get("evaluation_thresholds")
+                break
+    if not thresholds:
+        thresholds = (event or {}).get("evaluation_thresholds") or {
+            "shortlist_min": 70,
+            "waitlist_min": 50,
+            "reject_below": 50
+        }
 
     shortlist_min = float(thresholds.get("shortlist_min") or 70)
     waitlist_min = float(thresholds.get("waitlist_min") or 50)
@@ -2314,12 +2323,65 @@ async def get_integrated_leaderboard(
             except Exception:
                 pass
 
-    # 3. Query submission_data_col directly (judge scores stored here via submit_score)
+    # 3. Resolve effective stage: if selected stage is a terminal/view-only stage (FINAL, etc.),
+    #    fall back to the last preceding non-terminal stage that has submissions.
+    effective_stage_id = stage_id
+    if stage_id and event:
+        stage_types = event.get("stages") or []
+        selected_stage_obj = None
+        for s in stage_types:
+            if str(s.get("id") or "") == str(stage_id):
+                selected_stage_obj = s
+                break
+        if selected_stage_obj:
+            stype = str(selected_stage_obj.get("type") or "").upper().strip()
+            terminal_types = {"FINAL", "FINALE", "RESULTS", "CERTIFICATION", "AWARDS"}
+            if stype in terminal_types or selected_stage_obj.get("view_only"):
+                # Fall back to previous non-terminal stage
+                prev_stage_id = None
+                for s in reversed(stage_types):
+                    s_stype = str(s.get("type") or "").upper().strip()
+                    if s_stype in terminal_types or s.get("view_only"):
+                        continue
+                    prev_stage_id = str(s.get("id") or "")
+                    break
+                if prev_stage_id:
+                    effective_stage_id = prev_stage_id
+
     sub_query: dict = {"event_id": {"$in": event_id_in}}
-    if stage_id:
-        sub_query["stage_id"] = stage_id
+    if effective_stage_id:
+        sub_query["stage_id"] = effective_stage_id
 
     all_submissions = await submission_data_col.find(sub_query).to_list(length=10000)
+
+    # ---- Look up previous stage data for teams that need it ----
+    prev_stage_data_map: dict = {}
+    if effective_stage_id and event:
+        stages_list = event.get("stages") or []
+        prev_stage_ids = []
+        for s in stages_list:
+            if str(s.get("id") or "") == str(effective_stage_id):
+                break
+            prev_stage_ids.append(str(s.get("id") or ""))
+            
+        if prev_stage_ids:
+            for ps_id in reversed(prev_stage_ids):
+                prev_subs = await submission_data_col.find({
+                    "event_id": {"$in": event_id_in},
+                    "stage_id": ps_id
+                }).to_list(length=10000)
+                for ps in prev_subs:
+                    ptid = ps.get("team_id")
+                    puid = ps.get("user_id")
+                    key = str(ptid) if ptid else ("user:" + str(puid) if puid else None)
+                    if key:
+                        if key not in prev_stage_data_map:
+                            prev_stage_data_map[key] = {}
+                        current_data = ps.get("data") or {}
+                        for k, v in current_data.items():
+                            if k not in prev_stage_data_map[key]:
+                                prev_stage_data_map[key][k] = v
+    # ------------------------------------------------------------
 
     # 4. Batch-fetch teams and users for lookup
     team_ids = set()
@@ -2411,25 +2473,50 @@ async def get_integrated_leaderboard(
 
         data = sub.get("data") or {}
 
-        # Dynamic project title & description from submission data
-        project_title = ""
-        description = ""
-        if isinstance(data, dict):
-            for key, val in data.items():
-                if val and isinstance(val, str) and val.strip():
-                    if not project_title and ("title" in key.lower() or "name" in key.lower()):
-                        project_title = val
-                    elif not description and ("abstract" in key.lower() or "description" in key.lower() or "problem" in key.lower() or "solution" in key.lower()):
-                        description = val
-            if not project_title:
-                for key, val in data.items():
-                    if val and isinstance(val, str) and val.strip():
-                        project_title = val
-                        break
-            if not project_title:
-                project_title = data.get("project_title") or data.get("project_name") or data.get("idea_name") or "Unnamed Project"
-            if not description:
-                description = data.get("solution_description") or data.get("abstract") or data.get("problem_statement") or ""
+        # Dynamic project title & description — try current stage first
+        def is_url(s: str) -> bool:
+            return s.startswith("http://") or s.startswith("https://") or s.startswith("www.")
+
+        def is_file_val(v) -> bool:
+            return isinstance(v, dict) or (isinstance(v, str) and any(v.lower().endswith(ext) for ext in (".pdf", ".ppt", ".pptx", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".zip", ".rar")))
+
+        def extract_title_desc(src: dict) -> tuple:
+            t = ""
+            d = ""
+            if isinstance(src, dict):
+                for k, v in src.items():
+                    if v and isinstance(v, str) and v.strip() and not is_url(v) and not is_file_val(v):
+                        if not t and ("title" in k.lower() or "name" in k.lower() or "project" in k.lower() or "idea" in k.lower()):
+                            t = v
+                        elif not d and ("abstract" in k.lower() or "description" in k.lower() or "problem" in k.lower() or "solution" in k.lower()):
+                            d = v
+                if not t:
+                    for k, v in src.items():
+                        if v and isinstance(v, str) and v.strip() and not is_url(v) and not is_file_val(v):
+                            t = v
+                            break
+                if not t:
+                    t = src.get("project_title") or src.get("project_name") or src.get("idea_name") or src.get("abstract") or src.get("description") or ""
+                if not d:
+                    d = src.get("solution_description") or src.get("abstract") or src.get("problem_statement") or src.get("description") or ""
+            return t, d
+
+        project_title, description = extract_title_desc(data)
+
+        # If no title found in current stage, try previous stage dynamically
+        if not project_title:
+            tid = sub.get("team_id")
+            lookup_key = str(tid) if tid else ("user:" + str(sub.get("user_id", "")) if sub.get("user_id") else None)
+            prev_data = prev_stage_data_map.get(lookup_key) if lookup_key else None
+            if prev_data:
+                pt, pd = extract_title_desc(prev_data)
+                if pt:
+                    project_title = pt
+                if not description and pd:
+                    description = pd
+
+        if not project_title:
+            project_title = sub.get("title") or sub.get("stage_name") or "Unnamed Project"
 
         rankings.append({
             "team_id": str(team_id) if team_id else None,
@@ -2510,12 +2597,16 @@ async def get_integrated_leaderboard(
     paginated = filtered[skip:skip + limit]
 
     # 11. Build stage_fields from event form config for dynamic columns
+    #     Use effective_stage_id (resolved for terminal stages) or fall back to stage_id
     stage_fields = []
+    stage_criteria = []
+    field_lookup_id = effective_stage_id if effective_stage_id else stage_id
     if event:
         stages = event.get("stages") or []
         for s in stages:
-            if str(s.get("id") or s.get("_id") or "") == str(stage_id) or (stage_id is None):
+            if str(s.get("id") or s.get("_id") or "") == str(field_lookup_id) or (field_lookup_id is None):
                 stage_fields = (s.get("fields") or (s.get("config") or {}).get("fields") or [])
+                stage_criteria = s.get("judging_criteria") or []
                 # Normalize field_id key (FieldBuilder stores as `id`, backend uses `field_id`)
                 normalized = []
                 for f in stage_fields:
@@ -2548,9 +2639,10 @@ async def get_integrated_leaderboard(
         "limit": limit,
         "evaluation_thresholds": thresholds,
         "stage_fields": stage_fields,
+        "judging_criteria": stage_criteria,
         "leaderboard_config": leaderboard_config,
         "score_bands": score_bands,
-        "event_title": event.get("title", "") if event else "",
+        "event_title": (event.get("title") or event.get("name") or "") if event else "",
     }
 
 @router.post("/events/{event_id}/leaderboard/verify")
@@ -2817,6 +2909,28 @@ async def issue_ranked_certificates(
     min_score = payload.get("min_score")
     bands = payload.get("bands") or []
     send_email = bool(payload.get("send_email", True))
+    used_thresholds = False
+
+    if not bands and limit is None and min_score is None:
+        thresholds = event.get("evaluation_thresholds") or {}
+        shortlist_min = thresholds.get("shortlist_min")
+        waitlist_min = thresholds.get("waitlist_min")
+        if shortlist_min is not None or waitlist_min is not None:
+            used_thresholds = True
+            sm = float(shortlist_min) if shortlist_min is not None else None
+            wm = float(waitlist_min) if waitlist_min is not None else None
+            bands = []
+            if sm is not None:
+                bands.append({"achievement_type": "winner", "min_score": sm, "limit": 1, "label": "Winner"})
+                bands.append({"achievement_type": "runner_up", "min_score": sm, "limit": 3, "label": "Runner Up"})
+                bands.append({"achievement_type": "finalist", "min_score": sm, "label": "Finalist"})
+            if wm is not None:
+                bands.append({
+                    "achievement_type": "participation",
+                    "min_score": wm,
+                    "max_score": sm - 0.01 if sm is not None else None,
+                    "label": "Participant"
+                })
 
     final_rankings = await leaderboard_service.calculate_event_leaderboard(event_id)
     if not final_rankings:
@@ -2881,7 +2995,7 @@ async def issue_ranked_certificates(
 
     return {
         "status": "success",
-        "award_policy": "bands" if isinstance(bands, list) and bands else "top_n" if isinstance(limit, int) and limit > 0 else "min_score" if isinstance(min_score, (int, float)) else "all_ranked",
+        "award_policy": "thresholds" if used_thresholds else "bands" if isinstance(bands, list) and bands else "top_n" if isinstance(limit, int) and limit > 0 else "min_score" if isinstance(min_score, (int, float)) else "all_ranked",
         "limit": limit,
         "min_score": min_score,
         "bands": bands,
@@ -3476,7 +3590,7 @@ async def create_submission(submission_data: dict, user: dict = Depends(get_curr
                 inst_email = institution.get("email")
                 if inst_email:
                     event = await events_col.find_one({"_id": ObjectId(submission_data.get("event_id"))})
-                    event_title = event.get("title", "Event") if event else "Event"
+                    event_title = event.get("title") or event.get("name") or "Event" if event else "Event"
                     
                     inst_subject = f"New Submission: {event_title}"
                     inst_body = f"""
@@ -4340,7 +4454,7 @@ async def _notify_deadline_extensions(event_id: str, changed_deadlines: list):
     event = await events_col.find_one({"_id": ObjectId(event_id)})
     if not event:
         return
-    event_title = event.get("title", "")
+    event_title = event.get("title") or event.get("name") or ""
     institution_id = event.get("institution_id", "")
     tmpl = await get_active_template(event_id, institution_id, "deadline_extension")
     async for p in participants_col.find({"event_id": event_id}):
@@ -5135,7 +5249,7 @@ async def add_event_judge(event_id: str, judge_data: dict, user: dict = Depends(
     )
 
     judge_name = judge_data.get("name") or judge_data.get("email") or "Judge"
-    event_title = event.get("title") or "Event"
+    event_title = event.get("title") or event.get("name") or "Event"
     accept_url = f"{evaluation_url}&action=accept"
     decline_url = f"{evaluation_url}&action=decline"
     judge_email = str(judge_data.get("email") or "").strip().lower()
@@ -5250,7 +5364,7 @@ async def _background_auto_classify(event_id: str, thresholds: dict, criteria_da
 
 @router.post("/events/{event_id}/criteria")
 async def update_judging_criteria(event_id: str, request: Request, background_tasks: BackgroundTasks, user: dict = Depends(get_auth_user)):
-    """Updates scoring rubrics and optional evaluation thresholds for an event."""
+    """Updates scoring rubrics and optional evaluation thresholds for an event or a specific stage."""
     await assert_institution_owns_event(event_id, user)
     body = await request.json()
     if isinstance(body, list):
@@ -5263,10 +5377,29 @@ async def update_judging_criteria(event_id: str, request: Request, background_ta
         stage_id = body.get("stage_id")
     else:
         raise HTTPException(status_code=400, detail="Invalid criteria payload")
-    update_doc = {"judging_criteria": criteria_data, "updated_at": datetime.utcnow()}
-    if isinstance(thresholds, dict):
-        update_doc["evaluation_thresholds"] = thresholds
-    await events_col.update_one({"_id": ObjectId(event_id)}, {"$set": update_doc})
+
+    now = datetime.utcnow()
+
+    if stage_id:
+        # Per-stage criteria: store inside the stage object
+        event = await events_col.find_one(
+            {"_id": ObjectId(event_id), "stages.id": stage_id},
+            {"stages.$": 1}
+        )
+        existing_stage = event["stages"][0] if event and event.get("stages") else {}
+        merged_stage = {**existing_stage, "judging_criteria": criteria_data, "updated_at": now}
+        if isinstance(thresholds, dict):
+            merged_stage["evaluation_thresholds"] = thresholds
+        await events_col.update_one(
+            {"_id": ObjectId(event_id), "stages.id": stage_id},
+            {"$set": {"stages.$": merged_stage}}
+        )
+    else:
+        # Event-level criteria (backward compatible)
+        update_doc = {"judging_criteria": criteria_data, "updated_at": now}
+        if isinstance(thresholds, dict):
+            update_doc["evaluation_thresholds"] = thresholds
+        await events_col.update_one({"_id": ObjectId(event_id)}, {"$set": update_doc})
 
     # ── Auto-classify submissions based on thresholds (BACKGROUND) ──
     if isinstance(thresholds, dict) and criteria_data:
