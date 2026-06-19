@@ -115,6 +115,8 @@ def validate_file_value(value: Any, accept_types: List[str], label: str = "File"
         return None
     if isinstance(value, str) and value.startswith("http"):
         return None
+    if isinstance(value, dict) and value.get("_stored_file"):
+        return None
     if not accept_types:
         return None
     if not isinstance(value, str):

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Filter, ChevronDown, CheckCircle, Clock, XCircle,
-  Trophy, Medal, Award, Users, FileText, Download, Eye, Mail, MoreVertical, ExternalLink, Loader2
+  Trophy, Medal, Award, Users, FileText, Download, Eye, Mail, MoreVertical, ExternalLink, Loader2, AlertCircle
 } from 'lucide-react';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
 
 interface EventStage { id: string; name: string }
 interface EventItem { _id: string; title: string; stages?: EventStage[] }
 interface CertStats { total: number; achievement: number; participation: number; verified_today: number; pending: number; revoked: number }
-interface EligibilityPreview { winner_teams: { count: number; recipients: number }; runner_up_teams: { count: number; recipients: number }; finalist_teams: { count: number; recipients: number }; participation_eligible: { count: number } }
+interface EligibilityPreview { winner_teams: { count: number; recipients: number }; runner_up_teams: { count: number; recipients: number }; finalist_teams: { count: number; recipients: number }; participation_eligible: { count: number }; non_qualifier_participants?: { count: number } }
 interface CertificateRecord {
   _id: string; certificate_id?: string; recipient_name?: string; student_name?: string;
   team_name?: string; event_title?: string; stage_name?: string; type?: string; category?: string;
@@ -41,10 +41,124 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
   const [eligibility, setEligibility] = useState<EligibilityPreview | null>(null);
   const [registry, setRegistry] = useState<CertificateRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [issuing, setIssuing] = useState(false);
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [issueResult, setIssueResult] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('All Certificates');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateRecord | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // New States for Eligibility and Wizard Progress
+  const [showEligibleModal, setShowEligibleModal] = useState(false);
+  const [eligibleRecipientsData, setEligibleRecipientsData] = useState<any>(null);
+  const [loadingEligible, setLoadingEligible] = useState(false);
+  const [issuingProgress, setIssuingProgress] = useState<string | null>(null);
+
+  const handleViewEligibleRecipients = async () => {
+    if (!selectedEvent || !selectedStage) return;
+    setLoadingEligible(true);
+    setShowEligibleModal(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/institution/certificates/eligible-recipients?event_id=${selectedEvent._id}&stage_id=${selectedStage.id}`,
+        { method: 'POST', headers: authHeaders() }
+      );
+      if (res.ok) {
+        setEligibleRecipientsData(await res.json());
+      }
+    } catch (e) {
+      console.error('Error fetching eligible recipients:', e);
+    } finally {
+      setLoadingEligible(false);
+    }
+  };
+
+  const handleIssueCertificates = async (target: 'all' | 'ranked' | 'participation' | 'non_qualifiers') => {
+    if (!selectedEvent || !selectedStage) return;
+    setIssuing(true);
+    setIssueResult(null);
+    setIssuingProgress("Fetching eligible recipients...");
+    
+    try {
+      // 1. Fetch eligible recipients for the selected stage and event
+      const eligibleRes = await fetch(
+        `${API_BASE_URL}/api/v1/institution/certificates/eligible-recipients?event_id=${selectedEvent._id}&stage_id=${selectedStage.id}`,
+        { method: 'POST', headers: authHeaders() }
+      );
+      
+      if (!eligibleRes.ok) {
+        throw new Error("Failed to retrieve eligible recipients from leaderboard.");
+      }
+      
+      const eligibleData = await eligibleRes.json();
+      const categories = eligibleData.categories || {};
+      
+      let issuedCount = 0;
+      
+      // Helper function to issue a specific category
+      const issueCategory = async (catKey: string, achievementType: string) => {
+        const cat = categories[catKey];
+        if (!cat || !cat.recipients || cat.recipients.length === 0) return 0;
+        
+        // Map recipients to their respective IDs (for qualifiers, use submission_id; for non-qualifiers, user_id)
+        const recipientIds = cat.recipients.map((r: any) => r.submission_id || r.user_id || r.participant_id).filter(Boolean);
+        if (recipientIds.length === 0) return 0;
+        
+        setIssuingProgress(`Issuing ${cat.label} certificates (${recipientIds.length})...`);
+        
+        const params = new URLSearchParams();
+        params.append("event_id", selectedEvent._id);
+        recipientIds.forEach((id: string) => params.append("recipient_ids", id));
+        params.append("achievement_type", achievementType);
+        params.append("send_email", "true");
+        
+        const issueRes = await fetch(
+          `${API_BASE_URL}/api/v1/institution/certificates/issue?${params.toString()}`,
+          { method: 'POST', headers: authHeaders() }
+        );
+        
+        if (issueRes.ok) {
+          const resData = await issueRes.json();
+          return resData.issued || 0;
+        } else {
+          console.error(`Failed to issue ${cat.label} certificates`);
+          return 0;
+        }
+      };
+
+      // 2. Issue certificates based on the user's selection
+      if (target === 'all' || target === 'ranked') {
+        issuedCount += await issueCategory('winner', 'winner');
+        issuedCount += await issueCategory('runner_up', 'runner_up');
+        issuedCount += await issueCategory('finalist', 'finalist');
+      }
+      
+      if (target === 'all' || target === 'participation') {
+        issuedCount += await issueCategory('participation', 'participation');
+      }
+      
+      if (target === 'all' || target === 'non_qualifiers') {
+        issuedCount += await issueCategory('non_qualifier_participation', 'participation');
+      }
+      
+      setIssueResult(`Successfully issued ${issuedCount} certificate(s)!`);
+      
+      // Refresh registry & stats
+      const [statsRes, regRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/v1/institution/certificates/stats?institution_id=${institutionId}`, { headers: authHeaders() }),
+        fetch(`${API_BASE_URL}/api/v1/institution/certificates/registry?institution_id=${institutionId}&event_id=${selectedEvent._id}${selectedStage ? `&stage_id=${selectedStage.id}` : ''}`, { headers: authHeaders() }),
+      ]);
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (regRes.ok) setRegistry(await regRes.json());
+      
+    } catch (err: any) {
+      setIssueResult(err.message || 'Error issuing certificates');
+    } finally {
+      setIssuing(false);
+      setIssuingProgress(null);
+    }
+  };
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -115,8 +229,8 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
     { icon: <Trophy className="w-4 h-4 text-slate-400" />, label: 'Winner', value: 'Top 1 Team' },
     { icon: <Medal className="w-4 h-4 text-slate-400" />, label: 'Runner Up', value: 'Rank 2 - 3' },
     { icon: <Award className="w-4 h-4 text-slate-400" />, label: 'Finalist', value: 'Rank 4 - 20' },
-    { icon: <CheckCircle className="w-4 h-4 text-slate-400" />, label: 'Participation', value: 'All who submitted final stage' },
-    { icon: <Award className="w-4 h-4 text-slate-400" />, label: 'Minimum Score', value: 'Not Applicable' },
+    { icon: <CheckCircle className="w-4 h-4 text-slate-400" />, label: 'Participation', value: 'All registered participants' },
+    { icon: <AlertCircle className="w-4 h-4 text-amber-500" />, label: 'Non-Qualifier', value: 'Registered, no qualifying score' },
   ];
 
   return (
@@ -130,7 +244,14 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
         <div className="flex space-x-3">
           <button className="flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 bg-white rounded-md hover:bg-indigo-50 font-medium text-sm"><FileText className="w-4 h-4 mr-2" /> Template Builder</button>
           <button className="flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 bg-white rounded-md hover:bg-indigo-50 font-medium text-sm"><CheckCircle className="w-4 h-4 mr-2" /> Verify Certificates</button>
-          <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium text-sm"><Award className="w-4 h-4 mr-2" /> Issue Certificates</button>
+          <button
+            onClick={() => setShowIssueModal(true)}
+            disabled={!selectedEvent || issuing}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium text-sm disabled:opacity-50"
+          >
+            {issuing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Award className="w-4 h-4 mr-2" />}
+            {issuing ? 'Issuing...' : 'Issue Certificates'}
+          </button>
         </div>
       </div>
 
@@ -231,17 +352,35 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
                   <div className="text-[10px] text-slate-400">Recipients: {eligibility?.finalist_teams?.recipients ?? 0}</div>
                 </div>
               </div>
-              <div className="flex items-center justify-between border border-slate-100 rounded-lg p-3 mb-4 bg-slate-50">
-                <div className="flex items-center">
-                  <Users className="w-8 h-8 text-indigo-600 bg-indigo-50 p-1.5 rounded-md mr-3" />
-                  <div>
-                    <div className="text-xs font-semibold">Participation Eligible Recipients</div>
-                    <div className="text-[10px] text-slate-500">Participants who completed the required criteria</div>
+                <div className="flex items-center justify-between border border-slate-100 rounded-lg p-3 mb-2 bg-slate-50">
+                  <div className="flex items-center">
+                    <Users className="w-8 h-8 text-indigo-600 bg-indigo-50 p-1.5 rounded-md mr-3" />
+                    <div>
+                      <div className="text-xs font-semibold">Participation Eligible Recipients</div>
+                      <div className="text-[10px] text-slate-500">All registered participants (including non-qualifiers)</div>
+                    </div>
                   </div>
+                  <div className="text-xl font-bold">{eligibility?.participation_eligible?.count ?? 0}</div>
                 </div>
-                <div className="text-xl font-bold">{eligibility?.participation_eligible?.count ?? 0}</div>
-              </div>
-              <button className="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">View Eligible Recipients →</button>
+                {eligibility?.non_qualifier_participants?.count > 0 && (
+                  <div className="flex items-center justify-between border border-amber-100 rounded-lg p-3 bg-amber-50">
+                    <div className="flex items-center">
+                      <AlertCircle className="w-8 h-8 text-amber-600 bg-amber-50 p-1.5 rounded-md mr-3" />
+                      <div>
+                        <div className="text-xs font-semibold">Non-Qualifier Participants</div>
+                        <div className="text-[10px] text-slate-500">Registered but didn't qualify for final stage</div>
+                      </div>
+                    </div>
+                    <div className="text-xl font-bold text-amber-600">{eligibility?.non_qualifier_participants?.count ?? 0}</div>
+                  </div>
+                )}
+              <button
+                onClick={handleViewEligibleRecipients}
+                disabled={!selectedEvent || !selectedStage}
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                View Eligible Recipients &rarr;
+              </button>
             </div>
 
             {/* Statistics */}
@@ -439,6 +578,195 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
               </div>
             ))}
           </div>
+
+          {/* Issue Certificates Modal */}
+          {showIssueModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => { if (!issuing) setShowIssueModal(false); }}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-900">Issue Certificates</h3>
+                  <button onClick={() => { if (!issuing) setShowIssueModal(false); }} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                    <XCircle className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-3">
+                  <p className="text-sm text-slate-600 mb-2">Select which certificates to issue for <strong>{selectedEvent?.title}</strong> - stage: <strong>{selectedStage?.name}</strong>:</p>
+                  
+                  {/* Option 1: Ranked Winners & Finalists */}
+                  <button
+                    onClick={() => handleIssueCertificates('ranked')}
+                    disabled={issuing || !selectedEvent}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors disabled:opacity-50 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Trophy className="w-5 h-5 text-indigo-600" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Winners, Runner-Ups & Finalists</div>
+                        <div className="text-[10px] text-slate-500">Issue achievement awards to top 20 teams</div>
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-indigo-400 -rotate-90" />
+                  </button>
+
+                  {/* Option 2: Qualified Participation */}
+                  <button
+                    onClick={() => handleIssueCertificates('participation')}
+                    disabled={issuing || !selectedEvent}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors disabled:opacity-50 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Users className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Qualified Participation</div>
+                        <div className="text-[10px] text-slate-500">Issue participation certs to ranked teams (21+)</div>
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-emerald-400 -rotate-90" />
+                  </button>
+
+                  {/* Option 3: Non-Qualifiers */}
+                  <button
+                    onClick={() => handleIssueCertificates('non_qualifiers')}
+                    disabled={issuing || !selectedEvent}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors disabled:opacity-50 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">Non-Qualifier Participation</div>
+                        <div className="text-[10px] text-slate-500">Issue participation certs to registered users with no submissions</div>
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-amber-400 -rotate-90" />
+                  </button>
+
+                  {/* Option 4: Issue All */}
+                  <button
+                    onClick={() => handleIssueCertificates('all')}
+                    disabled={issuing || !selectedEvent}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors disabled:opacity-50 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Award className="w-5 h-5 text-white" />
+                      <div>
+                        <div className="text-xs font-bold text-white">Issue All Certificates</div>
+                        <div className="text-[10px] text-indigo-100">Issue all ranked, qualified participation, and non-qualifiers</div>
+                      </div>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-indigo-200 -rotate-90" />
+                  </button>
+
+                  {issuingProgress && (
+                    <div className="flex items-center justify-center p-3 bg-slate-50 border border-slate-100 rounded-lg text-xs font-medium text-slate-600 gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                      <span>{issuingProgress}</span>
+                    </div>
+                  )}
+
+                  {issueResult && (
+                    <div className={`p-3 rounded-lg text-xs font-medium ${issueResult.includes('Successfully') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                      {issueResult}
+                    </div>
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+                  <button
+                    onClick={() => { setShowIssueModal(false); setIssueResult(null); }}
+                    disabled={issuing}
+                    className="px-5 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors disabled:opacity-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* View Eligible Recipients Modal */}
+          {showEligibleModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowEligibleModal(false)}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                  <h3 className="text-lg font-bold text-slate-900">Eligible Recipients Preview</h3>
+                  <button onClick={() => setShowEligibleModal(false)} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                    <XCircle className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                  {loadingEligible ? (
+                    <div className="flex items-center justify-center py-16 flex-col gap-2">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                      <span className="text-sm font-medium text-slate-500">Retrieving eligible recipients...</span>
+                    </div>
+                  ) : eligibleRecipientsData?.categories ? (
+                    Object.entries(eligibleRecipientsData.categories).map(([key, category]: [string, any]) => (
+                      <div key={key} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                            {typeIcon(key)}
+                            {category.label}
+                            <span className="text-xs font-normal text-slate-500">({category.rank_range})</span>
+                          </h4>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700">
+                            {category.recipients?.length || 0} Eligible
+                          </span>
+                        </div>
+                        
+                        {category.recipients && category.recipients.length > 0 ? (
+                          <div className="max-h-48 overflow-y-auto border border-slate-100 bg-white rounded-lg">
+                            <table className="w-full text-left text-xs border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold">
+                                  <th className="py-2 px-3">Name</th>
+                                  {key !== 'non_qualifier_participation' && <th className="py-2 px-3">Team Name</th>}
+                                  <th className="py-2 px-3 text-center">Rank</th>
+                                  {key !== 'non_qualifier_participation' && <th className="py-2 px-3 text-right">Score</th>}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-slate-700">
+                                {category.recipients.map((rec: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-50/50">
+                                    <td className="py-2 px-3 font-medium text-slate-900">{rec.user_name || rec.student_name || 'Participant'}</td>
+                                    {key !== 'non_qualifier_participation' && <td className="py-2 px-3">{rec.team_name || '-'}</td>}
+                                    <td className="py-2 px-3 text-center">#{rec.rank || idx + 1}</td>
+                                    {key !== 'non_qualifier_participation' && <td className="py-2 px-3 text-right font-medium">{rec.score}</td>}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400 italic">No recipients qualified under this category</p>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-16 text-slate-400">
+                      <AlertCircle className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm font-medium">No eligible recipients list returned</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowEligibleModal(false)}
+                    className="px-5 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => { setShowEligibleModal(false); setShowIssueModal(true); }}
+                    disabled={!selectedEvent || loadingEligible}
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Issue Certificates
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

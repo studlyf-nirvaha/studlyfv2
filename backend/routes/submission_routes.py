@@ -406,10 +406,12 @@ async def admin_view_stage_submissions(
             if sub_team_id and team:
                 team_name = team.get("team_name") or team.get("name") or participant_name
 
-            # Helper to extract files from dynamic data
+            # Helper to extract files from dynamic data (exclude github.com, youtube.com, etc.)
             files = []
-            for k, v in (sub.get("data") or {}).items():
-                if isinstance(v, str) and (v.startswith("data:") or v.startswith("http")):
+            data = sub.get("data") or {}
+            uploaded_filename = data.get("filename", "")
+            for k, v in data.items():
+                if isinstance(v, str) and (v.startswith("data:") or v.startswith("http") or v.startswith("/api/")) and not any(x in v.lower() for x in ["github.com", "youtube.com", "vimeo.com"]):
                     # Try to find field label in stage_fields
                     field_label = k
                     for f in stage_fields:
@@ -419,12 +421,13 @@ async def admin_view_stage_submissions(
                     
                     # Dynamically determine file type
                     file_type = "other"
-                    v_lower = v.lower()
-                    if "pdf" in v_lower or "application/pdf" in v_lower:
+                    target = uploaded_filename if uploaded_filename else v
+                    target_lower = target.lower()
+                    if "pdf" in target_lower or target_lower.endswith(".pdf") or "application/pdf" in target_lower:
                         file_type = "pdf"
-                    elif "presentation" in v_lower or "powerpoint" in v_lower or "ppt" in v_lower:
+                    elif any(x in target_lower for x in ["presentation", "powerpoint", ".ppt"]):
                         file_type = "ppt"
-                    elif "image" in v_lower:
+                    elif "image" in target_lower or any(target_lower.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]):
                         file_type = "image"
                         
                     files.append({"name": field_label, "url": v, "type": file_type})

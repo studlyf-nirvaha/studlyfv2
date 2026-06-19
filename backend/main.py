@@ -48,7 +48,7 @@ app.add_middleware(PerformanceMiddleware)
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # ── Sentry Error Tracking ──
 sentry_dsn = os.getenv("SENTRY_DSN")

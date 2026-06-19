@@ -108,6 +108,38 @@ interface ProjectInfo {
   usedFieldIds: string[];
 }
 
+function isUrlValue(val: string): boolean {
+  return val.startsWith('http://') || val.startsWith('https://') || val.startsWith('www.');
+}
+
+function isNonTextValue(val: any): boolean {
+  if (val === undefined || val === null || val === '') return true;
+  if (typeof val === 'object') return true;
+  const s = String(val);
+  if (isUrlValue(s)) return true;
+  if (s.startsWith('data:')) return true;
+  if (s.startsWith('/api/')) return true;
+  return false;
+}
+
+/** Shorten long dynamic column labels for compact table display */
+function shortenColumnLabel(label: string): string {
+  const l = label.trim().toLowerCase();
+  if (l === 'final github repository' || l === 'github repository' || l === 'github link' || l === 'final github link') return 'Repository';
+  if (l === 'demo video link' || l === 'demo video' || l === 'video link' || l === 'video') return 'Demo Video';
+  if (l === 'final ppt presentation' || l === 'ppt presentation' || l === 'final ppt' || l === 'ppt') return 'PPT';
+
+  return label
+    .replace(/^final\s+/i, '')
+    .replace(/\s+link$/i, '')
+    .replace(/\s+url$/i, '')
+    .replace(/\bgithub\s+repository\b/i, 'Repository')
+    .replace(/\brepository\b/i, 'Repository')
+    .replace(/\bpresentation\b/i, 'PPT')
+    .replace(/\bdemo\s+video\b/i, 'Demo Video')
+    .replace(/\bvideo\s+link\b/i, 'Video');
+}
+
 function resolveProjectInfo(
   row: Submission,
   fields: StageField[],
@@ -116,30 +148,63 @@ function resolveProjectInfo(
   const data = row.data || {};
   const usedFieldIds: string[] = [];
 
+  const textValue = (val: any): string | null => {
+    if (isNonTextValue(val)) return null;
+    return String(val);
+  };
+
   // 1. Use configured primary field
-  if (config?.primary_field_id && data[config.primary_field_id]) {
-    usedFieldIds.push(config.primary_field_id);
-    return { title: String(data[config.primary_field_id]), preview: null, usedFieldIds };
+  if (config?.primary_field_id) {
+    const v = textValue(data[config.primary_field_id]);
+    if (v) {
+      usedFieldIds.push(config.primary_field_id);
+      return { title: v, preview: null, usedFieldIds };
+    }
   }
 
   // 2. Heuristic: find field by label matching common title/key patterns
   const titleKeywords = /title|name|project|idea|startup|research|topic|theme/i;
-  const titleField = fields.find(
-    f => titleKeywords.test(f.label) && f.field_type !== 'file' && data[f.field_id]
-  );
-  if (titleField) {
-    usedFieldIds.push(titleField.field_id);
-    return { title: String(data[titleField.field_id]), preview: null, usedFieldIds };
+  for (const f of fields) {
+    if (f.field_type === 'file') continue;
+    if (!titleKeywords.test(f.label)) continue;
+    const v = textValue(data[f.field_id]);
+    if (v) {
+      usedFieldIds.push(f.field_id);
+      return { title: v, preview: null, usedFieldIds };
+    }
   }
 
-  // 3. Fallback: first non-file field with data
-  const firstField = fields.find(f => f.field_type !== 'file' && data[f.field_id]);
-  if (firstField) {
-    usedFieldIds.push(firstField.field_id);
-    return { title: String(data[firstField.field_id]), preview: null, usedFieldIds };
+  // 3. Fallback: first non-file, non-url field with data
+  for (const f of fields) {
+    if (f.field_type === 'file') continue;
+    const v = textValue(data[f.field_id]);
+    if (v) {
+      usedFieldIds.push(f.field_id);
+      return { title: v, preview: null, usedFieldIds };
+    }
   }
 
-  return { title: 'Project information unavailable', preview: null, usedFieldIds };
+  // 4. Use project_title from backend (which already merges previous stage data)
+  if (row.project_title && !isUrlValue(row.project_title) && !row.project_title.startsWith('data:') && !row.project_title.startsWith('Unnamed')) {
+    return { title: row.project_title, preview: null, usedFieldIds };
+  }
+
+  // 5. Try solution_description / description from backend
+  if (row.solution_description && !isUrlValue(row.solution_description) && !row.solution_description.startsWith('data:')) {
+    return { title: row.solution_description, preview: null, usedFieldIds };
+  }
+
+  // 6. Try first non-url value from data
+  if (row.data) {
+    const firstText = Object.values(row.data).find(v => typeof v === 'string' && v.trim() && !isNonTextValue(v));
+    if (firstText) {
+      return { title: String(firstText), preview: null, usedFieldIds };
+    }
+  }
+
+  // 7. Last resort: use team/participant name
+  const fallbackName = row.display_name || row.team_name || 'Project information unavailable';
+  return { title: fallbackName, preview: null, usedFieldIds };
 }
 
 interface ScoreDisplay {
@@ -239,6 +304,7 @@ export default function LiveResultsDashboard() {
   const [pageSize, setPageSize] = useState(() => loadPersistedState('pageSize', DEFAULT_PAGE_SIZE));
   const [selectedTeam, setSelectedTeam] = useState<Submission | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [previewRecommendation, setPreviewRecommendation] = useState<{ title: string; text: string } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -389,16 +455,19 @@ export default function LiveResultsDashboard() {
   const handleIssueCertificates = async () => {
     if (!selectedEvent) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/institution/certificates/generate`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${selectedEvent._id}/certificates/issue-ranked`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ institution_id: user?.institution_id, event_id: selectedEvent._id }),
+        body: JSON.stringify({
+          send_email: true,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
-        showToast(`Successfully issued ${data.issued_count} certificates!`, 'success');
+        showToast(`Successfully issued ${data.certificates_issued} certificate(s)!`, 'success');
       } else {
-        showToast('Failed to issue certificates', 'error');
+        const err = await res.json().catch(() => ({}));
+        showToast(err?.detail || 'Failed to issue certificates', 'error');
       }
     } catch {
       showToast('Error issuing certificates', 'error');
@@ -547,15 +616,14 @@ export default function LiveResultsDashboard() {
             <>
               {/* Table */}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px] text-left border-collapse table-fixed">
+                <table className="w-full text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50">
-                      <th className="py-4 px-6 w-20 text-center">Rank</th>
-                      <th className="py-4 px-6 w-1/5">Team</th>
-                      <th className="py-4 px-6 w-1/5">Project / Idea</th>
-                      {/* Dynamic columns — text fields only, excludes title/preview */}
+                    <tr className="border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">
+                      <th className="py-2 px-1 text-center w-10">Rank</th>
+                      <th className="py-2 px-2 w-32">Team</th>
+                      <th className="py-2 px-2 w-40">Project / Idea</th>
+                      {/* Dynamic columns — excludes title/preview */}
                       {(leaderboardData?.stage_fields || []).filter(f => {
-                        if (f.field_type === 'file') return false;
                         const cfg = leaderboardData?.leaderboard_config || {};
                         if (cfg.primary_field_id && f.field_id === cfg.primary_field_id) return false;
                         if (cfg.preview_field_id && f.field_id === cfg.preview_field_id) return false;
@@ -567,19 +635,18 @@ export default function LiveResultsDashboard() {
                         }
                         return true;
                       }).map((field) => (
-                        <th key={field.field_id} className="py-4 px-6 w-32">{field.label}</th>
+                        <th key={field.field_id} className="py-3 px-2 whitespace-nowrap text-[10px]">{shortenColumnLabel(field.label)}</th>
                       ))}
-                      <th className="py-4 px-6 w-32">Final Score</th>
-                      <th className="py-4 px-6 w-32">Status</th>
-                      <th className="py-4 px-6 w-1/5">Recommendation</th>
-                      <th className="py-4 px-6 w-24" />
+                      <th className="py-2 px-1 w-16">Score</th>
+                      <th className="py-2 px-1 w-20">Status</th>
+                      <th className="py-2 px-1 w-24">Reco.</th>
+                      <th className="py-2 px-1 w-20">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {paginatedSubmissions.length === 0 ? (
                       <tr>
                         <td colSpan={7 + (leaderboardData?.stage_fields?.filter(f => {
-                          if (f.field_type === 'file') return false;
                           const cfg = leaderboardData?.leaderboard_config || {};
                           if (cfg.primary_field_id && f.field_id === cfg.primary_field_id) return false;
                           if (cfg.preview_field_id && f.field_id === cfg.preview_field_id) return false;
@@ -611,9 +678,8 @@ export default function LiveResultsDashboard() {
                         const recommendation = resolveRecommendation(row);
                         const teamInfo = resolveTeamInfo(row);
 
-                        // Dynamic columns = text fields only, excluding title/preview fields (same for all rows)
+                        // Dynamic columns = excluding title/preview fields (same for all rows)
                         const dynamicFields = stageFields.filter(f => {
-                          if (f.field_type === 'file') return false;
                           if (cfg.primary_field_id && f.field_id === cfg.primary_field_id) return false;
                           if (cfg.preview_field_id && f.field_id === cfg.preview_field_id) return false;
                           if (!cfg.primary_field_id) {
@@ -627,85 +693,90 @@ export default function LiveResultsDashboard() {
 
                         return (
                           <tr key={row.team_id || row.rank} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-4 px-6 text-center">
+                            <td className="py-2 px-1 text-center">
                               {renderRank(row.rank)}
                             </td>
-                            <td className="py-4 px-6">
-                              <div className="flex items-center space-x-2 mb-1">
+                            <td className="py-2 px-2 align-top">
+                              <div className="flex items-center space-x-1 mb-1 flex-wrap">
                                 <button
                                   onClick={() => setSelectedTeam(row)}
-                                  className="font-bold text-slate-900 hover:text-[#4f46e5] transition-colors text-left"
+                                  className="font-bold text-slate-900 hover:text-[#4f46e5] transition-colors text-left text-xs leading-tight"
                                 >
                                   {teamInfo.name}
                                 </button>
                                 {teamInfo.isVerified && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-[#4f46e5]">Verified</span>
+                                  <span className="px-1 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-[#4f46e5]">Verified</span>
                                 )}
                               </div>
                               {teamInfo.subtitle && (
-                                <div className="text-xs text-slate-500">{teamInfo.subtitle}</div>
+                                <div className="text-[10px] text-slate-500 leading-tight">{teamInfo.subtitle}</div>
                               )}
                             </td>
-                            <td className="py-4 px-6">
-                              <div className="font-bold text-slate-900">{projectInfo.title}</div>
+                            <td className="py-2 px-2 align-top">
+                              <div className="font-bold text-slate-900 text-xs line-clamp-2 leading-tight" title={projectInfo.title}>{projectInfo.title}</div>
                             </td>
                             {dynamicFields.map((field) => (
-                              <td key={field.field_id} className="py-4 px-6">
-                                <DynamicTableCell value={row.data?.[field.field_id]} fieldType={field.field_type} />
+                              <td key={field.field_id} className="py-2 px-1 align-top">
+                                <div className="max-h-16 overflow-hidden text-xs">
+                                  <DynamicTableCell
+                                    value={row.data?.[field.field_id]}
+                                    fieldType={field.field_type}
+                                    eventId={selectedEvent?._id}
+                                    submissionId={row.submission_id}
+                                    fieldId={field.field_id}
+                                  />
+                                </div>
                               </td>
                             ))}
-                            <td className="py-4 px-6">
+                            <td className="py-2 px-1 align-top">
                               {scoreDisplay ? (
                                 <div className="flex flex-col">
-                                  <span className="text-lg font-bold text-slate-900">{scoreDisplay.score.toFixed(1)}</span>
+                                  <span className="text-sm font-bold text-slate-900 leading-none">{scoreDisplay.score.toFixed(1)}</span>
                                   {scoreDisplay.label && (
-                                    <span className={`text-xs font-semibold ${scoreDisplay.color}`}>{scoreDisplay.label}</span>
+                                    <span className={`text-[9px] mt-0.5 font-semibold leading-tight ${scoreDisplay.color}`}>{scoreDisplay.label}</span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-sm text-slate-400 italic">Not Evaluated</span>
+                                <span className="text-[10px] text-slate-400 italic">N/A</span>
                               )}
                             </td>
-                            <td className="py-4 px-6">
+                            <td className="py-2 px-1 align-top">
                               {statusBadge ? (
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${statusBadge.bg}`}>
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold leading-tight ${statusBadge.bg}`}>
                                   {statusBadge.icon}
-                                  {row.status}
+                                  <span className="truncate max-w-[60px]">{row.status}</span>
                                 </span>
                               ) : (
-                                <span className="text-sm text-slate-400 italic">Not Evaluated</span>
+                                <span className="text-[10px] text-slate-400 italic">N/A</span>
                               )}
                             </td>
-                            <td className="py-4 px-6 text-xs text-slate-600 max-w-[200px]">
+                            <td className="py-2 px-1 align-top">
                               {Array.isArray(row.judges_feedback) && row.judges_feedback.length > 0 ? (
-                                <div className="flex flex-col gap-1.5">
-                                  {row.judges_feedback.slice(0, 2).map((fb: any, fbi: number) => (
-                                    <div key={fbi} className="bg-slate-50 rounded-lg p-2 border border-slate-100">
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[9px] font-bold text-slate-500 truncate">{fb.judge_name || fb.judge_email || 'Judge'}</span>
-                                        <span className="text-[10px] font-bold text-indigo-600 shrink-0">{typeof fb.score === 'number' ? fb.score.toFixed(1) : fb.score}</span>
-                                      </div>
-                                      {fb.feedback ? (
-                                        <p className="text-[10px] text-slate-600 mt-0.5 line-clamp-2 leading-relaxed">{fb.feedback}</p>
-                                      ) : null}
+                                <div className="flex flex-col gap-1">
+                                  {row.judges_feedback.slice(0, 1).map((fb: any, fbi: number) => (
+                                    <div key={fbi} className="bg-slate-50 rounded p-1 border border-slate-100">
+                                      <p className="text-[9px] text-slate-600 line-clamp-2 leading-tight">{fb.feedback || 'Evaluated'}</p>
                                     </div>
                                   ))}
-                                  {row.judges_feedback.length > 2 && (
-                                    <span className="text-[9px] font-semibold text-slate-400 italic">+{row.judges_feedback.length - 2} more</span>
-                                  )}
                                 </div>
                               ) : recommendation ? (
-                                <span className="line-clamp-2">{recommendation}</span>
+                                <button
+                                  onClick={() => setPreviewRecommendation({ title: row.display_name || row.team_name || 'Team', text: recommendation })}
+                                  className="text-[10px] font-bold text-slate-600 hover:text-purple-600 underline decoration-dashed underline-offset-2 text-left line-clamp-2 leading-tight"
+                                  title={recommendation}
+                                >
+                                  View
+                                </button>
                               ) : (
-                                <span className="text-slate-400 italic">No recommendation available</span>
+                                <span className="text-[9px] text-slate-400 italic">N/A</span>
                               )}
                             </td>
-                            <td className="py-4 px-6 text-right">
+                            <td className="py-2 px-1 align-top text-right">
                               <button
                                 onClick={() => setSelectedTeam(row)}
-                                className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 shadow-sm transition-all"
+                                className="inline-flex items-center justify-center px-2 py-1 text-[10px] font-semibold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 shadow-sm transition-all"
                               >
-                                View Details
+                                View
                               </button>
                             </td>
                           </tr>
@@ -840,6 +911,8 @@ export default function LiveResultsDashboard() {
                     <SubmissionDetailsRenderer
                       data={data}
                       fields={stageFields}
+                      eventId={selectedEvent?._id}
+                      submissionId={selectedTeam.submission_id}
                     />
                   </div>
                 </div>
@@ -935,6 +1008,31 @@ export default function LiveResultsDashboard() {
         </div>
         );
       })()}
+
+      {/* Recommendation Preview Modal */}
+      {previewRecommendation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">{previewRecommendation.title}</h3>
+              <button onClick={() => setPreviewRecommendation(null)} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{previewRecommendation.text}</p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setPreviewRecommendation(null)}
+                className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg hover:bg-[#4338ca] text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast && (

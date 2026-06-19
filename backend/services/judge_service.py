@@ -2,8 +2,10 @@ from db import judges_col
 from bson import ObjectId
 from datetime import datetime, timezone
 import secrets
+import os
+from dotenv import load_dotenv
 
-
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 def _judge_invitation_url(token: str) -> str:
     import os
     base = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
@@ -318,7 +320,7 @@ async def _count_judge_assignments(judge_id: str) -> int:
 
 async def assign_judge_to_multiple_submissions(submission_ids: list, judge_id: str):
     """Assign a judge to multiple submissions and send a SINGLE consolidated email."""
-    from db import submission_data_col, judges_col, events_col, submissions_col, teams_col
+    from db import submission_data_col, judges_col, events_col, submissions_col, teams_col, users_col
     from datetime import datetime, timezone, timedelta
     import os
     from bson import ObjectId
@@ -342,8 +344,12 @@ async def assign_judge_to_multiple_submissions(submission_ids: list, judge_id: s
     
     # 2. Process each submission
     projects_data = []
-    base_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    print(f"DEBUG: Processing {len(submission_ids)} submissions for judge {judge_email}")
+    base_url = (
+        os.getenv("FRONTEND_URL") or
+        os.getenv("RENDER_EXTERNAL_URL", "").replace("api.", "").replace(":8000", ":3000") or
+        "http://localhost:3000"
+    ).rstrip("/")
+    print(f"DEBUG: Processing {len(submission_ids)} submissions for judge {judge_email}, base_url={base_url}")
     
     for sid in submission_ids:
         sid_str = str(sid)
@@ -493,10 +499,79 @@ async def assign_judge_to_multiple_submissions(submission_ids: list, judge_id: s
         if files_html:
             files_html = f'<ul style="margin: 10px 0; padding-left: 20px; font-size: 12px; color: #64748b;">{files_html}</ul>'
 
+        # Resolve team name thoroughly
+        team_name = ""
+        for candidate in (
+            sub.get("team_name"),
+            sub_data.get("team_display_name"),
+            sub_data.get("team_name"),
+            sub.get("user_name"),
+            sub.get("title"),
+        ):
+            if candidate and str(candidate).strip():
+                team_name = str(candidate).strip()
+                break
+        if not team_name:
+            tid = sub.get("team_id")
+            if tid:
+                try:
+                    team_doc = await teams_col.find_one({"_id": ObjectId(str(tid))})
+                except Exception:
+                    team_doc = None
+                if not team_doc:
+                    try:
+                        team_doc = await teams_col.find_one({"team_id": str(tid)})
+                    except Exception:
+                        team_doc = None
+                if team_doc:
+                    team_name = str(team_doc.get("team_name") or team_doc.get("name") or team_doc.get("title") or "").strip()
+            if not team_name:
+                uid = sub.get("user_id")
+                if uid:
+                    try:
+                        user_doc = await users_col.find_one({"user_id": str(uid)})
+                    except Exception:
+                        user_doc = None
+                    if not user_doc:
+                        try:
+                            user_doc = await users_col.find_one({"_id": ObjectId(str(uid))})
+                        except Exception:
+                            user_doc = None
+                    if user_doc:
+                        team_name = str(user_doc.get("full_name") or user_doc.get("name") or user_doc.get("email") or "").strip()
+        if not team_name:
+            team_name = "Solo Participant"
+
+        # Resolve title
+        title = (
+            sub.get("title")
+            or sub.get("project_title")
+            or sub.get("stage_name")
+            or team_name
+            or "Submission"
+        )
+
+        # Resolve event name
+        event_name = (event.get("title") or event.get("name")) if event else ""
+        if not event_name:
+            eid = sub.get("event_id")
+            if eid:
+                try:
+                    ev_doc = await events_col.find_one({"_id": ObjectId(str(eid))})
+                except Exception:
+                    ev_doc = None
+                if not ev_doc:
+                    try:
+                        ev_doc = await events_col.find_one({"event_id": str(eid)})
+                    except Exception:
+                        ev_doc = None
+                if ev_doc:
+                    event_name = ev_doc.get("title") or ev_doc.get("name") or ""
+
         projects_data.append({
-            "title": sub.get("title") or sub.get("project_title") or "Untitled Project",
-            "team_name": sub.get("team_name") or sub.get("user_name") or sub.get("title") or "Team",
-            "event_name": event.get("name", "Event") if event else "Event",
+            "title": title,
+            "team_name": team_name,
+            "event_name": event_name or "Event",
             "stage_name": stage_name,
             "description": sub.get("description") or sub.get("solution_description") or sub_data.get("idea_abstract") or "No description provided",
             "evaluation_url": evaluation_url,

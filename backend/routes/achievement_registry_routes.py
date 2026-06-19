@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from db import certificates_col, events_col, participants_col, submission_data_col, scores_col
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from db import certificates_col, events_col, participants_col, submission_data_col, scores_col, users_col, teams_col
 from auth_institution import get_auth_user
 from bson import ObjectId
 from typing import Optional, List
@@ -92,12 +92,18 @@ async def get_eligibility_preview(
     winners = [e for e in entries if e.get("rank") == 1]
     runners = [e for e in entries if e.get("rank") in [2, 3]]
     finalists = [e for e in entries if e.get("rank") in range(4, 21)]
-    participant_count = len(entries)
+
+    # Count all registered participants (including non-qualifiers) for participation eligibility
+    total_participants = await participants_col.count_documents({"event_id": event_id})
+    qualified_count = len([e for e in entries if e.get("rank") and e["rank"] <= 20])
+    non_qualifier_count = max(0, total_participants - qualified_count)
+
     return {
         "winner_teams": {"count": len(winners), "recipients": len(winners)},
         "runner_up_teams": {"count": len(runners), "recipients": len(runners)},
         "finalist_teams": {"count": len(finalists), "recipients": len(finalists)},
-        "participation_eligible": {"count": participant_count},
+        "participation_eligible": {"count": total_participants},
+        "non_qualifier_participants": {"count": non_qualifier_count},
     }
 
 
@@ -137,6 +143,33 @@ async def get_eligible_recipients(
             "rank_range": "21+",
         },
     }
+    # Include all registered participants who are not in winner/runner_up/finalist
+    qualified_ids = set()
+    for cat in categories.values():
+        for r in cat["recipients"]:
+            if r.get("user_id"):
+                qualified_ids.add(r["user_id"])
+            if r.get("team_id"):
+                qualified_ids.add(r["team_id"])
+    all_participants = await participants_col.find({"event_id": event_id}).to_list(length=None)
+    non_qualifiers = []
+    for p in all_participants:
+        pid = str(p.get("user_id") or "")
+        if pid and pid not in qualified_ids:
+            non_qualifiers.append({
+                "user_id": pid,
+                "user_name": p.get("name") or p.get("participant_name") or "Participant",
+                "team_name": p.get("team_name") or "",
+                "rank": 999,
+                "score": 0,
+            })
+    if non_qualifiers:
+        categories.setdefault("non_qualifier_participation", {
+            "label": "Non-Qualifier Participation",
+            "achievement_key": "participation",
+            "recipients": non_qualifiers,
+            "rank_range": "Registered (no qualifying score)",
+        })
     return {"categories": categories, "total_entries": len(entries)}
 
 
@@ -168,12 +201,34 @@ async def issue_certificates(
 
     issued = []
     for sid in recipient_ids:
+        # Try to resolve from submission_data_col first, then participants_col
         sub = await submission_data_col.find_one({"_id": ObjectId(sid)})
-        if not sub:
-            continue
-        user_id = str(sub.get("user_id") or "")
-        participant_name = sub.get("user_name") or sub.get("name") or "Participant"
-        team_id = str(sub.get("team_id") or "")
+        user_id = None
+        participant_name = "Participant"
+        team_id = None
+
+        if sub:
+            user_id = str(sub.get("user_id") or "")
+            participant_name = sub.get("user_name") or sub.get("name") or "Participant"
+            team_id = str(sub.get("team_id") or "")
+        else:
+            # Fall back to participants_col (for non-qualifiers without submissions)
+            participant = await participants_col.find_one({"_id": ObjectId(sid)})
+            if not participant:
+                # Try treating sid as a user_id
+                participant = await participants_col.find_one({"event_id": event_id, "user_id": sid})
+            if participant:
+                user_id = str(participant.get("user_id") or "")
+                participant_name = participant.get("name") or participant.get("participant_name") or "Participant"
+                team_id = str(participant.get("team_id") or "")
+                if not user_id:
+                    continue
+                # Look up user name from users_col if needed
+                if participant_name == "Participant":
+                    user_doc = await users_col.find_one({"user_id": user_id})
+                    if user_doc:
+                        participant_name = user_doc.get("full_name") or user_doc.get("name") or "Participant"
+
         if not user_id:
             continue
         existing = await certificates_col.find_one({

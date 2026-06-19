@@ -4,7 +4,7 @@ JWT helpers for institution-scoped routes. Hydrates institution_id from users co
 from typing import Optional
 import logging
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Query
 from auth_utils import decode_access_token
 from bson import ObjectId
 from db import users_col, events_col, opportunities_col
@@ -12,10 +12,14 @@ from db import users_col, events_col, opportunities_col
 logger = logging.getLogger("auth_institution")
 
 
-async def get_auth_user(authorization: Optional[str] = Header(None)) -> dict:
-    if not authorization or not authorization.startswith("Bearer "):
+async def get_auth_user(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> dict:
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+    if not token:
         raise HTTPException(status_code=401, detail="Missing or invalid token")
-    token = authorization.split(" ")[1]
     payload = decode_access_token(token) or {}
     uid = payload.get("user_id")
     if not uid:
