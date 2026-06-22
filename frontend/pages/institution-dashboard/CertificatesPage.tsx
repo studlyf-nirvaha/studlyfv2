@@ -161,7 +161,12 @@ const CertificatesPage: React.FC<{ institutionId: string }> = ({ institutionId }
       );
       
       if (!eligibleRes.ok) {
-        throw new Error("Failed to retrieve eligible recipients from leaderboard.");
+        let errMsg = "Failed to retrieve eligible recipients from leaderboard.";
+        try {
+          const errBody = await eligibleRes.json();
+          if (errBody.detail) errMsg = errBody.detail;
+        } catch {}
+        throw new Error(errMsg);
       }
       
       const eligibleData = await eligibleRes.json();

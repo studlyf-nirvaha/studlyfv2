@@ -15,14 +15,13 @@ async def get_participant_card(
     event_id: str = Query(...),
     participant_id: str = Query(...),
 ):
-    try:
-        p_obj = ObjectId(participant_id)
-    except:
-        raise HTTPException(400, "Invalid participant_id format")
-
-    participant = await participants_col.find_one({"_id": p_obj, "event_id": event_id})
+    participant = await participants_col.find_one({"event_id": event_id, "user_id": participant_id})
     if not participant:
-        participant = await participants_col.find_one({"event_id": event_id, "user_id": participant_id})
+        try:
+            p_obj = ObjectId(participant_id)
+            participant = await participants_col.find_one({"_id": p_obj, "event_id": event_id})
+        except:
+            pass
 
     if not participant:
         raise HTTPException(404, "Participant not found for this event")

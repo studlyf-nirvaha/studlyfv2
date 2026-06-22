@@ -335,6 +335,19 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
             except Exception:
                 team = None
         
+        # Fetch event to resolve stage names
+        from db import events_col
+        event = await events_col.find_one({"_id": ObjectId(event_id)}) if ObjectId.is_valid(event_id) else await events_col.find_one({"event_id": event_id})
+        event_stages = (event or {}).get("stages", []) or []
+
+        def resolve_stage_name(stage_id):
+            if not stage_id:
+                return None
+            for s in event_stages:
+                if str(s.get("id")) == str(stage_id):
+                    return s.get("name")
+            return None
+
         # Check evaluations
         if p:
             sub_query = {"event_id": str(event_id)}
@@ -346,10 +359,13 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
             latest_sub = await submissions_col.find_one(sub_query, sort=[("submitted_at", -1)])
             if latest_sub and latest_sub.get("status") == "Evaluated":
                 is_evaluated = True
+                stage_id = latest_sub.get("stage_id") or p.get("current_stage") or p.get("last_stage_submitted")
                 evaluation_data = {
                     "score": latest_sub.get("total_score"),
                     "feedback": latest_sub.get("evaluator_feedback"),
-                    "evaluated_at": latest_sub.get("evaluated_at")
+                    "evaluated_at": latest_sub.get("evaluated_at"),
+                    "stage_id": stage_id,
+                    "stage_name": resolve_stage_name(stage_id)
                 }
             else:
                 # Fallback to legacy scores
@@ -362,10 +378,13 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
                 legacy_score = await scores_col.find_one(score_query)
                 if legacy_score:
                     is_evaluated = True
+                    stage_id = legacy_score.get("stage_id") or p.get("current_stage") or p.get("last_stage_submitted")
                     evaluation_data = {
                         "score": legacy_score.get("total_score"),
                         "feedback": legacy_score.get("comments"),
-                        "evaluated_at": legacy_score.get("evaluated_at")
+                        "evaluated_at": legacy_score.get("evaluated_at"),
+                        "stage_id": stage_id,
+                        "stage_name": resolve_stage_name(stage_id)
                     }
         
         # --- BATCH 3: Enrich team members (if team exists) ---

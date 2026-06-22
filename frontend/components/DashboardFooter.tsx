@@ -4,17 +4,6 @@ import { Link } from 'react-router-dom';
 import {
     Mail,
     MessageCircle,
-    Users,
-    Trophy,
-    HelpCircle,
-    Video,
-    MonitorPlay,
-    FileText,
-    BookOpen,
-    Book,
-    GraduationCap,
-    ArrowRight,
-    Sparkles,
     Instagram
 } from 'lucide-react';
 
@@ -251,13 +240,9 @@ const DashboardFooter: React.FC<DashboardFooterProps> = ({ variant = 'student' }
                     {/* Column 1: Logo & Slogan */}
                     <div className="col-span-2 lg:col-span-1 flex flex-col items-start space-y-6">
                         <Link to="/" className="relative group/logo block">
-                            {/* Animated Outer Glow Background */}
                             <div className="absolute inset-0 bg-[#7C3AED]/20 blur-2xl rounded-3xl opacity-50 group-hover/logo:opacity-100 transition-opacity duration-500" />
-                            
                             <div className="relative bg-white px-6 py-3 rounded-2xl shadow-2xl transition-all duration-500 hover:scale-[1.03] w-fit overflow-hidden">
-                                {/* Subtle Internal Radial Light */}
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(0,0,0,0.02)_0%,_transparent_75%)]" />
-                                
                                 <img 
                                     src="/images-optimized/studlyf.webp" 
                                     alt="Studlyf" 
@@ -266,57 +251,62 @@ const DashboardFooter: React.FC<DashboardFooterProps> = ({ variant = 'student' }
                             </div>
                         </Link>
                         <p className="text-[#CFCFEA]/80 text-sm md:text-base font-poppins leading-relaxed font-semibold opacity-60">
-                            Empowering the next generation of engineers with AI-driven career tools and resources.
+                            {isInstitution
+                                ? 'Empowering institutions with AI-driven tools to manage events, participants, and certifications seamlessly.'
+                                : 'Empowering the next generation of engineers with AI-driven career tools and resources.'
+                            }
                         </p>
                     </div>
 
                     {/* Column 2 */}
                     <div className="flex flex-col space-y-5 lg:ml-8">
-                        {[
-                            { name: 'Courses', to: '/learn/courses-overview' },
-                            { name: 'Company Modules', to: '/learn/company-modules' },
-                            { name: 'Blogs', to: '/blog' }
-                        ].map((item) => (
-                            <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
-                                {item.name}
-                            </Link>
+                        {links.col2.map((item) => (
+                            item.name === 'Contact Us' || item.name === 'Support' ? (
+                                <a key={item.name} href={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </a>
+                            ) : (
+                                <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </Link>
+                            )
                         ))}
                     </div>
 
                     {/* Column 3 */}
                     <div className="flex flex-col space-y-5">
-                        {[
-                            { name: 'Portfolio', to: '/job-prep/portfolio' },
-                            { name: 'Resume', to: '/job-prep/resume-builder' },
-                            { name: 'Skills Assignment', to: '/learn/assessment-intro' },
-                            { name: 'Interviews', to: '/job-prep/mock-interview' },
-                            { name: 'Project', to: '/job-prep/projects' }
-                        ].map((item) => (
-                            <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
-                                {item.name}
-                            </Link>
+                        {links.col3.map((item) => (
+                            item.name === 'Contact Us' || item.name === 'Support' ? (
+                                <a key={item.name} href={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </a>
+                            ) : (
+                                <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </Link>
+                            )
                         ))}
                     </div>
 
                     {/* Column 4 */}
                     <div className="flex flex-col space-y-5">
-                        {[
-                            { name: 'AI Tools', to: '/ai-tools' }
-                        ].map((item) => (
-                            <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
-                                {item.name}
-                            </Link>
+                        {links.col4.map((item) => (
+                            item.name === 'Contact Us' || item.name === 'Support' ? (
+                                <a key={item.name} href={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </a>
+                            ) : (
+                                <Link key={item.name} to={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
+                                    {item.name}
+                                </Link>
+                            )
                         ))}
                     </div>
 
                     {/* Column 5 */}
                     <div className="flex flex-col space-y-5">
-                        {[
-                            { name: 'About Application', to: '/about' },
-                            { name: 'Contact Us', to: 'mailto:saieshwarerelli10@gmail.com' },
-                            { name: 'Resources', to: '/' }
-                        ].map((item) => (
-                            item.name === 'Contact Us' ? (
+                        {links.col5.map((item) => (
+                            item.name === 'Contact Us' || item.name === 'Support' ? (
                                 <a key={item.name} href={item.to} className="text-white/80 hover:text-[#9D7CFF] transition-all duration-200 uppercase tracking-wider text-sm md:text-base font-medium font-poppins hover:translate-x-1 w-fit">
                                     {item.name}
                                 </a>

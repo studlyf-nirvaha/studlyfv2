@@ -348,7 +348,7 @@ const InstitutionDashboard: React.FC = () => {
                             </motion.div>
                         </AnimatePresence>
                     </div>
-                    <DashboardFooter />
+                    <DashboardFooter variant="institution" />
                 </main>
             </div>
 

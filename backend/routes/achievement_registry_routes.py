@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
-from db import db, certificates_col, events_col, participants_col, submission_data_col, scores_col, users_col, teams_col, cert_templates_col, event_certificates_col
+from db import db, certificates_col, events_col, participants_col, submissions_col, submission_data_col, scores_col, users_col, teams_col, cert_templates_col, event_certificates_col
 from auth_institution import get_auth_user
 from bson import ObjectId
 from typing import Optional, List
@@ -19,11 +19,22 @@ router = APIRouter(prefix="/api/v1/institution/certificates", tags=["Achievement
 
 
 async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None):
-    """Fetch submissions with scores to build a leaderboard."""
+    """Fetch submissions with scores to build a leaderboard (queries both collections)."""
     match = {"event_id": event_id}
     if stage_id:
         match["stage_id"] = stage_id
-    submissions = await submission_data_col.find(match).to_list(length=None)
+
+    subs_data = await submission_data_col.find(match).to_list(length=None)
+    subs_main = await submissions_col.find(match).to_list(length=None)
+
+    seen = set()
+    submissions = []
+    for sub in subs_main + subs_data:
+        sid = str(sub.get("_id"))
+        if sid not in seen:
+            seen.add(sid)
+            submissions.append(sub)
+
     scores_by_sub = {}
     cursor = scores_col.find({"event_id": event_id})
     async for sc in cursor:
@@ -59,7 +70,7 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
             "submission_id": sid,
             "user_id": user_id,
             "team_id": team_id,
-            "title": title or sub.get("title") or "Untitled",
+            "title": title or sub.get("title") or sub.get("project_name") or sub.get("project_title") or "Untitled",
             "score": round(total, 1),
             "user_name": sub.get("user_name") or sub.get("name") or "Participant",
             "team_name": sub.get("team_name") or "",

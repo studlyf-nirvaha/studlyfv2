@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL, authHeaders, FRONTEND_URL } from '../../apiConfig';
 import { useAuth } from '../../AuthContext';
-import { ChevronLeft, UsersRound, Link as LinkIcon, Loader2, Upload, FileText, CheckCircle2, Clock, Trophy, Share2, Copy, Check, LayoutGrid, IdCard } from 'lucide-react';
+import { ChevronLeft, UsersRound, Link as LinkIcon, Loader2, Upload, FileText, CheckCircle2, Clock, Trophy, Share2, Copy, Check, LayoutGrid, IdCard, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IEvent, IParticipant, ITeam } from '../../types/event';
 
@@ -1086,6 +1086,11 @@ const EventHub: React.FC = () => {
                                                 <Award size={20} className="text-yellow-600" />
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-yellow-600">Your Score</p>
                                             </div>
+                                            {evaluation.stage_name && (
+                                                <p className="text-xs font-bold text-amber-600 mb-1">
+                                                    Stage: {evaluation.stage_name}
+                                                </p>
+                                            )}
                                             <p className="text-5xl font-black text-slate-900 mb-2">
                                                 {evaluation.score}<span className="text-2xl text-slate-400">/100</span>
                                             </p>

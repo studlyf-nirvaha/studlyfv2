@@ -373,9 +373,22 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
                     m["is_leader"] = str(m.get("role", "MEMBER")) == "LEADER" or user_id == str(team.get("leader_id", ""))
                     
     # Check for existing evaluations (to lock submissions)
-    from db import scores_col, submissions_col
+    from db import scores_col, submissions_col, events_col
     is_evaluated = False
     evaluation_data = {}
+
+    # Fetch event to resolve stage names
+    event = await events_col.find_one({"_id": ObjectId(event_id)}) if ObjectId.is_valid(event_id) else await events_col.find_one({"event_id": event_id})
+    event_stages = (event or {}).get("stages", []) or []
+
+    def resolve_stage_name(stage_id):
+        if not stage_id:
+            return None
+        for s in event_stages:
+            if str(s.get("id")) == str(stage_id):
+                return s.get("name")
+        return None
+
     if p:
         # Check submissions_col first for the new judging system results
         sub_query = {"event_id": str(event_id)}
@@ -387,10 +400,13 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
         latest_sub = await submissions_col.find_one(sub_query, sort=[("submitted_at", -1)])
         if latest_sub and latest_sub.get("status") in ("Evaluated", "Reviewed", "Scored", "Scoring", "Shortlisted", "Waitlisted"):
             is_evaluated = True
+            stage_id = latest_sub.get("stage_id") or p.get("current_stage") or p.get("last_stage_submitted")
             evaluation_data = {
                 "score": latest_sub.get("total_score") or latest_sub.get("evaluation_score"),
                 "feedback": latest_sub.get("evaluator_feedback") or latest_sub.get("feedback"),
-                "evaluated_at": latest_sub.get("evaluated_at") or latest_sub.get("last_evaluated_at")
+                "evaluated_at": latest_sub.get("evaluated_at") or latest_sub.get("last_evaluated_at"),
+                "stage_id": stage_id,
+                "stage_name": resolve_stage_name(stage_id)
             }
         else:
             # Fallback to legacy scores_col
@@ -403,10 +419,13 @@ async def get_event_hub_data(event_id: str, user: dict = Depends(get_auth_user))
             legacy_score = await scores_col.find_one(score_query)
             if legacy_score:
                 is_evaluated = True
+                stage_id = legacy_score.get("stage_id") or p.get("current_stage") or p.get("last_stage_submitted")
                 evaluation_data = {
                     "score": legacy_score.get("total_score"),
                     "feedback": legacy_score.get("comments"),
-                    "evaluated_at": legacy_score.get("evaluated_at")
+                    "evaluated_at": legacy_score.get("evaluated_at"),
+                    "stage_id": stage_id,
+                    "stage_name": resolve_stage_name(stage_id)
                 }
 
     return {
