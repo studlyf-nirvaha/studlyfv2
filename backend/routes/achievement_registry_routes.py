@@ -74,20 +74,18 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
 
 @router.get("/stats")
 async def get_certificate_stats(institution_id: str, user: dict = Depends(get_auth_user)):
-    total = await certificates_col.count_documents({"institution_id": institution_id})
-    ach = await certificates_col.count_documents({"institution_id": institution_id, "type": "Achievement"})
-    part = await certificates_col.count_documents({"institution_id": institution_id, "type": "Participation"})
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    verified = await certificates_col.count_documents({"institution_id": institution_id, "status": "Verified", "verified_at": {"$gte": today}})
-    pending = await certificates_col.count_documents({"institution_id": institution_id, "status": "Pending"})
-    revoked = await certificates_col.count_documents({"institution_id": institution_id, "status": "Revoked"})
+    achievement_keys = ["winner", "runner_up", "second_runner_up", "finalist", "top_performer", "organizer", "mentor"]
+    total = await event_certificates_col.count_documents({"institution_id": institution_id})
+    ach = await event_certificates_col.count_documents({"institution_id": institution_id, "achievement_key": {"$in": achievement_keys}})
+    part = await event_certificates_col.count_documents({"institution_id": institution_id, "achievement_key": "participation"})
+    pending = await event_certificates_col.count_documents({"institution_id": institution_id, "$or": [{"status": "Pending"}, {"status": {"$exists": False}}]})
     return {
         "total": total,
         "achievement": ach,
         "participation": part,
-        "verified_today": verified,
+        "verified_today": 0,
         "pending": pending,
-        "revoked": revoked,
+        "revoked": 0,
     }
 
 
@@ -331,13 +329,8 @@ async def get_certificate_registry(
     query = {"institution_id": institution_id}
     if event_id and event_id != "All Events":
         query["event_id"] = event_id
-    # Note: stage_id might not be in event_certificates
-    if stage_id and stage_id != "All Stages":
-        query["stage_id"] = stage_id
     if type and type != "All Types":
         query["achievement_key"] = type
-    if category and category != "All Certificates":
-        query["category"] = category
     if status and status != "All Status":
         query["status"] = status
     if search:
@@ -356,18 +349,12 @@ async def get_certificate_registry(
 # Template Builder Endpoints
 @router.get("/templates")
 async def list_cert_templates_for_institution(user: dict = Depends(get_auth_user)):
-    """Institution-scoped: list all certificate templates (built-in + custom).
-    Unlike /api/admin/cert-templates, this uses institution JWT auth instead of super-admin."""
-    # Use the imported cert_templates_col directly
+    """Institution-scoped: list all user-saved certificate templates only."""
     results = []
     async for doc in cert_templates_col.find({}):
         doc["_id"] = str(doc["_id"])
         results.append(doc)
-    builtins = [
-        {"template_id": "standard", "name": "Standard (Default)", "description": "Studlyf default certificate", "is_builtin": True},
-        {"template_id": "honors",   "name": "Elite Honors",        "description": "Purple honours certificate",  "is_builtin": True},
-    ]
-    return builtins + results
+    return results
 
 @router.post("/templates")
 async def create_cert_template_for_institution(payload: dict = Body(...), user: dict = Depends(get_auth_user)):

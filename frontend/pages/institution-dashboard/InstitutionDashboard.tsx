@@ -31,7 +31,7 @@ const LeaderboardPage = lazy(() => import('./LeaderboardPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const CertificatesPage = lazy(() => import('./CertificatesPage'));
 const DownloadsPage = lazy(() => import('./DownloadsPage'));
-const Footer = lazy(() => import('../../components/institution/Footer'));
+const DashboardFooter = lazy(() => import('../../components/DashboardFooter'));
 
 const TabLoader = () => (
     <div className="flex items-center justify-center py-24 text-slate-400">
@@ -334,8 +334,8 @@ const InstitutionDashboard: React.FC = () => {
                     onNavigateToSettings={() => handleTabChange('settings')}
                 />
                 
-                <main className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-14">
-                    <div className="max-w-[1400px] mx-auto py-6">
+                <main className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="max-w-[1400px] mx-auto py-6 px-6">
                         <AnimatePresence mode="wait">
                             <motion.div
                                 key={activeTab}
@@ -348,8 +348,8 @@ const InstitutionDashboard: React.FC = () => {
                             </motion.div>
                         </AnimatePresence>
                     </div>
+                    <DashboardFooter />
                 </main>
-                <Footer />
             </div>
 
             <PostSelectionModal 

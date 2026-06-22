@@ -7524,7 +7524,7 @@ async def create_team():
 async def join_team(team_id: str):
     raise HTTPException(status_code=410, detail="Deprecated. Use /api/teams/join-by-invite (JWT required).")
 
-@app.patch("/api/participants/{p_id}/status", dependencies=[Depends(require_role(["Admin"]))])
+@app.patch("/api/participants/{p_id}/status", dependencies=[Depends(require_role(["Admin", "institution"]))])
 async def update_participant_status(p_id: str, status: str = Body(embed=True), current_user: dict = Depends(get_current_user)):
     """
     ADMIN: Verifies or rejects a participant registration.
