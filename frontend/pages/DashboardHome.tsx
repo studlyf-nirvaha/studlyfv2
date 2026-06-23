@@ -19,7 +19,6 @@ import { AuroraText } from '../registry/magicui/aurora-text';
 import { TypewriterEffectSmooth } from '../registry/aceternity/typewriter-effect';
 import { Button } from "@heroui/react";
 
-import DashboardFooter from '../components/DashboardFooter';
 import FAQCarousel from '../components/FAQCarousel';
 import WhyUsSection from '../components/WhyUsSection';
 import AdsCarousel from '../components/AdsCarousel';
@@ -649,7 +648,6 @@ const DashboardHome: React.FC = () => {
       <FeaturedColleges />
       <WhyUsSection />
       <FAQCarousel />
-      <DashboardFooter />
     </>
   );
 };

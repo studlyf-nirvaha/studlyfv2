@@ -23,7 +23,6 @@ def get_cache(key: str):
 
 def set_cache(key: str, data: any):
     _cache[key] = (data, datetime.now())
-from main import get_current_user, require_role
 from routes.auth import get_current_user, require_role
 from services.email_service import (
     send_notification_email,

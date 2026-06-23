@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GraduationCap, Landmark, Rocket, ArrowLeft, Target, Briefcase, ExternalLink, Code, Lightbulb, Users, Cloud } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import DashboardFooter from '../components/DashboardFooter';
 
 const schemeCategories = [
   { id: 'all', label: 'All Schemes', icon: Target },
@@ -303,7 +302,6 @@ const StudentSchemes: React.FC = () => {
         </div>
 
       </div>
-      <DashboardFooter />
     </div>
   );
 };

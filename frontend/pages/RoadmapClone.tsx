@@ -5,7 +5,6 @@ import { rolesData, getFlatNodes, RoadmapNodeData, RoleData } from '../data/road
 import ProgressHeader from '../components/roadmap/ProgressHeader';
 import ChapterAccordion from '../components/roadmap/ChapterAccordion';
 import FocusPanel from '../components/roadmap/FocusPanel';
-import DashboardFooter from '../components/DashboardFooter';
 import { 
   MonitorSmartphone, Database, Layers, BrainCircuit, Target, 
   PenTool, BarChart3, CloudCog, ShieldCheck, Terminal, 
@@ -276,8 +275,6 @@ const RoadmapClone: React.FC = () => {
           </div>
         </section>
         </div>
-        
-        <DashboardFooter />
       </div>
     );
   }
@@ -396,10 +393,6 @@ const RoadmapClone: React.FC = () => {
           isCompleted={activePanelNode ? completedNodes.includes(activePanelNode.id) : false}
           onToggleComplete={handleToggleComplete}
         />
-      </div>
-      
-      <div className="mt-10">
-        <DashboardFooter />
       </div>
     </div>
   );

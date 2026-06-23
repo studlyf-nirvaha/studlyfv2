@@ -27,7 +27,6 @@ import {
     Trophy,
     Building2
 } from 'lucide-react';
-import DashboardFooter from '../components/DashboardFooter';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type Step = 'INTRO' | 'API_KEY' | 'SETUP' | 'INTERVIEW' | 'REPORT';
@@ -1845,7 +1844,6 @@ export default function MockInterview() {
                 )}
             </AnimatePresence>
             </div>
-            <DashboardFooter />
         </div>
     );
 }

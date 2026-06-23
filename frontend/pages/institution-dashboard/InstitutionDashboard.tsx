@@ -31,7 +31,6 @@ const LeaderboardPage = lazy(() => import('./LeaderboardPage'));
 const ReportsPage = lazy(() => import('./ReportsPage'));
 const CertificatesPage = lazy(() => import('./CertificatesPage'));
 const DownloadsPage = lazy(() => import('./DownloadsPage'));
-const Footer = lazy(() => import('../../components/institution/Footer'));
 
 const TabLoader = () => (
     <div className="flex items-center justify-center py-24 text-slate-400">

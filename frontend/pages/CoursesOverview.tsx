@@ -4,7 +4,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../apiConfig';
 import WebImage from '../components/WebImage';
 import { useAuth } from '../AuthContext';
-import DashboardFooter from '../components/DashboardFooter';
 import {
   Search, Star, Clock, User, ChevronRight,
   Monitor, BrainCircuit, Rocket, Layout, Database, TrendingUp, Plus,
@@ -892,8 +891,6 @@ const CoursesOverview: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <DashboardFooter />
     </div>
   );
 };

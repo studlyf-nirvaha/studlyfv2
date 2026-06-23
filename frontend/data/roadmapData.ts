@@ -842,7 +842,7 @@ export const rolesData: RoleData[] = [
             ],
             resources: [
               { title: "What is an AI Engineer?", url: "https://www.latent.space/p/ai-engineer", type: "Best Starting Point" },
-              { title: "AI vs ML Engineer", url: "https://roadmap.sh/ai-data-scientist", type: "Beginner Friendly" }
+              { title: "AI vs ML Engineer", url: "https://en.wikipedia.org/wiki/Artificial_intelligence", type: "Beginner Friendly" }
             ]
           },
           {

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { API_BASE_URL } from '../../apiConfig';
 import Navigation from '../../components/Navigation';
-import Footer from '../../components/Footer';
 import { Search, ChevronDown, ChevronUp, Users } from 'lucide-react';
 
 interface Member {
@@ -79,7 +78,6 @@ const ResultsPage: React.FC = () => {
                         {[1, 2, 3].map(i => <div key={i} className="h-20 bg-slate-200 rounded-xl" />)}
                     </div>
                 </div>
-                <Footer />
             </div>
         );
     }
@@ -91,7 +89,6 @@ const ResultsPage: React.FC = () => {
                 <div className="max-w-4xl mx-auto px-4 py-20 text-center">
                     <p className="text-slate-500 font-medium">Results not available.</p>
                 </div>
-                <Footer />
             </div>
         );
     }
@@ -233,10 +230,6 @@ const ResultsPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
-
-            <div className="mt-12">
-                <Footer />
             </div>
         </div>
     );

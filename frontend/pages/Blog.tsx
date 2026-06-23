@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Clock, User, Calendar, ArrowRight } from 'lucide-react';
 import Navigation from '../components/Navigation';
-import Footer from '../components/Footer';
 import { API_BASE_URL } from '../apiConfig';
 
 interface BlogArticle {
@@ -165,7 +164,6 @@ const Blog: React.FC = () => {
           <BlogDetail key="detail" post={selectedPost} onBack={() => setSelectedPost(null)} />
         )}
       </AnimatePresence>
-      <Footer />
     </div>
   );
 };

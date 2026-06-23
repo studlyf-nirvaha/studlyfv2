@@ -10,7 +10,6 @@ import {
   Briefcase, GraduationCap, LayoutDashboard, BrainCircuit, Play, Globe, X
 } from 'lucide-react';
 import { getDetailedCurriculum } from '../utils/curriculumUtils';
-import DashboardFooter from '../components/DashboardFooter';
 
 interface Course {
   _id: string;
@@ -778,10 +777,6 @@ const CourseDetail: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Main Footer */}
-      <DashboardFooter />
-
     </div>
   );
 };
