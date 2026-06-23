@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { API_BASE_URL } from '../apiConfig';
 import { useAuth } from '../AuthContext';
-import DashboardFooter from '../components/DashboardFooter';
 import MyProfile from './MyProfile';
 import { downloadCertPDF } from '../utils/downloadCertPDF';
 import { generatePdfHtml } from '../utils/resumePdf';
@@ -476,7 +475,6 @@ const LearnerDashboard: React.FC = () => {
           </motion.div>
         </AnimatePresence>
       </main>
-      <DashboardFooter />
     </div>
   );
 };

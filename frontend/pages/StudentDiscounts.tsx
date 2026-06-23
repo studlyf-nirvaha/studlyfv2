@@ -5,7 +5,6 @@ import {
   Music, Search, Tag, ExternalLink, ArrowLeft, Terminal, ShieldCheck 
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import DashboardFooter from '../components/DashboardFooter';
 
 const discountCategories = [
   { id: 'all', label: 'All Discounts', icon: Tag },
@@ -563,7 +562,6 @@ const StudentDiscounts: React.FC = () => {
         </div>
 
       </div>
-      <DashboardFooter />
     </div>
   );
 };

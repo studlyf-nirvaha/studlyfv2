@@ -77,6 +77,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const RoadmapClone = lazy(() => import('./pages/RoadmapClone'));
+const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
 const OpportunitiesList = lazy(() => import('./pages/opportunities/OpportunitiesList'));
 const OpportunityDetails = lazy(() => import('./pages/opportunities/OpportunityDetails'));
 const ResultsPage = lazy(() => import('./pages/opportunities/ResultsPage'));
@@ -494,6 +495,7 @@ const App: React.FC = () => {
             {/* Misc */}
             <Route path="/roadmaps" element={<RoadmapClone />} />
             <Route path="/roadmaps/:roleId" element={<RoadmapClone />} />
+            <Route path="/roadmap/:skillId" element={<ProtectedRoute><RoadmapPage /></ProtectedRoute>} />
             <Route path="/goal-selector" element={<ProtectedRoute><GoalSelector /></ProtectedRoute>} />
             <Route path="/learn/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
             <Route path="/learn/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
@@ -556,9 +558,10 @@ const App: React.FC = () => {
           <Testimonials />
           <ResourceCenter />
           <EnquiryForm />
-          <Footer />
         </>
       )}
+
+      <Footer />
     </div>
   );
 };

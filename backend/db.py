@@ -7,8 +7,16 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("db_service")
 
-# Load from root directory .env
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+# Load from repo root `.env`, but fall back to backend/.env if present.
+root_env = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+backend_env = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(root_env):
+    load_dotenv(root_env)
+elif os.path.exists(backend_env):
+    load_dotenv(backend_env)
+else:
+    # Last resort: let python-dotenv attempt to find a .env in cwd or parent paths
+    load_dotenv()
 
 class DatabaseManager:
     """
