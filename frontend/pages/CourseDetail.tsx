@@ -154,7 +154,7 @@ const CourseDetail: React.FC = () => {
 
         setCourse(foundCourse);
 
-        setCourseModules(GENERATIVE_AI_CURRICULUM);
+        setCourseModules(getDetailedCurriculum(courseIdFromSlug));
 
         if (userId) {
           const stateRes = await fetch(`${API_BASE_URL}/api/user-courses/${userId}`);
@@ -459,7 +459,7 @@ const CourseDetail: React.FC = () => {
           <div className="lg:col-span-2">
             <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Course Curriculum</h2>
             <div className="flex items-center justify-between text-gray-500 font-medium text-sm mb-8">
-              <span>14 Modules • 80 Lessons • Self-Paced</span>
+              <span>{courseModules.length} Modules • Self-Paced</span>
               <button
                 onClick={() => setIsCurriculumModalOpen(true)}
                 className="text-[#6C2BFF] hover:text-[#5B21D6] font-bold transition-colors"
@@ -469,7 +469,7 @@ const CourseDetail: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {courseModules.slice(0, 5).map((mod, i) => (
+              {courseModules.map((mod, i) => (
                 <div key={i} className="border border-gray-200 rounded-xl bg-gray-50 overflow-hidden shadow-sm">
                   <button
                     onClick={() => toggleModule(i)}
@@ -480,9 +480,6 @@ const CourseDetail: React.FC = () => {
                       <span className="font-bold text-gray-900 pr-4">{mod.title}</span>
                     </div>
                     <div className="flex items-center gap-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-500 font-medium hidden sm:inline-block">
-                        {Array.isArray(mod.lessons) ? mod.lessons.length : (mod.lessons || 0)} Lessons • {mod.duration || '45 mins'}
-                      </span>
                       <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform shrink-0 ${expandedModules.includes(i) ? 'rotate-180' : ''}`} />
                     </div>
                   </button>
@@ -736,9 +733,6 @@ const CourseDetail: React.FC = () => {
                           <div className="w-10 h-10 rounded-full bg-[#6C2BFF]/10 text-[#6C2BFF] flex items-center justify-center font-black text-base shrink-0">{i + 1}</div>
                           <div className="flex-1">
                             <h4 className="font-bold text-gray-900 text-lg leading-tight mb-1">{mod.title}</h4>
-                            <div className="text-xs font-medium text-gray-500">
-                              {Array.isArray(mod.lessons) ? mod.lessons.length : (mod.lessons || 0)} Lessons • {mod.duration || '45 mins'}
-                            </div>
                           </div>
                         </div>
 
@@ -749,13 +743,29 @@ const CourseDetail: React.FC = () => {
                         )}
 
                         {mod.topics && mod.topics.length > 0 && (
-                          <ul className="space-y-3 pl-2">
-                            {mod.topics.map((topic: string, tIdx: number) => (
-                              <li key={tIdx} className="flex items-start gap-3 text-sm text-gray-700">
-                                <PlayCircle className="w-4 h-4 text-[#6C2BFF] mt-0.5 shrink-0" />
-                                <span className="leading-relaxed">{topic}</span>
-                              </li>
-                            ))}
+                          <ul className="space-y-3 pl-14">
+                            {mod.topics.map((topic: any, tIdx: number) => {
+                              // If it's a primitive, render it. If it's an object, try to extract a string value.
+                              let displayValue = '';
+                              if (typeof topic === 'string') {
+                                displayValue = topic;
+                              } else if (typeof topic === 'object' && topic !== null) {
+                                // Try common keys for content/title
+                                displayValue = topic.title || topic.name || topic.content || JSON.stringify(topic);
+                              } else {
+                                displayValue = String(topic);
+                              }
+                              
+                              // Safety check: ensure we don't render an object
+                              if (typeof displayValue !== 'string') return null;
+
+                              return (
+                                <li key={tIdx} className="flex items-start gap-3 text-sm text-gray-700">
+                                  <PlayCircle className="w-4 h-4 text-[#6C2BFF] mt-0.5 shrink-0" />
+                                  <span className="leading-relaxed">{displayValue}</span>
+                                </li>
+                              );
+                            })}
                           </ul>
                         )}
                       </div>

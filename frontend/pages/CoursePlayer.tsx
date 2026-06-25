@@ -215,15 +215,18 @@ const CoursePlayer: React.FC = () => {
         }));
       }
 
-      // Enforce the dynamic subtopics schema using the imported curriculum
-      const formatted = fetched.map((mod: any, i: number) => {
+      // Ensure we have at least as many modules as in our local curriculum
+      const totalModules = Math.max(fetched.length, curriculumSource.length);
+      const formatted = Array.from({ length: totalModules }).map((_, i) => {
+        const mod = fetched[i] || { _id: `dummy-mod-${i}`, progress: null };
         const curChapter = curriculumSource[i] || curriculumSource[i % curriculumSource.length];
+        
         return {
           ...mod,
           title: curChapter.title,
           order_index: i + 1,
-          lessons: curChapter.topics.map(t => ({
-            type: t.type,
+          lessons: curChapter.topics.map((t: any) => ({
+            type: t.type || 'text',
             title: t.title,
           })),
         };
