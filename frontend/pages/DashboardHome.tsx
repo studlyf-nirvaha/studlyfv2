@@ -73,7 +73,7 @@ const DashboardHome: React.FC = () => {
     const fetchOpps = async () => {
       try {
         const [oppRes, overviewRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/opportunities?limit=24&offset=0`),
+          fetch(`${API_BASE_URL}/api/opportunities?limit=24&offset=0&t=${Date.now()}`, { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } }),
           user
             ? fetch(`${API_BASE_URL}/api/opportunities/me/overview?limit=8`, { headers: { ...authHeaders() } })
             : Promise.resolve({ ok: false, json: async () => ({ upcoming: [], timeline: [] }) } as Response),

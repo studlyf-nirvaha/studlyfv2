@@ -59,6 +59,7 @@ import {
     plainTextFromRichContent,
     richHtmlFromOpportunityField,
     sanitizePresentationHtml,
+    getOpportunityDeadline,
 } from '../../utils/text';
 
 // Define User type for the component
@@ -217,10 +218,19 @@ const OpportunityDetails: React.FC = () => {
         return registrationStatus;
     }, [registrationStatus, myApplication]);
 
+    const effectiveDeadline = (() => {
+        const stagesList = Array.isArray(opportunity?.stages) ? opportunity.stages : [];
+        const regStage = stagesList.find((s: any) => 
+            String(s?.type || '').toUpperCase() === 'REGISTRATION' || 
+            String(s?.name || '').toLowerCase().includes('regist')
+        );
+        return regStage?.endDate || regStage?.end_date || regStage?.deadline || getOpportunityDeadline(opportunity);
+    })();
+
     const regCTA = useRegistrationState({
         isAuthenticated: !!user?.user_id,
         isRegistered: isApplied || effectiveRegStatus !== 'NOT_REGISTERED',
-        deadline: opportunity?.deadline,
+        deadline: effectiveDeadline,
         externalLink: opportunity?.external_registration_link || opportunity?.externalRegistrationLink,
         isLoading: !opportunity,
     });
@@ -328,11 +338,11 @@ const OpportunityDetails: React.FC = () => {
     // Real-time countdown timer effect
 
     useEffect(() => {
-        if (!opportunity?.deadline) {
+        if (!effectiveDeadline) {
             setTimeLeftStr('');
             return;
         }
-        const deadline = new Date(opportunity.deadline).getTime();
+        const deadline = new Date(effectiveDeadline).getTime();
         
         const updateTimer = () => {
             const now = new Date().getTime();
@@ -361,7 +371,7 @@ const OpportunityDetails: React.FC = () => {
         updateTimer();
         const interval = setInterval(updateTimer, 60000); // Update every minute
         return () => clearInterval(interval);
-    }, [opportunity?.deadline]);
+    }, [effectiveDeadline]);
 
     const FAV_KEY = 'studlyf_opp_favorites';
 
@@ -1007,7 +1017,7 @@ const OpportunityDetails: React.FC = () => {
 
     const addToCalendar = () => {
         const title = opportunity.title || 'Opportunity';
-        const end = opportunity.deadline ? new Date(opportunity.deadline) : new Date();
+        const end = effectiveDeadline ? new Date(effectiveDeadline) : new Date();
         const start = opportunity.eventStartDate
             ? new Date(opportunity.eventStartDate)
             : new Date(end.getTime() - 24 * 3600 * 1000);
@@ -1224,9 +1234,9 @@ const OpportunityDetails: React.FC = () => {
     const orgDisplay = opportunity.organization || opportunity.institution_profile_name || 'Host institution';
     const registeredCount = Number(opportunity.applicantsCount ?? opportunity.registeredCount ?? 0);
     const deadlineDate = (() => {
-        if (!opportunity.deadline) return null;
-        const d = new Date(opportunity.deadline);
-        if (d.getHours() === 0 && d.getMinutes() === 0 && !String(opportunity.deadline).includes('T')) {
+        if (!effectiveDeadline) return null;
+        const d = new Date(effectiveDeadline);
+        if (d.getHours() === 0 && d.getMinutes() === 0 && !String(effectiveDeadline).includes('T')) {
             d.setHours(23, 59, 59, 999);
         }
         return d;
@@ -1624,8 +1634,8 @@ const OpportunityDetails: React.FC = () => {
                                             <Calendar size={14} /> Registration deadline
                                         </p>
                                         <p className="text-slate-700 font-semibold">
-                                            {opportunity.deadline
-                                                ? new Date(opportunity.deadline).toLocaleDateString('en-GB', {
+                                            {derivedDeadline
+                                                ? new Date(derivedDeadline).toLocaleDateString('en-GB', {
                                                       day: '2-digit',
                                                       month: 'short',
                                                       year: 'numeric',
@@ -2858,7 +2868,7 @@ const OpportunityDetails: React.FC = () => {
                                 })()}
 
                                 <div className="mt-5 flex items-center justify-center text-slate-600 font-semibold text-sm">
-                                    <span><span className="text-slate-800 font-bold">{(stats.participants || 0).toLocaleString()}</span> Registered</span>
+                                    <span><span className="text-slate-800 font-bold">{((opportunity?.applicantsCount ?? opportunity?.registeredCount ?? 0)).toLocaleString()}</span> Registered</span>
                                 </div>
                             </div>
                         </div>

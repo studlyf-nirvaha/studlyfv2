@@ -3,18 +3,14 @@ import { Plus, Trash2, Eye, EyeOff, Save, ChevronLeft, Upload, Edit3 } from 'luc
 import { CERT_TEMPLATES, CertData } from './CertTemplates';
 import { API_BASE_URL, authHeaders } from '../../../apiConfig';
 
-// Helper for file upload
-const uploadFile = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  const res = await fetch(`/api/v1/institution/uploads`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: formData
+// Helper for file upload – converts to base64 data URI client-side
+const uploadFile = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
-  if (!res.ok) throw new Error('Upload failed');
-  const data = await res.json();
-  return data.url;
 };
 
 // Validated Date Field for DD-MM-YYYY
@@ -282,6 +278,9 @@ const CertificateTemplateBuilder: React.FC<{ institutionId: string; onSave?: (da
 
   const selected = CERT_TEMPLATES.find(t => t.id === selectedId);
   const PreviewComp = selected?.component;
+  const savedTemplateName = savedTemplateId
+    ? savedTemplates.find(st => st.template_id === savedTemplateId)?.name
+    : null;
 
   // ── Step 1: Template Gallery ─────────────────────────────────────
   if (!selectedId && !savedTemplateId) {
@@ -369,7 +368,7 @@ const CertificateTemplateBuilder: React.FC<{ institutionId: string; onSave?: (da
           </button>
           <div className="h-4 w-px bg-slate-200" />
           <div>
-            <h2 className="text-xl font-black text-slate-900">{selected?.label || 'Custom Template'}</h2>
+            <h2 className="text-xl font-black text-slate-900">{selected?.label || savedTemplateName || 'Custom Template'}</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{savedTemplateId ? 'Editing saved template' : (selected?.tag || '')}</p>
           </div>
         </div>
@@ -385,8 +384,22 @@ const CertificateTemplateBuilder: React.FC<{ institutionId: string; onSave?: (da
         </div>
       </div>
 
-      {showPreview && PreviewComp ? (
-        <div className="max-w-3xl mx-auto"><PreviewComp data={data} /></div>
+      {showPreview ? (
+        PreviewComp ? (
+          <div className="max-w-3xl mx-auto"><PreviewComp data={data} /></div>
+        ) : (
+          <div className="max-w-3xl mx-auto bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="w-full overflow-hidden rounded-xl" style={{ height: 380 }}>
+              <div style={{ transform: 'scale(0.65)', transformOrigin: 'top left', width: '153%' }}>
+                <div dangerouslySetInnerHTML={{
+                  __html: buildHtmlContent(data, selected?.label)
+                    .replace(/\{student_name\}/g, 'Recipient Name')
+                    .replace(/\{course_title\}/g, data.eventName || 'Event')
+                }} />
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Form */}

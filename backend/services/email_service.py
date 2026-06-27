@@ -1,6 +1,7 @@
 import smtplib
 import os
 import time
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from html import escape
@@ -256,7 +257,7 @@ def get_certificate_issued_template(
             </div>
         </div>
 
-        <p style="margin:18px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;text-align:center;">Queries? We’re just one email away: <a href="mailto:{_safe_text(os.getenv('VITE_SUPPORT_EMAIL', os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')))}" style="color:#1d4ed8;text-decoration:none;font-weight:700;">{_safe_text(os.getenv('VITE_SUPPORT_EMAIL', os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')))}</a> &middot; &copy; 2026 { _safe_text(organization_name) }. All rights reserved.</p>
+        <p style="margin:18px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;text-align:center;">Queries? We’re just one email away: <a href="mailto:{_safe_text(os.getenv('VITE_SUPPORT_EMAIL', os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')))}" style="color:#1d4ed8;text-decoration:none;font-weight:700;">{_safe_text(os.getenv('VITE_SUPPORT_EMAIL', os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')))}</a> &middot; &copy; {datetime.utcnow().year} { _safe_text(organization_name) }. All rights reserved.</p>
         """,
         subtitle="Your certificate is ready",
         accent="#6C3BFF",
@@ -433,7 +434,7 @@ def get_certificate_template(user_name: str, event_name: str, rank: str = None, 
                         <!-- Footer -->
                         <tr>
                             <td style="background-color: #F8FAFC; padding: 20px; text-align: center;">
-                                <p style="margin: 0; font-size: 12px; color: #94A3B8;">Studlyf Communication Portal • 2026</p>
+                                <p style="margin: 0; font-size: 12px; color: #94A3B8;">Studlyf Communication Portal • {datetime.utcnow().year}</p>
                             </td>
                         </tr>
                     </table>
@@ -491,7 +492,7 @@ def get_announcement_template(user_name: str, event_name: str, message: str, nex
                         <!-- Footer -->
                         <tr>
                             <td style="background-color: #F8FAFC; padding: 20px; text-align: center;">
-                                <p style="margin: 0; font-size: 12px; color: #94A3B8;">Studlyf Communication Portal • 2026</p>
+                                <p style="margin: 0; font-size: 12px; color: #94A3B8;">Studlyf Communication Portal • {datetime.utcnow().year}</p>
                             </td>
                         </tr>
                     </table>
@@ -530,7 +531,7 @@ def _email_shell(title: str, body_html: str, subtitle: str = "", accent: str = "
                         </tr>
                         <tr>
                             <td style="background:#f8fafc;padding:18px;text-align:center;border-top:1px solid #e2e8f0;">
-                                <p style="margin:0;font-size:12px;color:#94a3b8;">Studlyf Communication Portal • 2026</p>
+                                <p style="margin:0;font-size:12px;color:#94a3b8;">Studlyf Communication Portal • {datetime.utcnow().year}</p>
                             </td>
                         </tr>
                     </table>

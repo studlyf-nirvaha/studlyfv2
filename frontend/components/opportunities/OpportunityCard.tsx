@@ -2,7 +2,7 @@ import React from 'react';
 import { Calendar, MapPin, Briefcase, ChevronRight, Building2, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { plainTextFromRichContent, formatOpportunityLocation } from '../../utils/text';
+import { plainTextFromRichContent, formatOpportunityLocation, getOpportunityDeadline } from '../../utils/text';
 
 interface OpportunityCardProps {
     opportunity: {
@@ -89,7 +89,7 @@ const OpportunityCard: React.FC<OpportunityCardProps> = ({ opportunity, isApplie
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-lg">
                                 <Calendar size={12} className="text-slate-400" />
-                                {new Date(opportunity.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                                {new Date(getOpportunityDeadline(opportunity)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                             </div>
                             {locationText && !isRemote ? (
                                 <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-lg max-w-[120px] truncate">

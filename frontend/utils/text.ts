@@ -138,3 +138,8 @@ export function formatOpportunityLocation(loc: string | undefined | null): strin
     if (loc == null) return '';
     return String(loc).replace(/^\s*,\s*/, '').trim();
 }
+
+/** Resolve the effective deadline from an opportunity object with fallback chain */
+export function getOpportunityDeadline(opp: any): string {
+    return opp?.deadline || opp?.registrationDeadline || opp?.registration_deadline || '';
+}

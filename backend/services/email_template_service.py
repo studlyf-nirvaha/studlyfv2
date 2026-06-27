@@ -45,7 +45,7 @@ def _wrap_premium_html_shell(content_html: str, title: str, accent_color: str = 
                         Empowering builders, learning, and hackathons worldwide.
                     </p>
                     <p style="margin: 6px 0 0 0; font-size: 11px; color: #cbd5e1; font-family: 'Poppins', sans-serif', sans-serif;">
-                        &copy; 2026 Studlyf Platform. All rights reserved. &bull; <a href="{{{{frontend_url}}}}" style="color: {accent_color}; text-decoration: none; font-weight: 600;">Visit Platform</a>
+                        &copy; {datetime.utcnow().year} Studlyf Platform. All rights reserved. &bull; <a href="{{{{frontend_url}}}}" style="color: {accent_color}; text-decoration: none; font-weight: 600;">Visit Platform</a>
                     </p>
                 </td>
             </tr>
@@ -234,7 +234,7 @@ DEFAULT_TEMPLATES = {
     <div style=\"font-size:28px;font-weight:900;color:#1d4ed8;line-height:1;margin-bottom:10px;\">{{organization_name}}</div>
     <div style=\"font-size:14px;color:#475569;margin-bottom:12px;\">Join our evergrowing unstoppable community</div>
 </div>
-<p style=\"margin:18px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;text-align:center;\">Queries? We’re just one email away: <a href=\"mailto:{{support_email}}\" style=\"color:#1d4ed8;text-decoration:none;font-weight:700;\">{{support_email}}</a> &middot; &copy; 2026 {{organization_name}}. All rights reserved.</p>"""
+<p style=\"margin:18px 0 0 0;color:#94a3b8;font-size:12px;line-height:1.6;text-align:center;\">Queries? We’re just one email away: <a href=\"mailto:{{support_email}}\" style=\"color:#1d4ed8;text-decoration:none;font-weight:700;\">{{support_email}}</a> &middot; &copy; {{current_year}} {{organization_name}}. All rights reserved.</p>"""
     },
     "certificate_content": {
         "name": "Certificate Details",
@@ -553,6 +553,7 @@ def render_template(template: dict, context: dict) -> (str, str):
     
     full_context = {
         "frontend_url": frontend_url,
+        "current_year": str(datetime.utcnow().year),
     }
     full_context.update(context)
 
@@ -880,6 +881,7 @@ def render_stage_custom_email(subject_override: str, body_markdown: str, context
     # Resolve context placeholders in both subject and full HTML
     full_context = {
         "frontend_url": frontend_url,
+        "current_year": str(datetime.utcnow().year),
     }
     full_context.update(context)
 

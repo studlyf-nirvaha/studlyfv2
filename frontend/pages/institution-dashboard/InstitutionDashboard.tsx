@@ -54,7 +54,7 @@ const InstitutionDashboard: React.FC = () => {
         const postFromUrl = searchParams.get('post');
 
         if (postFromUrl === 'true') {
-            setIsSelectionModalOpen(true);
+            setIsPostModalOpen(true);
             navigate(path, { replace: true });
             return;
         }

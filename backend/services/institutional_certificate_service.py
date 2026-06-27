@@ -33,7 +33,8 @@ VALID_ACHIEVEMENTS = list(ACHIEVEMENT_TYPES.keys())
 def generate_certificate_id(event_code: str = "HACK") -> str:
     year = datetime.utcnow().year
     seq = uuid.uuid4().int % 100000
-    return f"STUD-{event_code}-{year}-{seq:05d}"
+    code = event_code[:6].upper() if event_code else "HACK"
+    return f"STUD-{code}-{year}-{seq:05d}"
 
 
 def resolve_rank_achievement(rank: int | None) -> str:
@@ -98,6 +99,7 @@ def _build_certificate_record(
         "verification_code": verification_code,
         "verification_url": verification_url,
         "pdf_path": pdf_path,
+        "status": "Issued",
         "immutable_flag": True,
     }
 
@@ -227,7 +229,7 @@ class InstitutionalCertificateService:
         cert_id = generate_certificate_id(event_code)
         v_code = hashlib.sha256(f"{cert_id}:{event_id}:{user_id}".encode()).hexdigest()[:12].upper()
         frontend_url = os.getenv("FRONTEND_URL", "https://studlyf.in")
-        v_url = f"{frontend_url}/verify/{cert_id}"
+        v_url = f"{frontend_url}/#/verify/{cert_id}"
         qr_blob = self._generate_qr_blob(v_url)
         issue_date = datetime.utcnow().strftime("%B %d, %Y")
         achievement_label = ACHIEVEMENT_TYPES.get(achievement_type, "Participation")
@@ -570,7 +572,7 @@ async def process_certificate_jobs():
                 puser = await users_col.find_one({"user_id": pid})
                 cert_id = generate_certificate_id(event_code[:6].upper())
                 v_code = hashlib.sha256(f"{cert_id}:{event_id}:{pid}".encode()).hexdigest()[:12].upper()
-                v_url = f"{frontend_url}/verify/{cert_id}"
+                v_url = f"{frontend_url}/#/verify/{cert_id}"
                 issue_date = datetime.utcnow().strftime("%B %d, %Y")
                 record = _build_certificate_record(
                     cert_id=cert_id,

@@ -439,7 +439,7 @@ Good luck in the next round!"""
         "event_name": event.get("title", "StudLyf Hackathon"),
         "stage_name": stage_name,
         "participant_name": "Alex Mercer",
-        "deadline": "2026-05-29",
+        "deadline": (datetime.utcnow().isoformat()[:10] if hasattr(datetime, 'utcnow') else "2026-01-01"),
         "event_link": "https://studlyf.in/dashboard/learner",
     }
     
@@ -3181,7 +3181,7 @@ async def download_certificate(certificate_id: str):
         "event_date": issued_date,
         "issued_date": issued_date,
         "certificate_id": certificate_id,
-        "verification_url": cert.get("verification_url") or f"{os.getenv('FRONTEND_URL', 'https://studlyf.in')}/verify/{certificate_id}",
+        "verification_url": cert.get("verification_url") or f"{os.getenv('FRONTEND_URL', 'https://studlyf.in')}/#/verify/{certificate_id}",
         "achievement_type": cert.get("achievement_type") or cert.get("category") or "Participation",
         "organizer_signature": cert.get("organization_name") or cert.get("organization") or "Studlyf",
         "studlyf_signature": "Studlyf Authorized Signature",
@@ -7092,7 +7092,7 @@ async def bulk_onboard_members(data: dict, user: dict = Depends(get_current_user
                         <p style="font-size: 14px; font-weight: 500; text-align: center;">Need assistance? Our team is available 24/7 to help you settle in.</p>
                     </div>
                     <div class="footer">
-                        <p style="margin-bottom: 10px;">&copy; 2026 Studlyf Technologies Inc. All Rights Reserved.</p>
+                        <p style="margin-bottom: 10px;">&copy; {datetime.utcnow().year} Studlyf Technologies Inc. All Rights Reserved.</p>
                         <p>You received this because an authorized administrator at {inst_id} invited you to their private network.</p>
                     </div>
                 </div>

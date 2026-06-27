@@ -139,6 +139,90 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
     return entries
 
 
+async def _get_category_definitions(event_id: str) -> dict:
+    rules = await db.eligibility_rules.find({
+        "event_id": event_id,
+        "status": "active",
+        "is_deleted": False,
+    }).to_list(length=None)
+
+    rules_by_type: dict[str, list] = {}
+    for r in rules:
+        ct = r.get("certificate_type", "")
+        rules_by_type.setdefault(ct, []).append(r)
+
+    def _match(rules_list):
+        def fn(e):
+            rank = e.get("rank")
+            score = e.get("score", 0)
+            for r in rules_list:
+                rt = r.get("rule_type")
+                cfg = r.get("rule_configuration", {})
+                if rt == "rank":
+                    target = cfg.get("rank")
+                    if isinstance(target, list) and rank in target: return True
+                    if isinstance(target, (int, float)) and rank == int(target): return True
+                elif rt == "rank_range":
+                    s = cfg.get("rank_start", 0)
+                    end = cfg.get("rank_end", 999999)
+                    if s <= rank <= end: return True
+                elif rt == "top_n":
+                    if rank and rank <= cfg.get("top_n", 0): return True
+                elif rt == "score_threshold":
+                    if score >= cfg.get("minimum_score", 0): return True
+            return False
+        return fn
+
+    def _range_label(rules_list):
+        parts = []
+        for r in rules_list:
+            rt = r.get("rule_type")
+            cfg = r.get("rule_configuration", {})
+            if rt == "rank":
+                target = cfg.get("rank")
+                if isinstance(target, list):
+                    parts.append(f"Rank {','.join(str(x) for x in target)}")
+                else:
+                    parts.append(f"Rank {target}")
+            elif rt == "rank_range":
+                parts.append(f"Rank {cfg.get('rank_start')}-{cfg.get('rank_end')}")
+            elif rt == "top_n":
+                parts.append(f"Top {cfg.get('top_n')}")
+            elif rt == "score_threshold":
+                min_s = cfg.get("minimum_score", 0)
+                parts.append(f"Score \u2265 {min_s}" if min_s > 0 else "Score ≥ 0")
+            else:
+                parts.append(rt.replace("_", " ").title() if rt else "Custom")
+        return ", ".join(parts)
+
+    return {
+        "winner": {
+            "label": "Winner",
+            "achievement_key": "winner",
+            "rank_range": _range_label(rules_by_type["winner"]) if "winner" in rules_by_type else "1",
+            "match_fn": _match(rules_by_type["winner"]) if "winner" in rules_by_type else (lambda e: e.get("rank") == 1),
+        },
+        "runner_up": {
+            "label": "Runner Up",
+            "achievement_key": "runner_up",
+            "rank_range": _range_label(rules_by_type["runner_up"]) if "runner_up" in rules_by_type else "2-3",
+            "match_fn": _match(rules_by_type["runner_up"]) if "runner_up" in rules_by_type else (lambda e: e.get("rank") in [2, 3]),
+        },
+        "finalist": {
+            "label": "Finalist",
+            "achievement_key": "finalist",
+            "rank_range": _range_label(rules_by_type["finalist"]) if "finalist" in rules_by_type else "4-20",
+            "match_fn": _match(rules_by_type["finalist"]) if "finalist" in rules_by_type else (lambda e: e.get("rank") and 4 <= e["rank"] <= 20),
+        },
+        "participation": {
+            "label": "Participation",
+            "achievement_key": "participation",
+            "rank_range": _range_label(rules_by_type["participation"]) if "participation" in rules_by_type else "21+",
+            "match_fn": _match(rules_by_type["participation"]) if "participation" in rules_by_type else (lambda e: e.get("rank") and e["rank"] >= 21),
+        },
+    }
+
+
 @router.get("/stats")
 async def get_certificate_stats(
     institution_id: str,
@@ -149,13 +233,11 @@ async def get_certificate_stats(
     match: dict = {"institution_id": institution_id}
     if event_id:
         match["event_id"] = event_id
-    if stage_id:
-        match["stage_id"] = stage_id
     achievement_keys = ["winner", "runner_up", "second_runner_up", "finalist", "top_performer", "organizer", "mentor"]
     total = await event_certificates_col.count_documents(match)
     ach = await event_certificates_col.count_documents({**match, "achievement_key": {"$in": achievement_keys}})
     part = await event_certificates_col.count_documents({**match, "achievement_key": "participation"})
-    pending = await event_certificates_col.count_documents({**match, "$or": [{"status": "Pending"}, {"status": {"$exists": False}}]})
+    pending = await event_certificates_col.count_documents({**match, "status": "Pending"})
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     verified_today = await event_certificates_col.count_documents({
         **match, "status": "verified", "verified_at": {"$gte": today_start}
@@ -178,14 +260,19 @@ async def get_eligibility_preview(
     user: dict = Depends(get_auth_user),
 ):
     entries = await _get_leaderboard_for_event(event_id, stage_id)
-    winners = [e for e in entries if e.get("rank") == 1]
-    runners = [e for e in entries if e.get("rank") in [2, 3]]
-    finalists = [e for e in entries if e.get("rank") in range(4, 21)]
+    cats = await _get_category_definitions(event_id)
 
-    # Count all registered participants (including non-qualifiers) for participation eligibility
+    winners = [e for e in entries if cats["winner"]["match_fn"](e)]
+    runners = [e for e in entries if cats["runner_up"]["match_fn"](e)]
+    finalists = [e for e in entries if cats["finalist"]["match_fn"](e)]
+
     total_participants = await participants_col.count_documents({"event_id": event_id})
-    qualified_count = len([e for e in entries if e.get("rank") and e["rank"] <= 20])
-    non_qualifier_count = max(0, total_participants - qualified_count)
+    qualified_ids = set()
+    for e in winners + runners + finalists:
+        uid = e.get("user_id") or e.get("team_id") or ""
+        if uid:
+            qualified_ids.add(uid)
+    non_qualifier_count = max(0, total_participants - len(qualified_ids))
 
     return {
         "winner_teams": {"count": len(winners), "recipients": len(winners)},
@@ -211,32 +298,16 @@ async def get_eligible_recipients(
     entries = await _get_leaderboard_for_event(event_id, stage_id)
     if min_score > 0:
         entries = [e for e in entries if e["score"] >= min_score]
-    categories = {
-        "winner": {
-            "label": "Winner",
-            "achievement_key": "winner",
-            "recipients": [e for e in entries if e.get("rank") == 1],
-            "rank_range": "1",
-        },
-        "runner_up": {
-            "label": "Runner Up",
-            "achievement_key": "runner_up",
-            "recipients": [e for e in entries if e.get("rank") in [2, 3]],
-            "rank_range": "2-3",
-        },
-        "finalist": {
-            "label": "Finalist",
-            "achievement_key": "finalist",
-            "recipients": [e for e in entries if e.get("rank") in range(4, 21)],
-            "rank_range": "4-20",
-        },
-        "participation": {
-            "label": "Participation",
-            "achievement_key": "participation",
-            "recipients": [e for e in entries if e.get("rank") and e["rank"] >= 21],
-            "rank_range": "21+",
-        },
-    }
+    cat_defs = await _get_category_definitions(event_id)
+    categories = {}
+    for key in ["winner", "runner_up", "finalist", "participation"]:
+        cd = cat_defs[key]
+        categories[key] = {
+            "label": cd["label"],
+            "achievement_key": cd["achievement_key"],
+            "rank_range": cd["rank_range"],
+            "recipients": [e for e in entries if cd["match_fn"](e)],
+        }
     # Include all registered participants who are not in winner/runner_up/finalist
     qualified_ids = set()
     for cat in categories.values():
@@ -289,10 +360,18 @@ async def issue_certificates(
     org_name = event.get("organisation") or event.get("organization") or "Unknown"
     event_date = event.get("eventDate") or event.get("start_date") or datetime.utcnow().strftime("%B %d, %Y")
     institution_id = str(user.get("institution_id", ""))
-    event_code = (event.get("eventCode") or event.get("event_type") or "HACK")[:6].upper()
+    event_code = (event.get("eventCode") or event.get("event_type") or event.get("title", "HACK"))[:6].upper()
 
     if achievement_type not in VALID_ACHIEVEMENTS:
         raise HTTPException(status_code=400, detail=f"Invalid achievement type. Valid: {VALID_ACHIEVEMENTS}")
+
+    # Build rank mapping from event leaderboard
+    leaderboard = await _get_leaderboard_for_event(event_id)
+    sub_rank_map = {}
+    for entry in leaderboard:
+        eid = str(entry.get("_id") or "")
+        if eid:
+            sub_rank_map[eid] = entry.get("rank")
 
     issued = []
     for sid in recipient_ids:
@@ -302,6 +381,8 @@ async def issue_certificates(
                 return ObjectId(s)
             return s
 
+        # Resolve rank from leaderboard or fallback to query param
+        recipient_rank = rank if rank is not None else sub_rank_map.get(sid, None)
         sid_query = to_oid(sid)
         
         # Try to resolve from submission_data_col first, then participants_col
@@ -365,7 +446,7 @@ async def issue_certificates(
                 achievement_type=achievement_type,
                 event_code=event_code,
                 institution_id=institution_id,
-                rank=rank,
+                rank=recipient_rank,
                 team_id=team_id or None,
                 template_id=template_id,
             )
@@ -441,7 +522,7 @@ async def get_certificate_registry(
         c["_id"] = str(c["_id"])
         c["recipient_name"] = c.get("participant_name") or ""
         c["type"] = c.get("achievement_type") or "Participation"
-        c["issued_on"] = c.get("issued_date") or ""
+        c["issued_on"] = c.get("issued_at") or c.get("issued_date") or ""
         c["status"] = c.get("status") or "Issued"
         team_id = c.get("team_id")
         if team_id and not c.get("team_name"):

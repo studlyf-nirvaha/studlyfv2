@@ -3,7 +3,7 @@ Registration Service - Auto-fill user profile data and merge with event-specific
 Implements Unstop-like registration with pre-filled profile data
 """
 
-from db import db, users_col, participants_col, events_col, submission_data_col
+from db import db, users_col, participants_col, events_col, submission_data_col, opportunities_col
 from bson import ObjectId
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
@@ -392,6 +392,17 @@ async def complete_registration(
             upsert=True
         )
         
+        # Increment applicantsCount on the linked opportunity, if any
+        try:
+            opp = await opportunities_col.find_one({"event_link_id": str(event_id)})
+            if opp:
+                await opportunities_col.update_one(
+                    {"_id": opp["_id"]},
+                    {"$inc": {"applicantsCount": 1}}
+                )
+        except Exception as e:
+            print(f"[WARNING] Could not increment applicantsCount for event {event_id}: {e}")
+
         return {
             "status": "success",
             "message": "Registration completed successfully with auto-filled profile data",

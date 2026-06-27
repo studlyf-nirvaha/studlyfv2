@@ -48,7 +48,8 @@ class CertificateGenerationService:
     async def generate_single(self, recipient: dict, batch: dict):
         cert_id = await generate_certificate_id(batch["batch_type"])
         v_code = await generate_unique_verification_code()
-        url = f"https://studlyf.com/verify/{cert_id}"
+        frontend_url = os.getenv("FRONTEND_URL", "https://studlyf.in")
+        url = f"{frontend_url}/#/verify/{cert_id}"
         
         # 1. Generate QR Assets
         qr_assets = await generate_qr_assets(url, cert_id)

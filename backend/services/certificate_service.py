@@ -32,7 +32,7 @@ class CertificateService:
         organization_name = cert_data.get('organization_name') or cert_data.get('organization') or cert_data.get('institution_name') or 'Studlyf'
         event_date = cert_data.get('event_date') or cert_data.get('issued_date') or datetime.now().strftime("%B %d, %Y")
         certificate_id = cert_data.get('certificate_id') or cert_data.get('cert_id') or f"STUD-{uuid.uuid4().hex[:8].upper()}"
-        verification_url = cert_data.get('verification_url') or cert_data.get('verify_url') or f"{os.getenv('FRONTEND_URL', 'https://studlyf.in')}/verify/{certificate_id}"
+        verification_url = cert_data.get('verification_url') or cert_data.get('verify_url') or f"{os.getenv('FRONTEND_URL', 'https://studlyf.in')}/#/verify/{certificate_id}"
         achievement_type = cert_data.get('achievement_type') or cert_data.get('category') or 'Participation'
         organizer_signature = cert_data.get('organizer_signature') or organization_name
         studlyf_signature = cert_data.get('studlyf_signature') or 'Studlyf Authorized Signature'

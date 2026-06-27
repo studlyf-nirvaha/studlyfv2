@@ -198,16 +198,20 @@ const EmailTemplatesManager: React.FC<{ eventId: string; institutionId: string }
   };
 
   const renderPreview = () => {
+    const now = new Date();
+    const yr = now.getFullYear();
+    const deadline1 = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+    const deadline2 = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10);
     let preview = bodyHtml;
     preview = preview.replace(/\{(\w+)\}/g, (_, key) => {
       const sample: Record<string, string> = {
         team_name: 'Team Alpha',
-        event_name: 'National Hackathon 2026',
+        event_name: `National Hackathon ${yr}`,
         stage_name: 'Final Round',
         participant_name: 'John Doe',
         custom_message: 'Your team has been selected for the next phase!',
-        deadline: '2026-06-15 23:59 UTC',
-        new_deadline: '2026-06-20 23:59 UTC',
+        deadline: `${deadline1} 23:59 UTC`,
+        new_deadline: `${deadline2} 23:59 UTC`,
         score: '94',
         frontend_url: 'https://app.studlyf.com',
       };

@@ -1,5 +1,6 @@
 import secrets
 import time
+from datetime import datetime
 from services.email_service import send_notification_email
 
 # Simple in-memory storage for OTPs (In production, use Redis or a DB)
@@ -41,7 +42,7 @@ async def generate_and_send_otp(email: str):
                     </div>
                 </div>
                 <div style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eef2f6;">
-                    <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; 2026 Studlyf Engineering. All rights reserved.</p>
+                    <p style="font-size: 12px; color: #9ca3af; margin: 0;">&copy; {datetime.utcnow().year} Studlyf Engineering. All rights reserved.</p>
                 </div>
             </div>
         </body>
@@ -102,7 +103,7 @@ async def send_welcome_email(email: str, name: str):
                     <p style="font-size: 13px; color: #9ca3af; text-align: center;">The Studlyf team is here to support you at every step of your journey.</p>
                 </div>
                 <div style="background-color: #fafafa; padding: 20px; text-align: center; border-top: 1px solid #eef2f6;">
-                    <p style="font-size: 12px; color: #9ca3af; margin: 0;">Studlyf Engineering Protocol &copy; 2026</p>
+                    <p style="font-size: 12px; color: #9ca3af; margin: 0;">Studlyf Engineering Protocol &copy; {datetime.utcnow().year}</p>
                 </div>
             </div>
         </body>

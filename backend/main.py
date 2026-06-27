@@ -2936,7 +2936,7 @@ async def confirm_track_enrollment(user_id: str, data: dict = Body(...)):
                 <!-- Footer -->
                 <div style="background-color: #F9FAFB; padding: 30px; border-top: 1px solid #E5E7EB; text-align: center; font-size: 11px; color: #9CA3AF; font-weight: 500;">
                     <p style="margin: 0 0 10px 0;">Have queries? Reach our team at <a href="mailto:{os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')}" style="color: #7C3AED; text-decoration: none; font-weight: bold;">{os.getenv('SUPPORT_EMAIL', 'support@studlyf.com')}</a></p>
-                    <p style="margin: 0;">Studlyf Engineering Systems &copy; 2026. All Rights Reserved.</p>
+                    <p style="margin: 0;">Studlyf Engineering Systems &copy; {datetime.utcnow().year}. All Rights Reserved.</p>
                 </div>
             </div>
         </body>

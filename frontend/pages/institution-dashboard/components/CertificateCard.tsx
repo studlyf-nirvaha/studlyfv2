@@ -12,7 +12,7 @@ interface CertificateCardProps {
 export default function CertificateCard({
   recipientName = 'John Doe',
   achievementType = 'Winner',
-  eventTitle = 'CodeForge 2026 - Final Submission',
+  eventTitle = 'Event Certificate',
   certificateId = 'CERT-0001',
   verificationCode = '7F8A9D2B',
 }: CertificateCardProps) {

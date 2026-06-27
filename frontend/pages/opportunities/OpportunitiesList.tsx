@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, Briefcase, Calendar, MapPin, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, X, Globe, Users, DollarSign, Star, Sparkles, Building2, ArrowRight, Clock, TrendingUp, Target, ShieldCheck, Zap } from 'lucide-react';
+import { Search, Filter, Briefcase, Calendar, MapPin, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, X, Globe, Users, DollarSign, Star, Sparkles, Building2, ArrowRight, Clock, TrendingUp, Target, ShieldCheck, Zap, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
 import { useAuth } from '../../AuthContext';
-import { plainTextFromRichContent, formatOpportunityLocation } from '../../utils/text';
+import { plainTextFromRichContent, formatOpportunityLocation, getOpportunityDeadline } from '../../utils/text';
 
 const clientSideEligible = (opp: any, user: any) => {
     if (!opp) return true;
@@ -12,16 +12,26 @@ const clientSideEligible = (opp: any, user: any) => {
     if (!candidateTypes || candidateTypes.length === 0) return true;
     const allowed = (Array.isArray(candidateTypes) ? candidateTypes : [candidateTypes]).map((x: any) => String(x).toLowerCase());
     if (allowed.some((a: string) => a.includes('everyone'))) return true;
+
+    // If user is not logged in or has no profile data, we can't determine eligibility — assume eligible
+    if (!user || !user.user_id) return true;
+
     const profileType = (user?.profile_type || user?.profileType || user?.userType || '').toString().toLowerCase();
     const userCollege = (user?.college || user?.institution || user?.college_name || '').toString().toLowerCase();
 
-    // simple heuristics
+    // Direct match: profile type matches an allowed type (e.g. "student" matches "College Students" because "college students".includes("student"))
     if (profileType && allowed.some((a: string) => a.includes(profileType))) return true;
-    if (allowed.some((a: string) => a.includes('student')) && (userCollege || profileType === 'student')) return true;
+
+    // For "college student" type: user has a college or profile type is "student"
+    if (allowed.some((a: string) => a.includes('college student')) && (userCollege || profileType === 'student')) return true;
+
+    // For "fresher" type
+    if (allowed.some((a: string) => a.includes('fresher')) && (profileType === 'fresher' || profileType === 'student')) return true;
+
     return false;
 }
 
-const typeOptions = ['All', 'Hackathon', 'Competition', 'Challenge', 'Conference', 'Workshop', 'Internship', 'Job'];
+const typeOptions = ['All'];
 
 const normalizeText = (value: unknown) => String(value ?? '').toLowerCase();
 
@@ -90,7 +100,7 @@ const OpportunitiesList: React.FC = () => {
     const [appliedIds, setAppliedIds] = useState<string[]>([]);
     const [eligibilityMap, setEligibilityMap] = useState<Record<string, { eligible: boolean; reason?: string }>>({});
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const [ineligibleModal, setIneligibleModal] = useState<{ visible: boolean; reason?: string; eventId?: string; opp?: any }>({ visible: false });
 
     useEffect(() => {
@@ -132,6 +142,26 @@ const OpportunitiesList: React.FC = () => {
                             setAppliedIds(Array.isArray(apps) ? apps.map((a: any) => a.opportunity_id) : []);
                         })
                         .catch(() => setAppliedIds([]));
+
+                    // Fetch server-side eligibility for events
+                    const eventOpps = Array.isArray(opps) ? opps.filter((o: any) => ['Hackathon', 'Competition', 'Challenge', 'Workshop', 'Conference'].includes(o.type)) : [];
+                    if (eventOpps.length > 0) {
+                        const results: Record<string, { eligible: boolean; reason?: string }> = {};
+                        await Promise.all(eventOpps.map(async (opp: any) => {
+                            const eid = String(opp.event_link_id || opp.event_id || opp._id || '');
+                            if (!eid) return;
+                            try {
+                                const res = await fetch(`${API_BASE_URL}/api/v1/registration/events/${eid}/eligibility`, {
+                                    headers: { ...authHeaders() }
+                                });
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    results[eid] = { eligible: data.eligible ?? false, reason: data.reason };
+                                }
+                            } catch { }
+                        }));
+                        setEligibilityMap(results);
+                    }
                 } else {
                     setAppliedIds([]);
                 }
@@ -161,7 +191,10 @@ const OpportunitiesList: React.FC = () => {
             const matchesPayment = selectedPayment === 'All' || normalizeText(opp.prize_type ?? opp.compensation_type ?? '').includes(normalizeText(selectedPayment));
             const matchesSkills = selectedSkills.length === 0 || (opp.skills && opp.skills.some((s: string) => selectedSkills.some(sk => normalizeText(s).includes(normalizeText(sk)))));
 
-            return matchesSearch && matchesType && matchesSelectedLocation && matchesStatus && matchesParticipation && matchesTeamSize && matchesPayment && matchesSkills;
+            const deadlineStr = getOpportunityDeadline(opp);
+            const isExpired = deadlineStr ? new Date(deadlineStr) < new Date() : false;
+
+            return !isExpired && matchesSearch && matchesType && matchesSelectedLocation && matchesStatus && matchesParticipation && matchesTeamSize && matchesPayment && matchesSkills;
         });
 
         const sorted = [...filtered].sort((a, b) => {
@@ -434,7 +467,14 @@ const OpportunitiesList: React.FC = () => {
                         </button>
                         
                         <button
-                            onClick={() => navigate('/dashboard/institution?post=true')}
+                            onClick={() => {
+                                if (user && role === 'institution') {
+                                    navigate('/institution-dashboard?post=true');
+                                } else {
+                                    localStorage.removeItem('auth_token');
+                                    window.location.href = '/login?role=institution&next=' + encodeURIComponent('/institution-dashboard?post=true');
+                                }
+                            }}
                             className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition-all"
                         >
                             <Plus size={14} /> Post Opportunity
@@ -605,13 +645,11 @@ const OpportunitiesList: React.FC = () => {
                                                         Not eligible
                                                     </button>
                                                 )
-                                            ) : null}
-
-                                            {!likelyEligible && (
+                                            ) : !likelyEligible ? (
                                                 <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-rose-50 text-rose-700 ring-1 ring-rose-200/60">
                                                     Not eligible
                                                 </span>
-                                            )}
+                                            ) : null}
                                         </div>
 
                                         <p className="text-sm font-medium text-slate-600 line-clamp-2 leading-relaxed mb-6 flex-grow">

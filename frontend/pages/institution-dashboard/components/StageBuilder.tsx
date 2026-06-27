@@ -53,7 +53,7 @@ Good luck in the next round!`;
             .replace(/\{\{stage_name\}\}|\{stage_name\}/g, stageName)
             .replace(/\{\{event_name\}\}|\{event_name\}/g, 'StudLyf Hackathon')
             .replace(/\{\{participant_name\}\}|\{participant_name\}/g, 'Alex Mercer')
-            .replace(/\{\{deadline\}\}|\{deadline\}/g, '2026-05-29')
+            .replace(/\{\{deadline\}\}|\{deadline\}/g, new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))
             .replace(/\{\{event_link\}\}|\{event_link\}/g, 'https://studlyf.in/dashboard/learner');
     };
 
