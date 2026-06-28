@@ -167,7 +167,7 @@ const PostJobModal: React.FC<PostJobModalProps> = ({ isOpen, onClose, institutio
                 status: isDraft ? 'draft' : 'active'
             };
 
-            const response = await fetch(`${API_BASE_URL}/api/opportunities`, {
+            const response = await fetch(`${API_BASE_URL}/api/opportunities/`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',

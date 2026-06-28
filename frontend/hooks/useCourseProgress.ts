@@ -39,6 +39,7 @@ interface ProgressHook {
     passed: boolean,
     quizAnswers: number[][]
   ) => Promise<void>;
+  updateModules: (mods: any[]) => void;
 }
 
 /**

@@ -89,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
                 setUser(userData);
                 setRole(validateRole(userData.role));
-            } else if (response.status === 401 || response.status === 403) {
+            } else if (response.status === 401 || response.status === 403 || response.status === 404) {
                 localStorage.removeItem('auth_token');
                 setUser(null);
                 setRole(null);

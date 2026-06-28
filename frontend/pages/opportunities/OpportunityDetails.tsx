@@ -41,6 +41,7 @@ import {
     HelpCircle,
     AlertCircle,
     Copy,
+    CalendarX,
 } from 'lucide-react';
 import { getStatusById, getStatusColor, getStatusLabel } from '../../utils/calendarStatuses';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -379,7 +380,7 @@ const OpportunityDetails: React.FC = () => {
     useEffect(() => {
         if (!opportunity?._id) return;
         const t = opportunity.type || 'General';
-        fetch(`${API_BASE_URL}/api/opportunities?type=${encodeURIComponent(t)}`)
+        fetch(`${API_BASE_URL}/api/opportunities/?type=${encodeURIComponent(t)}`)
             .then((r) => r.json())
             .then((rows) => {
                 const list = Array.isArray(rows) ? rows : [];

@@ -2,7 +2,7 @@ import os
 import subprocess
 import inspect
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header, Request, status, Query, Body
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header, Request, status, Query, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from typing import Any, Dict, List, Optional
@@ -19,7 +19,6 @@ from services.ai_tools_scraper import fetch_ai_tools
 from jinja2 import Environment, FileSystemLoader, Template
 from fastapi.responses import HTMLResponse
 import json
-from time import time
 import asyncio
 from services.email_service import send_notification_email, get_registration_template, get_announcement_template
 from datetime import datetime, timezone
@@ -81,13 +80,13 @@ def cache_get(key: str):
     if not item:
         return None
     html, expiry = item
-    if expiry and expiry < time():
+    if expiry and expiry < time.time():
         _html_cache.pop(key, None)
         return None
     return html
 
 def cache_set(key: str, html: str, ttl: int = 60):
-    expiry = time() + ttl if ttl and ttl > 0 else None
+    expiry = time.time() + ttl if ttl and ttl > 0 else None
     _html_cache[key] = (html, expiry)
 
 
@@ -615,7 +614,7 @@ async def upload_temp_image(request: Request, file: UploadFile = File(...), publ
 
 from domain_models import Institution, Event, Participant, Team, Submission, Judge, Score, Notification, LeaderboardEntry, Certificate
 from services.email_service import send_notification_email, get_registration_template, get_email_verification_template
-from auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token
+from auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token, dummy_verify_password
 # from routes import upgrade_routes
 import integration_routes
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -6468,7 +6467,7 @@ async def forgot_password(data: dict = Body(...)):
     
     # Generate secure token and persist to DB so it survives restarts
     token = secrets.token_urlsafe(32)
-    expiry_ts = int(time() + 3600)  # 1 hour expiry (unix ts)
+    expiry_ts = int(time.time() + 3600)  # 1 hour expiry (unix ts)
     try:
         # Use a dedicated collection for password resets
         # Persist a token_hash to avoid unique-index conflicts on null values
@@ -6520,7 +6519,7 @@ async def reset_password(data: dict = Body(...)):
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    if int(time()) > int(token_doc.get("expiry", 0)):
+    if int(time.time()) > int(token_doc.get("expiry", 0)):
         # remove expired token
         try:
             await db.password_resets.delete_one({"token": token})
@@ -6549,7 +6548,7 @@ async def reset_password(data: dict = Body(...)):
 
 # --- AUTH ENDPOINTS ---
 @app.post("/api/auth/signup")
-async def signup(user_data: UserSignup, request: Request):
+async def signup(user_data: UserSignup, request: Request, background_tasks: BackgroundTasks):
     # Apply rate limiting for signup attempts
     check_rate_limit(request, "register", "auth")
     """
@@ -6635,7 +6634,7 @@ async def signup(user_data: UserSignup, request: Request):
     await users_col.insert_one({**user_doc, "email_verified": False})
 
     verification_token = secrets.token_urlsafe(32)
-    verification_expiry = int(time() + 86400)
+    verification_expiry = int(time.time() + 86400)
     try:
         await db.email_verifications.insert_one({
             "token": verification_token,
@@ -6652,7 +6651,8 @@ async def signup(user_data: UserSignup, request: Request):
     verification_link = f"{frontend_url}/#/verify-email?token={verification_token}"
     signup_name = user_data.full_name or "Participant"
     from services.platform_notification_service import notify_email_verification
-    await notify_email_verification(
+    background_tasks.add_task(
+        notify_email_verification,
         recipient_email=email_clean,
         participant_name=signup_name,
         verification_link=verification_link,
@@ -6678,7 +6678,7 @@ async def verify_email(data: dict = Body(...)):
         expiry = int(token_doc.get("expiry") or 0)
     except Exception:
         expiry = 0
-    if expiry and int(time()) > expiry:
+    if expiry and int(time.time()) > expiry:
         await db.email_verifications.delete_one({"token": token})
         raise HTTPException(status_code=400, detail="Verification link has expired")
 
@@ -6720,7 +6720,8 @@ async def login(credentials: UserLogin, request: Request):
             user = verified_users[0] if verified_users else matching_users[0]
         
         if not user:
-            logger.warning(f"Login attempt with non-existent email: {email_clean}")
+            dummy_verify_password()
+            logger.warning("Login attempt for non-existent account")
             raise HTTPException(status_code=401, detail="Invalid email or password")
     except HTTPException:
         raise
@@ -6827,7 +6828,7 @@ async def resend_verification(data: dict = Body(...)):
         return {"status": "success", "message": "Email is already verified."}
 
     token = secrets.token_urlsafe(32)
-    expiry = int(time() + 86400)
+    expiry = int(time.time() + 86400)
     await db.email_verifications.update_one(
         {"email": email},
         {
@@ -6861,7 +6862,12 @@ async def get_me(user_payload: dict = Depends(get_current_user)):
     # If the token says judge, look them up in judges_col (no users_col account)
     if role == "judge":
         from bson import ObjectId
-        judge = await judges_col.find_one({"_id": ObjectId(uid)})
+        from bson.errors import InvalidId
+        try:
+            judge_oid = ObjectId(uid)
+        except (InvalidId, TypeError):
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+        judge = await judges_col.find_one({"_id": judge_oid})
         if not judge:
             raise HTTPException(status_code=404, detail="Judge not found")
         return {

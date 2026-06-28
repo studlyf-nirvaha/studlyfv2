@@ -103,6 +103,7 @@ const CoursePlayer: React.FC = () => {
   const [activeToolTab, setActiveToolTab] = useState<'notes' | 'transcript' | 'resources'>('notes');
 
   const [moduleDetails, setModuleDetails] = useState<any>(null);
+  const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [courseData, setCourseData] = useState<any>(null);
 
@@ -124,7 +125,11 @@ const CoursePlayer: React.FC = () => {
     markLessonComplete,
     submitGradedQuiz,
     updateModules,
-  } = useCourseProgress({ userId: user?.uid, courseId: resolvedCourseId });
+  } = useCourseProgress({ userId: user?.user_id, courseId: resolvedCourseId });
+
+  useEffect(() => {
+    updateModules(modules);
+  }, [modules, updateModules]);
 
   useEffect(() => {
     if (resolvedCourseId) {
@@ -192,8 +197,8 @@ const CoursePlayer: React.FC = () => {
     try {
       // ✅ PERF FIX: Parallel API calls instead of sequential
       const [modulesRes, courseRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/courses/${resolvedCourseId}/modules?user_id=${user?.uid || ''}`),
-        fetch(`${API_BASE_URL}/api/course/${resolvedCourseId}/details?user_id=${user?.uid || ''}`)
+        fetch(`${API_BASE_URL}/api/courses/${resolvedCourseId}/modules?user_id=${user?.user_id || ''}`),
+        fetch(`${API_BASE_URL}/api/course/${resolvedCourseId}/details?user_id=${user?.user_id || ''}`)
       ]);
 
       const data = await modulesRes.json().catch(() => []);
@@ -238,7 +243,7 @@ const CoursePlayer: React.FC = () => {
         const p = mod.progress;
         if (p) {
           if (p.status === 'completed') {
-            const curChapter = courseCurriculum[modIdx] || courseCurriculum[modIdx % courseCurriculum.length];
+            const curChapter = curriculumSource[modIdx] || curriculumSource[modIdx % curriculumSource.length];
             curChapter.topics.forEach((_, tIdx) => {
               initialCompleted[`${modIdx}_${tIdx}`] = true;
             });
@@ -271,14 +276,14 @@ const CoursePlayer: React.FC = () => {
     } catch (err) {
       try { console.error('Error fetching modules:', err instanceof Error ? err.message : String(err)); } catch (_) {}
       let fetched: any[] = [];
-      if (courseCurriculum && courseCurriculum.length > 0) {
-        fetched = courseCurriculum.map((_, i) => ({
+      if (curriculumSource && curriculumSource.length > 0) {
+        fetched = curriculumSource.map((_, i) => ({
           _id: `dummy-mod-${i}`,
           progress: null
         }));
       }
       const formatted = fetched.map((mod: any, i: number) => {
-        const curChapter = courseCurriculum[i] || courseCurriculum[i % courseCurriculum.length];
+        const curChapter = curriculumSource[i] || curriculumSource[i % curriculumSource.length];
         return {
           ...mod,
           title: curChapter?.title || `Module ${i + 1}`,
@@ -294,7 +299,7 @@ const CoursePlayer: React.FC = () => {
       setLoading(false);
       return formatted;
     }
-  }, [resolvedCourseId, user, courseCurriculum]);
+  }, [resolvedCourseId, user, curriculumSource]);
 
   // ✅ PERF FIX: Track last fetched module to avoid redundant detail fetches
   const lastFetchedModuleIdRef = useRef<string | null>(null);
@@ -330,7 +335,7 @@ const CoursePlayer: React.FC = () => {
     setModuleDetails(data);
     
     // Fetch dynamic questions count from the current chapter topic
-    const activeChapter = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+    const activeChapter = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
     const quizTopic = activeChapter?.topics?.find(t => t.type === 'graded_quiz');
     const gradedQs = quizTopic?.graded || [];
     setQuizAnswers(gradedQs.map(() => []));
@@ -364,7 +369,7 @@ const CoursePlayer: React.FC = () => {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          user_id: user?.uid, 
+          user_id: user?.user_id, 
           course_id: resolvedCourseId, 
           module_id: modules[activeModuleIndex]?._id, 
           updates 
@@ -377,7 +382,7 @@ const CoursePlayer: React.FC = () => {
     }
   };
 
-  const activeChapterData = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+  const activeChapterData = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
   const activeTopicData = activeChapterData?.topics?.[activeLessonIndex];
 
   /* ── Graded Quiz Submission ── */
@@ -1276,7 +1281,7 @@ const CoursePlayer: React.FC = () => {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                user_id: user?.uid,
+                                user_id: user?.user_id,
                                 course_id: resolvedCourseId,
                                 updates: { 
                                   github_link: githubLink, 
@@ -1361,7 +1366,7 @@ const CoursePlayer: React.FC = () => {
               )}
 
             </AnimatePresence>
-          {activeStage !== 'result' && activeStage !== 'capstone' && (
+          {(activeStage as string) !== 'result' && (activeStage as string) !== 'capstone' && (
             <div className="cp-lesson-navigation" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
               <button
                 className="cp-bottom-nav-btn"
@@ -1372,7 +1377,7 @@ const CoursePlayer: React.FC = () => {
               </button>
               <button
                 className="cp-bottom-nav-btn"
-                disabled={currentFlatIndex >= flatLessons.length - 1 || activeStage === 'result' || activeStage === 'capstone'}
+                disabled={currentFlatIndex >= flatLessons.length - 1 || (activeStage as string) === 'result' || (activeStage as string) === 'capstone'}
                 onClick={goToNextLesson}
               >
                 Next Lesson →
@@ -1489,7 +1494,7 @@ const CoursePlayer: React.FC = () => {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               style={{ padding: '48px 32px', textAlign: 'center', borderRadius: 24, boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}
             >
-              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justify_content: 'center' }}>
+              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: '#F5F3FF', borderRadius: '50%', transform: 'scale(1.2)' }} />
                 <Award size={64} style={{ color: '#7C3AED', position: 'relative', zIndex: 2, margin: '18px auto' }} />
                 <div style={{ position: 'absolute', bottom: -5, right: -5, background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800 }}>MODULE COMPLETED</div>

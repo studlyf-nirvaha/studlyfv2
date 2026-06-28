@@ -144,6 +144,31 @@ const TeamsManagement: React.FC<TeamsManagementProps> = ({ institutionId }) => {
         }
     };
 
+    const handleNotifyTeam = async (teamId: string) => {
+        if (!selectedEventId) return;
+        const msg = window.prompt("Enter message to send to the team members:", "An update regarding your team status has been posted.");
+        if (msg === null) return; // user cancelled
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/v1/institution/events/${selectedEventId}/teams/${teamId}/notify`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...authHeaders() 
+                },
+                body: JSON.stringify({ message: msg })
+            });
+            if (res.ok) {
+                alert('Notification emails sent to all team members successfully.');
+            } else {
+                const err = await res.json().catch(() => ({}));
+                alert(`Failed to send notifications: ${err.detail || 'Unknown error'}`);
+            }
+        } catch (err) {
+            alert('Network error while notifying team.');
+        }
+    };
+
     const filteredTeams = teams.filter(t => {
         const matchesSearch = t.team_name?.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = filterStatus === 'All' || t.status === filterStatus.toLowerCase();
