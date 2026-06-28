@@ -161,7 +161,7 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
 
     const handleOpenJudgeAssignment = async (submissionId: string, sourceType?: 'legacy' | 'hackathon') => {
         try {
-            const res = await fetch(`${API_BASE_URL}/api/judges`, { headers: { ...authHeaders() } });
+            const res = await fetch(`${API_BASE_URL}/api/judges/`, { headers: { ...authHeaders() } });
             if (res.ok) {
                 const judges = await res.json();
                 setAvailableJudges(judges);

@@ -1693,7 +1693,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         // Fetch available judges
         try {
             console.log('DEBUG: Fetching judges for submission:', submissionId);
-            const res = await fetch(`${API_BASE_URL}/api/judges`, { headers: { ...authHeaders() } });
+            const res = await fetch(`${API_BASE_URL}/api/judges/`, { headers: { ...authHeaders() } });
             console.log('DEBUG: Judges API response status:', res.status);
             if (res.ok) {
                 const judges = await res.json();

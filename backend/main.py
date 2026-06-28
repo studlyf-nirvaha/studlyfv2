@@ -6444,10 +6444,8 @@ async def delete_experience(user_id: str, exp_index: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
 @app.post("/api/auth/forgot-password")
-async def forgot_password(data: dict = Body(...)):
+async def forgot_password(data: dict = Body(...), background_tasks: BackgroundTasks = None):
     import re
 
     email = str(data.get("email") or "").strip().lower()
@@ -6461,16 +6459,21 @@ async def forgot_password(data: dict = Body(...)):
     logger.info(f"[FORGOT PASSWORD DEBUG] Attempting reset for: {email}")
     logger.info(f"[FORGOT PASSWORD DEBUG] User found in database: {bool(user)}")
     
+    # SECURITY FIX: Always return the same generic message regardless of whether the
+    # user exists or whether the email actually sends. Previously, an existing user
+    # whose email failed to send (e.g. misconfigured/down SMTP) got a 503 while a
+    # non-existent user got a 200 — that status-code difference is a user-enumeration
+    # side channel, and it also means password reset was fully broken whenever SMTP
+    # was unavailable. The email send is now fire-and-forget like signup.
+    generic_response = {"status": "success", "message": "If this email is registered, a reset link has been sent."}
+
     if not user:
-        # For security, don't reveal if user exists. Just say "If email exists, reset link sent"
-        return {"status": "success", "message": "If this email is registered, a reset link has been sent."}
+        return generic_response
     
     # Generate secure token and persist to DB so it survives restarts
     token = secrets.token_urlsafe(32)
     expiry_ts = int(time.time() + 3600)  # 1 hour expiry (unix ts)
     try:
-        # Use a dedicated collection for password resets
-        # Persist a token_hash to avoid unique-index conflicts on null values
         import hashlib
         token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
         await db.password_resets.insert_one({
@@ -6482,24 +6485,28 @@ async def forgot_password(data: dict = Body(...)):
         })
     except Exception as e:
         logger.error(f"Failed to persist reset token: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate reset link")
+        return generic_response
 
-    # Send email via template system
     from services.platform_notification_service import notify_password_reset
     reset_link = f"{frontend_url}/#/reset-password?token={token}"
-    user_doc = user or await users_col.find_one({"email": {"$regex": f"^{re.escape(email)}$", "$options": "i"}})
-    participant_name = (user_doc or {}).get("full_name") or (user_doc or {}).get("name") or "Participant"
-    sent_ok = await notify_password_reset(
-        recipient_email=email,
-        participant_name=participant_name,
-        reset_link=reset_link,
-        expiry_duration="1 hour",
-    )
-    if not sent_ok:
-        logger.error(f"[FORGOT PASSWORD] Email delivery failed for {email}")
-        raise HTTPException(status_code=503, detail="Email service unavailable. Please try again shortly.")
-    
-    return {"status": "success", "message": "Reset link sent"}
+    participant_name = user.get("full_name") or user.get("name") or "Participant"
+    if background_tasks is not None:
+        background_tasks.add_task(
+            notify_password_reset,
+            recipient_email=email,
+            participant_name=participant_name,
+            reset_link=reset_link,
+            expiry_duration="1 hour",
+        )
+    else:
+        await notify_password_reset(
+            recipient_email=email,
+            participant_name=participant_name,
+            reset_link=reset_link,
+            expiry_duration="1 hour",
+        )
+
+    return generic_response
 
 @app.post("/api/auth/reset-password")
 async def reset_password(data: dict = Body(...)):
