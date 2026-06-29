@@ -751,7 +751,6 @@ const OpportunityDetails: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log("Submitting registration...", { useStageRegistration, eventId, regAnswers });
         
         if (!user) {
             navigate('/login');
@@ -764,7 +763,6 @@ const OpportunityDetails: React.FC = () => {
         }
 
         if (useStageRegistration) {
-            console.log("Using stage registration flow");
             // ... (rest of the logic)
 
             const profile_data: Record<string, any> = {};
@@ -1655,7 +1653,6 @@ const OpportunityDetails: React.FC = () => {
                                             className="w-full h-full object-contain p-2"
                                             onError={(e) => {
                                                 // Log failing URL for diagnostics
-                                                try { console.warn('[LogoLoadError] failed to load', (e.currentTarget && e.currentTarget.src) || logoSrc); } catch (err) {}
                                                 e.currentTarget.style.display = 'none';
                                                 const sibling = e.currentTarget.nextElementSibling as HTMLElement;
                                                 if (sibling) sibling.style.display = 'flex';
@@ -2914,10 +2911,8 @@ const OpportunityDetails: React.FC = () => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={(e) => {
-                            console.log("Backdrop clicked");
                         }}
                     >
-                        {console.log("Registration modal rendering...")}
                         <motion.div
                             className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}

@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 import re
 import json
+import logging
+logger = logging.getLogger(__name__)
+
 
 def _ensure_list(val):
     """Normalize a field value to a list, handling JSON-encoded strings."""
@@ -123,7 +126,7 @@ async def validate_event_restrictions(
 
         return None
     except Exception as e:
-        print(f"[WARNING] validate_event_restrictions error: {e}")
+        logger.error(f"[WARNING] validate_event_restrictions error: {e}")
         return None  # Don't block on validation errors — fail open
 
 async def get_user_profile_data(user_id: str, user: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -182,7 +185,7 @@ async def get_user_profile_data(user_id: str, user: Optional[Dict[str, Any]] = N
         
         return profile_data
     except Exception as e:
-        print(f"[ERROR] get_user_profile_data: {e}")
+        logger.error(f"[ERROR] get_user_profile_data: {e}")
         return {}
 
 async def classify_registration_fields(
@@ -307,7 +310,7 @@ async def merge_registration_data(
             "user_profile": user_profile,
         }
     except Exception as e:
-        print(f"[ERROR] merge_registration_data: {e}")
+        logger.error(f"[ERROR] merge_registration_data: {e}")
         return {"error": str(e)}
 
 async def complete_registration(
@@ -403,7 +406,7 @@ async def complete_registration(
         }
     
     except Exception as e:
-        print(f"[ERROR] complete_registration: {e}")
+        logger.error(f"[ERROR] complete_registration: {e}")
         return {"error": str(e), "status": "error"}
 
 # Core profile keys that must ALWAYS be collected in registration (like Unstop).
@@ -510,7 +513,7 @@ async def get_registration_fields_with_prefill(
         }
     
     except Exception as e:
-        print(f"[ERROR] get_registration_fields_with_prefill: {e}")
+        logger.error(f"[ERROR] get_registration_fields_with_prefill: {e}")
         return {"error": str(e)}
 
 async def check_registration_status(
@@ -540,7 +543,8 @@ async def check_registration_status(
                         "event_id": str(ev["event_id"]),
                         "user_id": str(user_id)
                     })
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 543: {e}")
                 pass
         
         if not participant:
@@ -551,7 +555,8 @@ async def check_registration_status(
                         "event_id": str(ev["_id"]),
                         "user_id": str(user_id)
                     })
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 554: {e}")
                 pass
         
         if participant:
@@ -565,5 +570,5 @@ async def check_registration_status(
         return {"status": "not_registered"}
     
     except Exception as e:
-        print(f"[ERROR] check_registration_status: {e}")
+        logger.error(f"[ERROR] check_registration_status: {e}")
         return {"error": str(e)}

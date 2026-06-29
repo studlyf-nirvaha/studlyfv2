@@ -239,7 +239,8 @@ async def get_problem(problem_id: str, user: dict = Depends(get_auth_user)):
     institution_id = await _get_institution_id(user)
     try:
         obj_id = ObjectId(problem_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 242: {e}")
         raise HTTPException(400, "Invalid problem ID")
 
     pipeline = [
@@ -308,7 +309,8 @@ async def update_problem(
     await ensure_package_enabled(institution_id)
     try:
         obj_id = ObjectId(problem_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 311: {e}")
         raise HTTPException(400, "Invalid problem ID")
 
     existing = await hackathon_problems_col.find_one({"_id": obj_id, "institution_id": institution_id})
@@ -345,7 +347,8 @@ async def delete_problem(problem_id: str, user: dict = Depends(get_auth_user)):
     await ensure_package_enabled(institution_id)
     try:
         obj_id = ObjectId(problem_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 348: {e}")
         raise HTTPException(400, "Invalid problem ID")
 
     result = await hackathon_problems_col.delete_one({"_id": obj_id, "institution_id": institution_id})
@@ -418,7 +421,8 @@ async def select_problem(
     await ensure_package_enabled(institution_id)
     try:
         obj_id = ObjectId(problem_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 421: {e}")
         raise HTTPException(400, "Invalid problem ID")
 
     problem = await hackathon_problems_col.find_one({"_id": obj_id, "institution_id": institution_id})

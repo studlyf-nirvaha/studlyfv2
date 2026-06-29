@@ -4,6 +4,9 @@ from bson import ObjectId
 from datetime import datetime
 from typing import List, Optional
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 def _strict_team_size_limits(event_data: dict) -> Optional[tuple[int, int]]:
@@ -71,14 +74,14 @@ async def _create_opportunity_for_event(event_data: dict, opportunities_col):
                 {"_id": existing_opp["_id"]},
                 {"$set": opp_data}
             )
-            print(f"[SYNC] Updated opportunity for event {event_id_str}")
+            logger.info(f"[SYNC] Updated opportunity for event {event_id_str}")
         else:
             # Create new opportunity
             opp_data["createdAt"] = datetime.utcnow()
             result = await opportunities_col.insert_one(opp_data)
-            print(f"[SYNC] Created opportunity {result.inserted_id} for event {event_id_str}")
+            logger.info(f"[SYNC] Created opportunity {result.inserted_id} for event {event_id_str}")
     except Exception as e:
-        print(f"[WARNING] Failed to create opportunity mirror: {e}")
+        logger.error(f"[WARNING] Failed to create opportunity mirror: {e}")
         # Don't fail event creation if opportunity sync fails
         pass
 
@@ -91,7 +94,7 @@ async def _seed_default_email_templates(event_data: dict):
         if event_id and institution_id:
             await seed_default_templates(event_id, institution_id)
     except Exception as e:
-        print(f"[WARNING] Failed to seed email templates: {e}")
+        logger.error(f"[WARNING] Failed to seed email templates: {e}")
         pass
 
 async def create_event(event_data: dict):
@@ -165,7 +168,8 @@ async def get_event_by_id(event_id: str):
                     existing = await opportunities_col.find_one({"event_link_id": str(doc["_id"])})
                     if not existing:
                         asyncio.create_task(_create_opportunity_for_event(doc, opportunities_col))
-                except:
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 168: {e}")
                     pass
         
         return doc

@@ -56,7 +56,6 @@ const RightHoverPanel: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    console.log('RightHoverPanel open state:', open);
   }, [open]);
 
   const openGuide = () => {
@@ -86,7 +85,6 @@ const RightHoverPanel: React.FC = () => {
         <button
           ref={handleRef}
           aria-label="Open guide"
-          onClick={(e) => { e.stopPropagation(); console.log('Guide open (fixed) clicked'); openGuide(); }}
           className={`fixed right-4 bottom-5 z-[99999] flex items-center justify-center w-12 h-28 rounded-full bg-gradient-to-b from-purple-700 to-indigo-600 shadow-2xl text-white transition-all duration-500 ease-out cursor-pointer ${menuMounted ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto hover:scale-105'}`}
         >
           <div className="rotate-90 tracking-wide text-sm">GUIDE</div>
@@ -99,7 +97,6 @@ const RightHoverPanel: React.FC = () => {
           {/* backdrop to capture outside clicks and close the menu */}
           <div
             className={`fixed inset-0 z-[9998] bg-black/10 transition-opacity duration-500 ease-out ${menuClosing ? 'opacity-0' : 'opacity-100'}`}
-            onClick={() => { console.log('backdrop clicked'); closeGuide(); }}
             aria-hidden
           />
           <div className={`fixed right-4 bottom-5 z-[9999] transition-all duration-500 ease-[cubic-bezier(.16,1,.3,1)] ${menuClosing ? 'opacity-0 scale-90 translate-y-8' : 'opacity-100 scale-100 translate-y-0'}`}>
@@ -126,7 +123,6 @@ const RightHoverPanel: React.FC = () => {
 
             {/* close button placed outside decorative layer so it receives clicks */}
             <button
-              onClick={(e) => { e.stopPropagation(); console.log('Close guide clicked'); closeGuide(); }}
               aria-label="Close guide"
               title="Close"
               className="absolute z-50 flex items-center justify-center w-9 h-9 rounded-full bg-pink-500 text-white shadow-lg transition-transform duration-300 hover:scale-110"
@@ -147,7 +143,6 @@ const RightHoverPanel: React.FC = () => {
                       key={it.key}
                       onClick={(e) => {
                           e.stopPropagation();
-                          console.log('guide item clicked', it.key, it.route);
                           // Close the circle immediately so the bar returns
                           closeGuide(() => {
                             if (it.route && it.route !== '#') navigate(it.route);

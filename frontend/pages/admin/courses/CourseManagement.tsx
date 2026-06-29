@@ -513,12 +513,6 @@ const CourseManagement: React.FC = () => {
                 (coursePayload as any)._id = customId;
             }
 
-            console.log('Publishing course (via POST)...', {
-                url,
-                payload: coursePayload,
-                editingId: editingCourseId
-            });
-
             const res = await fetch(url, {
                 method: method,
                 headers: {

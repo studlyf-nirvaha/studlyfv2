@@ -8,6 +8,9 @@ from enum import Enum
 from db import events_col, participants_col, submissions_col, notifications_col, audit_logs_col
 from bson import ObjectId
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
+
 
 class EventStatus(str, Enum):
     DRAFT = "DRAFT"
@@ -59,7 +62,7 @@ class EventLifecycleService:
                 "status": event_doc["status"]
             }
         except Exception as e:
-            print(f"Event Creation Error: {e}")
+            logger.error(f"Event Creation Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -133,7 +136,7 @@ class EventLifecycleService:
                 "message": f"Event transitioned to {new_status.value}"
             }
         except Exception as e:
-            print(f"Status Transition Error: {e}")
+            logger.error(f"Status Transition Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -184,7 +187,7 @@ class EventLifecycleService:
                         "created_at": datetime.now(timezone.utc)
                     })
         except Exception as e:
-            print(f"Notification Error: {e}")
+            logger.error(f"Notification Error: {e}")
 
     @staticmethod
     async def auto_enforce_deadlines() -> Dict[str, Any]:
@@ -227,7 +230,7 @@ class EventLifecycleService:
             results["processed"] = len(live_events) + len(eval_events)
             return results
         except Exception as e:
-            print(f"Deadline Enforcement Error: {e}")
+            logger.error(f"Deadline Enforcement Error: {e}")
             return {"error": str(e)}
 
     @staticmethod
@@ -268,7 +271,7 @@ class EventLifecycleService:
                 )
             }
         except Exception as e:
-            print(f"Lifecycle Status Error: {e}")
+            logger.error(f"Lifecycle Status Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod

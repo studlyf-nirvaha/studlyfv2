@@ -4,6 +4,9 @@ Direct Sync Routes - Simple, direct stage synchronization
 from fastapi import APIRouter
 from datetime import datetime
 from db import events_col, opportunities_col
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/direct-sync", tags=["Direct Sync"])
 
@@ -13,15 +16,15 @@ async def force_update_all_opportunities(event_id: str):
     from bson import ObjectId
     from pymongo import UpdateOne
     try:
-        print(f"DIRECT SYNC: Force updating all opportunities for event: {event_id}")
+        logger.info(f"DIRECT SYNC: Force updating all opportunities for event: {event_id}")
         
         # Get the event
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
+        event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
         if not event:
             return {"success": False, "message": "Event not found"}
         
         event_stages = event.get("stages", [])
-        print(f"DIRECT SYNC: Event has {len(event_stages)} stages")
+        logger.info(f"DIRECT SYNC: Event has {len(event_stages)} stages")
         
         # Determine registration deadline
         deadline = event.get("registration_deadline") or event.get("registrationDeadline")
@@ -58,7 +61,7 @@ async def force_update_all_opportunities(event_id: str):
             
         result = await opportunities_col.bulk_write(bulk_operations)
         updated_count = result.modified_count
-        print(f"DIRECT SYNC: Updated {updated_count} opportunities via bulk write")
+        logger.info(f"DIRECT SYNC: Updated {updated_count} opportunities via bulk write")
         
         return {
             "success": True,
@@ -68,7 +71,7 @@ async def force_update_all_opportunities(event_id: str):
         }
         
     except Exception as e:
-        print(f"DIRECT SYNC ERROR: {str(e)}")
+        logger.error(f"DIRECT SYNC ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
         return {"success": False, "message": f"Error: {str(e)}"}

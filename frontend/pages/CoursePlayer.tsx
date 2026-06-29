@@ -378,7 +378,6 @@ const CoursePlayer: React.FC = () => {
       const data = await res.json();
       return data;
     } catch (err) {
-      console.warn("Failed to sync progress with database, persisting locally.", err);
     }
   };
 
@@ -1302,7 +1301,6 @@ const CoursePlayer: React.FC = () => {
                             setActiveStage('result');
                             scrollContentTop();
                           } catch (err) {
-                            console.warn("Failed to sync project with server, graduated locally.", err);
                             alert("Project submitted locally! Your certificate has been unlocked!");
                             setActiveModuleIndex(-3);
                             setActiveStage('result');

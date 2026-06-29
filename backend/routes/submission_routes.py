@@ -32,7 +32,7 @@ async def submit_project(data: dict = Body(...), current_user: dict = Depends(ge
         team_name = ""
         if team_id:
             from db import teams_col
-            team = await teams_col.find_one({"_id": ObjectId(team_id)})
+            team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
             if not team:
                 raise HTTPException(status_code=404, detail="Team not found")
 
@@ -151,7 +151,7 @@ async def notify_shortlisted(
             
             # Verify event ownership
             event_id = str(sub.get("event_id"))
-            event = await events_col.find_one({"_id": ObjectId(event_id)})
+            event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
             if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
                 results["failed"] += 1
                 results["logs"].append(f"Sub {sub_id}: Permission denied")
@@ -218,7 +218,7 @@ async def admin_view_event_submissions(
         
         # Get event and verify ownership
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             
@@ -322,7 +322,7 @@ async def admin_view_stage_submissions(
     try:
         # Verify event ownership
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             
@@ -500,7 +500,7 @@ async def admin_view_submission_history(
     try:
         # Get submission
         try:
-            sub_id = ObjectId(submission_id)
+            sub_id = (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)
         except Exception:
             sub_id = submission_id
         
@@ -511,7 +511,7 @@ async def admin_view_submission_history(
         # Verify event ownership
         event_id = str(sub.get("event_id"))
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             

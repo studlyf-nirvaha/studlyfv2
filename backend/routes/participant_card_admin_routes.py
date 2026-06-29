@@ -2,6 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from bson import ObjectId
 from db import events_col
 from auth_institution import get_auth_user
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/v1/institution/events", tags=["Participant Card Admin"])
 
@@ -28,8 +31,9 @@ async def get_card_config(
     user: dict = Depends(get_auth_user),
 ):
     try:
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
-    except:
+        event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
+    except Exception as e:
+        logger.warning(f"Handled exception at line 32: {e}")
         event = None
     if not event:
         raise HTTPException(404, "Event not found")
@@ -52,8 +56,9 @@ async def update_card_config(
         raise HTTPException(403, "Institution access required")
 
     try:
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
-    except:
+        event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
+    except Exception as e:
+        logger.warning(f"Handled exception at line 56: {e}")
         event = None
     if not event:
         raise HTTPException(404, "Event not found")
@@ -64,7 +69,7 @@ async def update_card_config(
     links = config.get("links", [])
 
     await events_col.update_one(
-        {"_id": ObjectId(event_id)},
+        {"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)},
         {
             "$set": {
                 "participant_card_config.cardStyle.backgroundFrom": card_style.get("backgroundFrom", DEFAULT_CARD_CONFIG["cardStyle"]["backgroundFrom"]),

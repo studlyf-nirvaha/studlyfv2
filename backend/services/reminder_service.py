@@ -32,7 +32,8 @@ class ReminderService:
                 deadline = datetime.fromisoformat(event["submission_deadline"].replace('Z', '+00:00'))
                 if now < deadline <= soon:
                     active_events.append(event)
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 35: {e}")
                 continue
                 
         if not active_events:

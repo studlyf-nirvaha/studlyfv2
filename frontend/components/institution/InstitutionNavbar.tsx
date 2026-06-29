@@ -369,7 +369,6 @@ const InstitutionNavbar: React.FC<{ refreshKey?: number, onNavigate?: (tab: stri
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => {
-                                    console.log("Notification Bell Clicked! Current State:", !isNotifOpen);
                                     setIsNotifOpen(!isNotifOpen);
                                 }}
                                 className="relative p-3.5 bg-white/10 border border-white/10 rounded-2xl text-white hover:bg-white/20 transition-all group overflow-visible"

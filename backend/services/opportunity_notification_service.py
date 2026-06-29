@@ -13,6 +13,9 @@ from db import db, users_col, opportunities_col, events_col, participants_col
 from services.email_service import send_notification_email
 from services.email_template_service import get_active_template, render_template
 from bson import ObjectId
+import logging
+logger = logging.getLogger(__name__)
+
 
 opportunity_emails_log_col = db["opportunity_emails_log"]
 
@@ -96,19 +99,19 @@ async def send_new_opportunity_email(opportunity: dict, event: dict = None) -> d
 
             except Exception as e:
                 failed_count += 1
-                print(f"[EMAIL FAIL] {user.get('email')}: {str(e)}")
+                logger.info(f"[EMAIL FAIL] {user.get('email')}: {str(e)}")
 
         if log_entries:
             try:
                 await opportunity_emails_log_col.insert_many(log_entries, ordered=False)
             except Exception as log_err:
-                print(f"[LOG FAIL] Failed to bulk insert logs: {str(log_err)}")
+                logger.error(f"[LOG FAIL] Failed to bulk insert logs: {str(log_err)}")
 
-        print(f"[EMAIL] New opportunity: sent={sent_count}, failed={failed_count}")
+        logger.error(f"[EMAIL] New opportunity: sent={sent_count}, failed={failed_count}")
         return {"sent_count": sent_count, "failed_count": failed_count, "opportunity_id": opp_id}
 
     except Exception as e:
-        print(f"[EMAIL ERROR] send_new_opportunity_email: {str(e)}")
+        logger.error(f"[EMAIL ERROR] send_new_opportunity_email: {str(e)}")
         return {"sent_count": sent_count, "failed_count": failed_count, "error": str(e)}
 
 
@@ -192,15 +195,15 @@ async def send_deadline_reminder_emails(days_until: int = 3) -> dict:
                         })
                     except Exception as e:
                         failed_count += 1
-                        print(f"Failed to send reminder to {user.get('email')}: {str(e)}")
+                        logger.error(f"Failed to send reminder to {user.get('email')}: {str(e)}")
             except Exception as e:
-                print(f"Error processing opportunity {opp_id}: {str(e)}")
+                logger.error(f"Error processing opportunity {opp_id}: {str(e)}")
         
-        print(f"Deadline reminder emails ({days_until}d) sent: {sent_count}, failed: {failed_count}")
+        logger.error(f"Deadline reminder emails ({days_until}d) sent: {sent_count}, failed: {failed_count}")
         return {"sent_count": sent_count, "failed_count": failed_count, "days_until": days_until}
         
     except Exception as e:
-        print(f"Error in send_deadline_reminder_emails: {str(e)}")
+        logger.error(f"Error in send_deadline_reminder_emails: {str(e)}")
         return {"sent_count": 0, "failed_count": 0, "error": str(e)}
 
 
@@ -308,12 +311,12 @@ async def send_daily_digest_email() -> dict:
                 })
             except Exception as e:
                 failed_count += 1
-                print(f"Failed to send digest to {user.get('email')}: {str(e)}")
+                logger.error(f"Failed to send digest to {user.get('email')}: {str(e)}")
         
-        print(f"Daily digest emails sent: {sent_count}, failed: {failed_count}")
+        logger.error(f"Daily digest emails sent: {sent_count}, failed: {failed_count}")
         return {"sent_count": sent_count, "failed_count": failed_count, "opportunities_count": len(upcoming_opps)}
         
     except Exception as e:
-        print(f"Error in send_daily_digest_email: {str(e)}")
+        logger.error(f"Error in send_daily_digest_email: {str(e)}")
         return {"sent_count": 0, "failed_count": 0, "error": str(e)}
 

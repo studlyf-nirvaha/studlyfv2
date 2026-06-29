@@ -190,7 +190,7 @@ async def learner_view_quiz(event_id: str, quiz_id: str, user: dict = Depends(ge
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     from bson.errors import InvalidId
-    quiz_query = {"_id": ObjectId(quiz_id), "$or": [{"event_id": resolved_eid}]}
+    quiz_query = {"_id": (ObjectId(quiz_id) if ObjectId.is_valid(quiz_id) else quiz_id), "$or": [{"event_id": resolved_eid}]}
     try:
         quiz_query["$or"].append({"event_id": ObjectId(resolved_eid)})
     except (InvalidId, ValueError):
@@ -269,7 +269,7 @@ async def learner_submit_quiz(event_id: str, quiz_id: str, payload: dict = Body(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     from bson.errors import InvalidId
-    quiz_query = {"_id": ObjectId(quiz_id), "$or": [{"event_id": resolved_eid}]}
+    quiz_query = {"_id": (ObjectId(quiz_id) if ObjectId.is_valid(quiz_id) else quiz_id), "$or": [{"event_id": resolved_eid}]}
     try:
         quiz_query["$or"].append({"event_id": ObjectId(resolved_eid)})
     except (InvalidId, ValueError):
@@ -362,20 +362,20 @@ async def list_event_stage_submissions(event_id: str, user: dict = Depends(get_a
     from bson import ObjectId
     
     try:
-        print(f"DEBUG: Fetching stage submissions for event_id: {event_id}")
+        logger.info(f"DEBUG: Fetching stage submissions for event_id: {event_id}")
         
         # Validate event_id format
         try:
-            ObjectId(event_id)
+            (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception as ve:
-            print(f"DEBUG: Invalid event_id format: {event_id}")
+            logger.info(f"DEBUG: Invalid event_id format: {event_id}")
             raise HTTPException(status_code=400, detail=f"Invalid event_id format: {str(ve)}")
         
         cursor = submission_data_col.find({"event_id": str(event_id)})
         items = []
         async for doc in cursor:
             doc["_id"] = str(doc["_id"])
-            print(f"DEBUG: Processing submission document: {doc['_id']}")
+            logger.info(f"DEBUG: Processing submission document: {doc['_id']}")
             
             # Try to attach team name or user name if possible
             if doc.get("team_id"):
@@ -383,7 +383,7 @@ async def list_event_stage_submissions(event_id: str, user: dict = Depends(get_a
                     team = await teams_col.find_one({"_id": ObjectId(doc["team_id"])})
                     if team: doc["team_name"] = team.get("team_name")
                 except Exception as te:
-                    print(f"DEBUG: Error fetching team {doc['team_id']}: {str(te)}")
+                    logger.error(f"DEBUG: Error fetching team {doc['team_id']}: {str(te)}")
             else:
                 user_rec = await users_col.find_one({"user_id": doc["user_id"]})
                 if user_rec: doc["user_name"] = user_rec.get("name")
@@ -431,15 +431,15 @@ async def list_event_stage_submissions(event_id: str, user: dict = Depends(get_a
             }
             items.append(h_doc)
             
-        print(f"DEBUG: Returning {len(items)} total submissions (including hackathon) for event {event_id}")
+        logger.info(f"DEBUG: Returning {len(items)} total submissions (including hackathon) for event {event_id}")
         return items
         
     except HTTPException as he:
-        print(f"DEBUG: HTTP Exception in stage submissions: {str(he)}")
+        logger.error(f"DEBUG: HTTP Exception in stage submissions: {str(he)}")
         raise he
     except Exception as e:
-        print(f"DEBUG: Unexpected error in stage submissions: {str(e)}")
-        print(f"DEBUG: Error details - Event ID: {event_id}, Error: {str(e)}")
+        logger.error(f"DEBUG: Unexpected error in stage submissions: {str(e)}")
+        logger.error(f"DEBUG: Error details - Event ID: {event_id}, Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stage submissions: {str(e)}")
 
 @router.post("/events/{event_id}/stages/{stage_id}/upload")
@@ -588,15 +588,15 @@ async def learner_upload_stage_file(
                         old_file_path = old_metadata.get("file_path")
                         if old_file_path and os.path.exists(old_file_path):
                             os.remove(old_file_path)
-                            print(f"Deleted old file: {old_file_path}")
+                            logger.info(f"Deleted old file: {old_file_path}")
                         break
                     
                     # Delete old GridFS entry
                     await bucket.delete(ObjectId(old_file_id))
         except Exception as e:
-            print(f"Warning: Could not delete old file: {str(e)}")
+            logger.warning(f"Warning: Could not delete old file: {str(e)}")
         
-        print(f"ALLOWING RE-UPLOAD for user {uid}, stage {stage_id}")
+        logger.info(f"ALLOWING RE-UPLOAD for user {uid}, stage {stage_id}")
 
     # ── Store file in filesystem and path in GridFS metadata ──────
     import os
@@ -654,7 +654,8 @@ async def learner_upload_stage_file(
         # Clean up the saved file if GridFS fails
         try:
             os.remove(file_path)
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 657: {e}")
             pass
         raise HTTPException(status_code=500, detail=f"Failed to store file metadata: {str(e)}")
 
@@ -794,7 +795,8 @@ async def add_opportunity_review(
     # Check if opportunity exists
     try:
         opp_oid = ObjectId(opportunity_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 797: {e}")
         opp_oid = opportunity_id
         
     opp = await opportunities_col.find_one({"$or": [{"_id": opp_oid}, {"_id": opportunity_id}]})
@@ -851,14 +853,16 @@ async def get_opportunity_reviews(opportunity_id: str):
     try:
         opp_oid = ObjectId(opportunity_id)
         opp = await opportunities_col.find_one({"_id": opp_oid})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 854: {e}")
         pass
     if not opp:
         opp = await opportunities_col.find_one({"event_link_id": opportunity_id})
     if not opp:
         try:
             opp = await opportunities_col.find_one({"_id": opportunity_id})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 861: {e}")
             pass
     if not opp:
         raise HTTPException(status_code=404, detail="Opportunity not found")
@@ -891,7 +895,7 @@ async def learner_submit_stage_data(
     
     # 1. Verify event and participant
     try:
-        ev_oid = ObjectId(event_id)
+        ev_oid = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid event id")
         

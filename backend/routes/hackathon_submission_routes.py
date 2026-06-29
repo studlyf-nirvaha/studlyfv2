@@ -10,6 +10,9 @@ from stage_access_control import check_stage_submission_access, check_stage_dead
 router = APIRouter(prefix="/api/hackathons", tags=["Hackathon Submissions"])
 
 from utils.db_helpers import fix_id
+import logging
+logger = logging.getLogger(__name__)
+
 
 @router.post("/submissions")
 async def create_hackathon_submission(submission: HackathonSubmission, current_user: dict = Depends(get_current_user)):
@@ -32,7 +35,8 @@ async def create_hackathon_submission(submission: HackathonSubmission, current_u
             opp = await opportunities_col.find_one({"_id": ObjectId(lookup_id)})
             if opp and opp.get("event_link_id"):
                 target_event_id = str(opp["event_link_id"])
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 35: {e}")
             pass
         
         # Derive current stage type from event stages
@@ -50,12 +54,14 @@ async def create_hackathon_submission(submission: HackathonSubmission, current_u
                     if isinstance(start, str):
                         try:
                             start = datetime.fromisoformat(start.replace("Z", "+00:00"))
-                        except:
+                        except Exception as e:
+                            logger.warning(f"Handled exception at line 53: {e}")
                             start = None
                     if isinstance(end, str):
                         try:
                             end = datetime.fromisoformat(end.replace("Z", "+00:00"))
-                        except:
+                        except Exception as e:
+                            logger.warning(f"Handled exception at line 58: {e}")
                             end = None
                     if isinstance(start, datetime) and start.tzinfo is None:
                         start = start.replace(tzinfo=timezone.utc)
@@ -70,7 +76,8 @@ async def create_hackathon_submission(submission: HackathonSubmission, current_u
                     if ev["stages"]:
                         current_stage_type = ev["stages"][0].get("type")
                         current_stage_name = ev["stages"][0].get("name", "")
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 73: {e}")
             pass
 
         # Access control: skip participant existence check for registration stages
@@ -171,7 +178,7 @@ async def create_hackathon_submission(submission: HackathonSubmission, current_u
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Submission Error: {str(e)}")
+        logger.error(f"Submission Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/events/{event_id}/submissions")
@@ -191,8 +198,9 @@ async def get_event_submissions(
     ev_variants = [event_id, str(event_id)]
     try:
         if len(str(event_id)) == 24:
-            ev_variants.append(ObjectId(event_id))
-    except:
+            ev_variants.append((ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id))
+    except Exception as e:
+        logger.warning(f"Handled exception at line 195: {e}")
         pass
     
     # Submissions might be linked to the event ID or the opportunity ID
@@ -204,7 +212,8 @@ async def get_event_submissions(
         hack_ids.append(opp_id_str)
         try:
             hack_ids.append(ObjectId(opp_id_str))
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 207: {e}")
             pass
             
     # FIX: Query by hackathonId OR eventId to be more inclusive
@@ -246,7 +255,8 @@ async def get_institution_hackathon_submissions(institution_id: str):
     try:
         if len(str(institution_id)) == 24:
             inst_variants.append(ObjectId(institution_id))
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 249: {e}")
         pass
 
     events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=None)
@@ -262,7 +272,8 @@ async def get_institution_hackathon_submissions(institution_id: str):
     try:
         event_ids.extend([ObjectId(e["_id"]) for e in events if len(str(e["_id"])) == 24])
         event_ids.extend([ObjectId(o["_id"]) for o in opps if len(str(o["_id"])) == 24])
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 265: {e}")
         pass
 
     query = {
@@ -280,7 +291,7 @@ async def get_institution_hackathon_submissions(institution_id: str):
 @router.get("/submissions/{submission_id}")
 async def get_submission(submission_id: str):
     """Get a specific submission by ID."""
-    submission = await hackathon_submissions_col.find_one({"_id": ObjectId(submission_id)})
+    submission = await hackathon_submissions_col.find_one({"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)})
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
     return fix_id(submission)
@@ -322,7 +333,7 @@ async def evaluate_submission(submission_id: str, data: dict = Body(...)):
     try:
         # 1. Update hackathon_submissions_col
         await hackathon_submissions_col.update_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {
                 "$set": {
                     "rubricScores": rubric_scores,
@@ -358,7 +369,7 @@ async def evaluate_submission(submission_id: str, data: dict = Body(...)):
         # 3. Update submission_data_col
         try:
             await submission_data_col.update_one(
-                {"_id": ObjectId(submission_id)},
+                {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
                 {"$set": {
                     "status": "Scored",
                     "total_score": total_score,
@@ -372,7 +383,7 @@ async def evaluate_submission(submission_id: str, data: dict = Body(...)):
         # 4. Update legacy submissions_col
         try:
             await submissions_col.update_one(
-                {"_id": ObjectId(submission_id)},
+                {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
                 {"$set": {
                     "status": "Reviewed",
                     "total_score": total_score,
@@ -385,7 +396,7 @@ async def evaluate_submission(submission_id: str, data: dict = Body(...)):
         # 5. Auto-advance participant if shortlisted
         try:
             sub_doc = await hackathon_submissions_col.find_one(
-                {"_id": ObjectId(submission_id)},
+                {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
                 {"eventId": 1}
             )
             event_id = (sub_doc or {}).get("eventId") or ""
@@ -419,8 +430,9 @@ async def get_hackathon_leaderboard(event_id: str, include_all: bool = Query(Fal
     ev_variants = [event_id, str(event_id)]
     try:
         if len(str(event_id)) == 24:
-            ev_variants.append(ObjectId(event_id))
-    except:
+            ev_variants.append((ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id))
+    except Exception as e:
+        logger.warning(f"Handled exception at line 423: {e}")
         pass
 
     linked_opp = await opportunities_col.find_one({"event_link_id": {"$in": ev_variants}})
@@ -431,7 +443,8 @@ async def get_hackathon_leaderboard(event_id: str, include_all: bool = Query(Fal
         hack_ids.append(opp_id_str)
         try:
             hack_ids.append(ObjectId(opp_id_str))
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 434: {e}")
             pass
 
     query = {"hackathonId": {"$in": hack_ids}}
@@ -461,8 +474,9 @@ async def get_hackathon_stats(event_id: str):
     ev_variants = [event_id, str(event_id)]
     try:
         if len(str(event_id)) == 24:
-            ev_variants.append(ObjectId(event_id))
-    except:
+            ev_variants.append((ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id))
+    except Exception as e:
+        logger.warning(f"Handled exception at line 465: {e}")
         pass
     
     linked_opp = await opportunities_col.find_one({"event_link_id": {"$in": ev_variants}})
@@ -472,7 +486,8 @@ async def get_hackathon_stats(event_id: str):
         hack_ids.append(opp_id_str)
         try:
             hack_ids.append(ObjectId(opp_id_str))
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 475: {e}")
             pass
     
     submissions = await hackathon_submissions_col.find({"hackathonId": {"$in": hack_ids}}).to_list(length=None)
@@ -520,8 +535,9 @@ async def get_my_hackathon_submission(event_id: str, current_user: dict = Depend
     try:
         from bson import ObjectId
         if len(str(event_id)) == 24:
-            ev_variants.append(ObjectId(event_id))
-    except:
+            ev_variants.append((ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id))
+    except Exception as e:
+        logger.warning(f"Handled exception at line 524: {e}")
         pass
     
     # 2. Find any team this user belongs to for this event

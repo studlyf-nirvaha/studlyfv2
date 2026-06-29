@@ -33,7 +33,7 @@ async def list_rules(
     
     if event_id:
         query["event_id"] = event_id
-        event = await db.events.find_one({"_id": ObjectId(event_id)})
+        event = await db.events.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
         if not event or str(event.get("institution_id", "")) != str(institution_id):
             raise HTTPException(status_code=403, detail="Forbidden")
     else:

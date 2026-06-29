@@ -261,9 +261,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     const [profileTypeLockedForPrefill, setProfileTypeLockedForPrefill] = useState(false);
 
     const fetchRegistrations = async () => {
-        console.log('fetchRegistrations called. eventId:', eventId, 'activeTab:', activeTab);
         if (!eventId || activeTab !== 'registrations') {
-            console.log('fetchRegistrations skipped: eventId missing or activeTab is not registrations');
             return;
         }
         setRegLoading(true);
@@ -636,7 +634,6 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
         if (!hasUnsavedChanges || saving) return;
 
         const autoSaveTimer = setTimeout(() => {
-            console.log('AUTO-SAVE: Triggering synchronization...');
             handleSaveEvent();
         }, 3000); // 3 seconds debounce for auto-save
 
@@ -1194,13 +1191,11 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 setShowSaveSuccess(true);
 
                 // Background sync - update all opportunities without blocking UI
-                console.log('DIRECT SYNC: Triggering background synchronization for event:', eventId);
                 fetch(`${API_BASE_URL}/api/direct-sync/force-update/${eventId}`, {
                     method: 'POST',
                     headers: { ...authHeaders() }
                 }).then(syncRes => {
                     if (syncRes.ok) {
-                        console.log('DIRECT SYNC: Background sync successful');
                     } else {
                         console.error('DIRECT SYNC: Background sync failed');
                     }
@@ -1246,10 +1241,8 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 alert('Upload failed: ' + (data.detail || 'Unknown error'));
                 return;
             }
-            console.log('[MediaUpload] response OK', { field, url: data.url, data });
             setEvent((prev: any) => {
                 const updated = prev ? { ...prev, [field]: data.url } : prev;
-                console.log('[MediaUpload] updated event state', { field, url: data.url, updated });
                 return updated;
             });
             if (field === 'logo_url') setLogoError(false);
@@ -1692,18 +1685,13 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
     const handleOpenJudgeAssignment = async (submissionId: string) => {
         // Fetch available judges
         try {
-            console.log('DEBUG: Fetching judges for submission:', submissionId);
             const res = await fetch(`${API_BASE_URL}/api/judges/`, { headers: { ...authHeaders() } });
-            console.log('DEBUG: Judges API response status:', res.status);
             if (res.ok) {
                 const judges = await res.json();
-                console.log('DEBUG: Judges data received:', judges);
                 setAvailableJudges(judges);
                 setJudgeAssignmentModal({ isOpen: true, submissionId });
             } else {
-                console.log('DEBUG: Failed to fetch judges, status:', res.status);
                 const errorData = await res.json().catch(() => ({}));
-                console.log('DEBUG: Judges API error:', errorData);
                 alert(`Failed to load judges: ${errorData.detail || 'Unknown error'}`);
             }
         } catch (error) {

@@ -11,6 +11,9 @@ from db import (
     leaderboard_col, audit_logs_col
 )
 from bson import ObjectId
+import logging
+logger = logging.getLogger(__name__)
+
 
 class AnalyticsService:
     """Handles comprehensive institution analytics and KPI tracking."""
@@ -88,7 +91,7 @@ class AnalyticsService:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
-            print(f"Analytics KPI Error: {e}")
+            logger.error(f"Analytics KPI Error: {e}")
             return {}
 
     @staticmethod
@@ -127,7 +130,7 @@ class AnalyticsService:
                 ]
             }
         except Exception as e:
-            print(f"Conversion Funnel Error: {e}")
+            logger.error(f"Conversion Funnel Error: {e}")
             return {"funnel_stages": []}
 
     @staticmethod
@@ -175,7 +178,7 @@ class AnalyticsService:
                 "hourly_distribution": hourly_activity
             }
         except Exception as e:
-            print(f"Engagement Metrics Error: {e}")
+            logger.error(f"Engagement Metrics Error: {e}")
             return {"registration_timeline": [], "submission_timeline": [], "hourly_distribution": []}
 
     @staticmethod
@@ -215,7 +218,7 @@ class AnalyticsService:
                 "by_college": by_college
             }
         except Exception as e:
-            print(f"Demographics Error: {e}")
+            logger.error(f"Demographics Error: {e}")
             return {"by_department": [], "by_year": [], "by_college": []}
 
     @staticmethod
@@ -244,7 +247,7 @@ class AnalyticsService:
                 "avg_evaluations_per_judge": sum(j["submissions_evaluated"] for j in judge_stats) / len(judge_stats) if judge_stats else 0
             }
         except Exception as e:
-            print(f"Judge Performance Error: {e}")
+            logger.error(f"Judge Performance Error: {e}")
             return {"judge_stats": [], "total_judges": 0, "avg_evaluations_per_judge": 0}
 
 # Initialize singleton

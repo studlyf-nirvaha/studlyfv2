@@ -54,11 +54,8 @@ const TeamManager: React.FC<TeamManagerProps> = ({ eventId }) => {
         setSuccess('');
 
         try {
-            console.log('DEBUG: Creating team with:', { event_id: eventId, team_name: teamName });
-            console.log('DEBUG: API_BASE_URL:', API_BASE_URL);
             
             const url = `${API_BASE_URL}/api/teams/create-secure`;
-            console.log('DEBUG: Full URL:', url);
             
             const res = await fetch(url, {
                 method: 'POST',
@@ -66,11 +63,8 @@ const TeamManager: React.FC<TeamManagerProps> = ({ eventId }) => {
                 body: JSON.stringify({ event_id: eventId, team_name: teamName }),
             });
             
-            console.log('DEBUG: Team creation response status:', res.status);
-            console.log('DEBUG: Response headers:', res.headers);
             
             const data = await res.json();
-            console.log('DEBUG: Team creation response data:', data);
             
             if (res.ok) {
                 setSuccess('Team created successfully!');

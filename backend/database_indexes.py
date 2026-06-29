@@ -19,32 +19,24 @@ class DatabaseIndexManager:
         """Create all required indexes on startup"""
         logger.info("Creating database indexes...")
         
-        try:
-            # Users collection
-            await self._create_users_indexes()
-            
-            # Institutions collection
-            await self._create_institutions_indexes()
-            
-            # Certificates collection
-            await self._create_certificates_indexes()
-            
-            # Events collection
-            await self._create_events_indexes()
-            
-            # Leaderboards collection
-            await self._create_leaderboards_indexes()
-            
-            # Email deliveries collection
-            await self._create_email_indexes()
-            
-            # Submission collections
-            await self._create_submission_indexes()
-            
-            # Audit logs collection
-            await self._create_audit_logs_indexes()
-            
-            logger.info("All indexes created successfully")
+        index_methods = [
+            ("Users", self._create_users_indexes),
+            ("Institutions", self._create_institutions_indexes),
+            ("Certificates", self._create_certificates_indexes),
+            ("Events", self._create_events_indexes),
+            ("Leaderboards", self._create_leaderboards_indexes),
+            ("Email", self._create_email_indexes),
+            ("Submissions", self._create_submission_indexes),
+            ("Audit Logs", self._create_audit_logs_indexes),
+        ]
+        
+        for name, method in index_methods:
+            try:
+                await method()
+            except Exception as e:
+                logger.error(f"Error creating {name} indexes: {e}")
+                
+        logger.info("All indexes process completed")
 
     async def _create_submission_indexes(self):
         """Indexes for submission collections"""
@@ -62,10 +54,6 @@ class DatabaseIndexManager:
             await col.create_index([("event_id", ASCENDING), ("stage_id", ASCENDING)])
             
         logger.info("✓ Submission indexes created")
-        
-        except Exception as e:
-            logger.error(f"Error creating indexes: {e}")
-            raise
     
     async def _create_users_indexes(self):
         """Indexes for users collection"""

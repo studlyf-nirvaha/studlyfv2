@@ -266,8 +266,9 @@ async def upload_event_media(
         
         # Update event in DB
         try:
-            event_id_obj = ObjectId(event_id)
-        except:
+            event_id_obj = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
+        except Exception as e:
+            logger.warning(f"Handled exception at line 270: {e}")
             event_id_obj = event_id
         
         # Try updating events collection first
@@ -679,7 +680,7 @@ async def list_event_participants(
     from db import participants_col, users_col
     
     # Verify event ownership
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="Only event hosts can view participants")
     
@@ -751,7 +752,7 @@ async def bulk_update_participant_status(
     from db import participants_col
     
     # Verify event ownership
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="Only event hosts can manage participants")
     

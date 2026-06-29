@@ -890,7 +890,6 @@ export default function MockInterview() {
                 .then(() => clearTimeout(timeoutId))
                 .catch(err => {
                     clearTimeout(timeoutId);
-                    console.warn('Backend report save failed (non-critical):', err);
                 });
         }
     };

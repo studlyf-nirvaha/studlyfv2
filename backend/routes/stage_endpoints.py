@@ -21,12 +21,14 @@ async def get_event_stages(event_id: str, user: any = Depends(get_auth_user_opti
     """Get all stages for an event with their configurations."""
     try:
         event_id_obj = ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 24: {e}")
         event_id_obj = event_id
     
     try:
         event = await events_col.find_one({"_id": event_id_obj})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 29: {e}")
         event = await events_col.find_one({"event_id": event_id})
     
     if not event:
@@ -46,12 +48,14 @@ async def get_stage_config(event_id: str, stage_id: str, user: any = Depends(get
     """Get stage configuration including fields."""
     try:
         event_id_obj = ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 49: {e}")
         event_id_obj = event_id
     
     try:
         event = await events_col.find_one({"_id": event_id_obj})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 54: {e}")
         event = await events_col.find_one({"event_id": event_id})
     
     if not event:
@@ -95,12 +99,14 @@ async def admin_view_stage_registrations(
     # Verify event ownership
     try:
         event_id_obj = ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 98: {e}")
         event_id_obj = event_id
     
     try:
         event = await events_col.find_one({"_id": event_id_obj})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 103: {e}")
         event = await events_col.find_one({"event_id": event_id})
     
     if not event:

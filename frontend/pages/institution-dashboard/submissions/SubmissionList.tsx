@@ -61,6 +61,45 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
 
     const [eventCriteria, setEventCriteria] = useState<any[]>([]);
 
+    const currentBundle: any[] = (() => {
+        const bucket = (submissions as any)?.[activeTab];
+        if (Array.isArray(bucket)) return bucket;
+        const all = (submissions as any)?.all;
+        if (Array.isArray(all)) return all;
+        return [];
+    })();
+
+    const filteredSubmissions = [
+        ...currentBundle.map(s => ({
+            ...s,
+            sourceType: s.source === 'stage_deliverable' || s.type === 'stage' ? 'stage' : 'legacy',
+            id: s.submission_id || s.team_id || s._id
+        })),
+        ...hackathonSubmissions.map(s => ({
+            _id: s._id,
+            id: s._id,
+            submission_id: s._id,
+            project_title: s.teamName,
+            team_name: s.teamLead || 'Hackathon Team',
+            event_title: s.eventName || s.hackathonId || 'Hackathon Submission',
+            total_judges: s.assignedJudgeId ? 1 : 0,
+            judges_completed: (s.evaluation_status === 'Evaluated' || s.status === 'Evaluated' || s.status === 'Pending Review') ? 1 : 0,
+            score: s.totalScore || 0,
+            status: s.status || 'Pending',
+            assignedJudgeId: s.assignedJudgeId,
+            hackathonId: s.hackathonId,
+            sourceType: 'hackathon',
+            solution: s.solution,
+            domain: s.domain
+        }))
+    ].filter(s => {
+        const matchesSearch = (s.project_title || s.stage_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             (s.team_name || s.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             (s.event_title || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesJudge = judgeFilter === 'All Judges' || s.assignedJudgeId === judgeFilter;
+        return matchesSearch && matchesJudge;
+    });
+
     useEffect(() => {
         const fetchCriteriaForSubmissions = async () => {
             if (filteredSubmissions.length > 0) {
@@ -148,7 +187,6 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
                             const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                             if (Array.isArray(parsed)) setEventPackages(parsed);
                         } catch (e) {
-                            console.warn('Failed to parse event_packages', e);
                         }
                     }
                 }
@@ -330,45 +368,6 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
         const ext = mimeMap[mime] || '';
         return 'Deliverable' + ext;
     };
-
-    const currentBundle: any[] = (() => {
-        const bucket = (submissions as any)?.[activeTab];
-        if (Array.isArray(bucket)) return bucket;
-        const all = (submissions as any)?.all;
-        if (Array.isArray(all)) return all;
-        return [];
-    })();
-
-    const filteredSubmissions = [
-        ...currentBundle.map(s => ({
-            ...s,
-            sourceType: s.source === 'stage_deliverable' || s.type === 'stage' ? 'stage' : 'legacy',
-            id: s.submission_id || s.team_id || s._id
-        })),
-        ...hackathonSubmissions.map(s => ({
-            _id: s._id,
-            id: s._id,
-            submission_id: s._id,
-                            project_title: s.teamName,
-                            team_name: s.teamLead || 'Hackathon Team',
-                            event_title: s.eventName || s.hackathonId || 'Hackathon Submission',
-            total_judges: s.assignedJudgeId ? 1 : 0,
-            judges_completed: (s.evaluation_status === 'Evaluated' || s.status === 'Evaluated' || s.status === 'Pending Review') ? 1 : 0,
-            score: s.totalScore || 0,
-            status: s.status || 'Pending',
-            assignedJudgeId: s.assignedJudgeId,
-            hackathonId: s.hackathonId,
-            sourceType: 'hackathon',
-            solution: s.solution,
-            domain: s.domain
-        }))
-    ].filter(s => {
-        const matchesSearch = (s.project_title || s.stage_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             (s.team_name || s.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             (s.event_title || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesJudge = judgeFilter === 'All Judges' || s.assignedJudgeId === judgeFilter;
-        return matchesSearch && matchesJudge;
-    });
 
     const filteredTotalPages = Math.max(1, Math.ceil(filteredSubmissions.length / limit));
     const safeFilteredPage = Math.min(page, filteredTotalPages);

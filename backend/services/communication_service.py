@@ -135,7 +135,7 @@ class CommunicationService:
                         "created_at": datetime.now(timezone.utc)
                     })
                 except Exception as e:
-                    print(f"Message send error for participant {participant.get('_id')}: {e}")
+                    logger.error(f"Message send error for participant {participant.get('_id')}: {e}")
                     failed_count += 1
             
             return {
@@ -146,7 +146,7 @@ class CommunicationService:
                 "failed": failed_count
             }
         except Exception as e:
-            print(f"Bulk Message Error: {e}")
+            logger.error(f"Bulk Message Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -181,7 +181,7 @@ class CommunicationService:
                 "campaign_id": str(result.inserted_id)
             }
         except Exception as e:
-            print(f"Campaign Creation Error: {e}")
+            logger.error(f"Campaign Creation Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -214,7 +214,7 @@ class CommunicationService:
                 } for m in messages
             ]
         except Exception as e:
-            print(f"History Fetch Error: {e}")
+            logger.error(f"History Fetch Error: {e}")
             return []
 
     @staticmethod
@@ -265,10 +265,13 @@ class CommunicationService:
                 "reminders_configured": len(reminders_config["reminders"])
             }
         except Exception as e:
-            print(f"Reminder Setup Error: {e}")
+            logger.error(f"Reminder Setup Error: {e}")
             return {"success": False, "error": str(e)}
 
 from datetime import timedelta
+import logging
+logger = logging.getLogger(__name__)
+
 
 # Initialize singleton
 communication_service = CommunicationService()

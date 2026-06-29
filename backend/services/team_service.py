@@ -10,6 +10,9 @@ from typing import Optional
 from bson import ObjectId
 
 from db import teams_col, participants_col, users_col, events_col
+import logging
+logger = logging.getLogger(__name__)
+
 
 async def create_team(
     event_id: str,
@@ -125,7 +128,7 @@ async def create_team(
             }
         }
     except Exception as e:
-        print(f"[ERROR] create_team: {e}")
+        logger.error(f"[ERROR] create_team: {e}")
         return {"error": str(e), "status": "error"}
 
 async def generate_invite_code(team_id: str, ttl_hours: int = 72) -> dict:
@@ -173,7 +176,7 @@ async def generate_invite_code(team_id: str, ttl_hours: int = 72) -> dict:
 
         return {"status": "success", "invite_code": code}
     except Exception as e:
-        print(f"[ERROR] generate_invite_code: {e}")
+        logger.error(f"[ERROR] generate_invite_code: {e}")
         return {"error": str(e)}
 
 async def join_team_with_code(
@@ -335,7 +338,7 @@ async def join_team_with_code(
             }
         }
     except Exception as e:
-        print(f"[ERROR] join_team_with_code: {e}")
+        logger.error(f"[ERROR] join_team_with_code: {e}")
         return {"error": str(e)}
 
 async def leave_team(event_id: str, user_id: str) -> dict:
@@ -391,7 +394,7 @@ async def leave_team(event_id: str, user_id: str) -> dict:
                 "message": f"You have left the team '{team.get('team_name')}'",
             }
     except Exception as e:
-        print(f"[ERROR] leave_team: {e}")
+        logger.error(f"[ERROR] leave_team: {e}")
         return {"error": str(e)}
 
 async def create_solo_team(event_id: str, user_id: str) -> dict:
@@ -464,7 +467,7 @@ async def create_solo_team(event_id: str, user_id: str) -> dict:
             }
         }
     except Exception as e:
-        print(f"[ERROR] create_solo_team: {e}")
+        logger.error(f"[ERROR] create_solo_team: {e}")
         return {"error": str(e), "status": "error"}
 
 
@@ -508,5 +511,5 @@ async def get_team_details(team_id: str) -> dict:
             }
         }
     except Exception as e:
-        print(f"[ERROR] get_team_details: {e}")
+        logger.error(f"[ERROR] get_team_details: {e}")
         return {"error": str(e)}

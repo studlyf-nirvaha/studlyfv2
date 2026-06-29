@@ -1,5 +1,8 @@
 from db import db, events_col, participants_col, opportunities_col, opportunity_applications_col
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
+
 
 async def get_institution_stats(institution_id: str):
     try:
@@ -63,7 +66,7 @@ async def get_institution_stats(institution_id: str):
             "engagement_rate": engagement_rate
         }
     except Exception as e:
-        print(f"STATS ERROR: {e}")
+        logger.error(f"STATS ERROR: {e}")
         return {
             "total_participants": 0,
             "active_ji": 0,

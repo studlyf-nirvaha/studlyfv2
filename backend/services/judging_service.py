@@ -9,6 +9,9 @@ from bson import ObjectId
 import asyncio
 import hashlib
 from difflib import SequenceMatcher
+import logging
+logger = logging.getLogger(__name__)
+
 
 class JudgingService:
     """Handles advanced judging workflows and evaluation management."""
@@ -33,7 +36,7 @@ class JudgingService:
                 "blind_mode": True
             }
         except Exception as e:
-            print(f"Blind Review Enable Error: {e}")
+            logger.error(f"Blind Review Enable Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -106,7 +109,7 @@ class JudgingService:
                 "details": similarities
             }
         except Exception as e:
-            print(f"Plagiarism Check Error: {e}")
+            logger.error(f"Plagiarism Check Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -126,7 +129,7 @@ class JudgingService:
             matcher = SequenceMatcher(None, text1, text2)
             return matcher.ratio()
         except Exception as e:
-            print(f"Similarity Calculation Error: {e}")
+            logger.error(f"Similarity Calculation Error: {e}")
             return 0.0
 
     @staticmethod
@@ -167,7 +170,7 @@ class JudgingService:
                 "consensus_required": len(judge_ids) > 1
             }
         except Exception as e:
-            print(f"Judge Assignment Error: {e}")
+            logger.error(f"Judge Assignment Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -222,7 +225,7 @@ class JudgingService:
                 "all_judges_submitted": all_submitted
             }
         except Exception as e:
-            print(f"Score Submission Error: {e}")
+            logger.error(f"Score Submission Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -271,7 +274,7 @@ class JudgingService:
             
             return {"success": True, "score_id": score_id}
         except Exception as e:
-            print(f"Score Moderation Error: {e}")
+            logger.error(f"Score Moderation Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -306,7 +309,7 @@ class JudgingService:
                 "submissions": submissions_data
             }
         except Exception as e:
-            print(f"Judge Dashboard Error: {e}")
+            logger.error(f"Judge Dashboard Error: {e}")
             return {"success": False, "error": str(e)}
 
 # Initialize singleton

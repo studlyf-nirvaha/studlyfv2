@@ -364,7 +364,6 @@ const StudOTT: React.FC = () => {
           if (!isMounted) return;
           // If browser blocks unmuted autoplay, fallback to muted
           if (e.name === 'NotAllowedError') {
-            console.warn("Autoplay with audio blocked, trying muted...");
             el.muted = true;
             el.play().catch(() => {
               if (isMounted) handleIntroEnd();

@@ -9,6 +9,9 @@ from db import (
     leaderboard_col, participants_col, submissions_col
 )
 from bson import ObjectId
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Badge:
     """Badge definition."""
@@ -154,7 +157,7 @@ class GamificationService:
             
             return newly_earned
         except Exception as e:
-            print(f"Badge Check Error: {e}")
+            logger.error(f"Badge Check Error: {e}")
             return []
 
     @staticmethod
@@ -182,7 +185,7 @@ class GamificationService:
             badge_doc["_id"] = str(result.inserted_id)
             return badge_doc
         except Exception as e:
-            print(f"Award Badge Error: {e}")
+            logger.error(f"Award Badge Error: {e}")
             return None
 
     @staticmethod
@@ -197,7 +200,8 @@ class GamificationService:
             
             time_diff = (sub_time - reg_time).total_seconds() / 3600  # hours
             return time_diff <= 24
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 200: {e}")
             return False
 
     @staticmethod
@@ -235,7 +239,7 @@ class GamificationService:
                 "leaderboard": leaderboard_data
             }
         except Exception as e:
-            print(f"Leaderboard Error: {e}")
+            logger.error(f"Leaderboard Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -288,7 +292,7 @@ class GamificationService:
                 "total_points": total_points
             }
         except Exception as e:
-            print(f"Achievements Fetch Error: {e}")
+            logger.error(f"Achievements Fetch Error: {e}")
             return {"error": str(e)}
 
     @staticmethod
@@ -321,7 +325,7 @@ class GamificationService:
                 "rank": rank
             }
         except Exception as e:
-            print(f"Leaderboard Entry Error: {e}")
+            logger.error(f"Leaderboard Entry Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -347,7 +351,7 @@ class GamificationService:
                 "top_badges": top_badges
             }
         except Exception as e:
-            print(f"Stats Error: {e}")
+            logger.error(f"Stats Error: {e}")
             return {}
 
 # Initialize singleton

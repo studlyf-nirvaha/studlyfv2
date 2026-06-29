@@ -59,7 +59,7 @@ if sentry_dsn:
         traces_sample_rate=0.1,
         send_default_pii=False,
     )
-    print("Sentry initialized")
+    logger.info("Sentry initialized")
 
 from routes.skill_assessment_controller import router as skill_assessment_router
 app.include_router(skill_assessment_router)
@@ -213,7 +213,15 @@ async def startup_event():
     """Handle startup tasks including database connection and scheduler."""
     # Attempt database connection; allow failures to propagate so the
     # process fails fast when no real MongoDB is available.
+    from db import db
     await db.connect()
+    
+    try:
+        from database_indexes import initialize_database
+        if db.db is not None:
+            await initialize_database(db.db)
+    except Exception as e:
+        logger.error(f"Failed to initialize database indexes: {e}")
     
     # Spawn background stage email queue worker
     try:
@@ -638,7 +646,7 @@ async def log_admin_action(admin_email: str, action: str, details: str = ""):
         await audit_logs_col.insert_one(log_entry)
         return True
     except Exception as e:
-        print(f"Log Error: {e}")
+        logger.error(f"Log Error: {e}")
         return False
 
 # --- Badge Helper Functions (No app dependency) ---
@@ -780,7 +788,7 @@ async def review_resume_ai(req: ResumeReviewRequest):
         return {"suggestions": suggestions} # Wrap in an object for the frontend
 
     except Exception as e:
-        print(f"AI ERROR: {e}")
+        logger.error(f"AI ERROR: {e}")
         return {"suggestions": [
             "Use stronger action verbs (e.g., 'Spearheaded', 'Orchestrated').",
             "Quantify your results with percentages or dollar amounts.",
@@ -935,7 +943,7 @@ from fastapi import Request
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"GLOBAL ERROR: {exc}")
+    logger.error(f"GLOBAL ERROR: {exc}")
     traceback.print_exc()
     response = JSONResponse(
         status_code=500,
@@ -1173,7 +1181,7 @@ async def toggle_ad(ad_id: str):
 @app.post("/api/assessment/generate")
 async def generate_assessment(req: AssessmentRequest):
 
-    print(f"AI Assessment Triggered: {req.role} @ {req.company}")
+    logger.info(f"AI Assessment Triggered: {req.role} @ {req.company}")
     prompt = f"""
     Act as a Tier-1 Tech Recruiter and Technical Interviewer.
     Generate a highly realistic, clinical-grade technical assessment protocol for:
@@ -1224,7 +1232,7 @@ async def generate_assessment(req: AssessmentRequest):
         data = json.loads(clean_json_string(response.choices[0].message.content))
         return data
     except Exception as e:
-        print(f"Error generating assessment: {e}")
+        logger.error(f"Error generating assessment: {e}")
         raise HTTPException(status_code=500, detail="AI generation failed. Using local fallback.")
 
 # Get Groq API key from environment
@@ -1261,9 +1269,9 @@ def get_github_data(token: str, endpoint: str, session=None):
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"GitHub API {endpoint} failed with {response.status_code} using {auth_header.split()[0]}")
+                logger.error(f"GitHub API {endpoint} failed with {response.status_code} using {auth_header.split()[0]}")
         except Exception as e:
-            print(f"GitHub API Error for {endpoint}: {e}")
+            logger.error(f"GitHub API Error for {endpoint}: {e}")
             
     return None
 
@@ -1530,7 +1538,7 @@ async def generate_ai_quiz(module_id: str, theory_content: str):
         await quizzes_col.insert_one(quiz_data)
         return fix_id(quiz_data)
     except Exception as e:
-        print(f"Error generating AI Quiz: {e}")
+        logger.error(f"Error generating AI Quiz: {e}")
         return None
 
 
@@ -1793,7 +1801,7 @@ def extract_text_from_pdf(file_path):
             for page in pdf.pages:
                 text += page.extract_text() or ""
     except Exception as e:
-        print(f"Error reading PDF: {e}")
+        logger.error(f"Error reading PDF: {e}")
     return text
 
 def extract_text_from_docx(file_path):
@@ -1801,7 +1809,7 @@ def extract_text_from_docx(file_path):
         doc = docx.Document(file_path)
         return "\n".join([p.text for p in doc.paragraphs])
     except Exception as e:
-        print(f"Error reading DOCX: {e}")
+        logger.error(f"Error reading DOCX: {e}")
         return ""
 
 def clean_json_string(json_str):
@@ -1820,7 +1828,8 @@ def clean_json_results(raw_str):
         if match:
             return json.loads(match.group(1))
         return json.loads(raw_str)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 1831: {e}")
         # 2. Fallback: split by lines and look for bullet points
         lines = [l.strip("- ").strip("123. ") for l in raw_str.split('\n') if len(l) > 10]
         return lines[:3]
@@ -1863,7 +1872,7 @@ def parse_with_groq(text):
         json_str = clean_json_string(response.choices[0].message.content)
         return json.loads(json_str)
     except Exception as e:
-        print(f"AI Parse Error: {e}")
+        logger.error(f"AI Parse Error: {e}")
         return parse_resume_text(text)
 
 @app.post("/generate-portfolio/")
@@ -1903,14 +1912,14 @@ async def generate_portfolio(
     if extracted_text:
         # Try Groq AI First
         try:
-            print("Attempting Groq Parsing...")
+            logger.info("Attempting Groq Parsing...")
             data = parse_with_groq(extracted_text)
             # Validate essential fields
             if not data.get("name") and not data.get("email"):
                  raise Exception("AI returned empty data")
-            print("Groq Parsing Success")
+            logger.info("Groq Parsing Success")
         except Exception as e:
-            print(f"AI Parse Error (Fallback to Regex): {e}")
+            logger.error(f"AI Parse Error (Fallback to Regex): {e}")
             # Fallback to deterministic parser
             data = parse_resume_text(extracted_text)
 
@@ -2342,7 +2351,7 @@ async def generate_summary(data: ResumeData):
         
         return {"summary": summary}
     except Exception as e:
-        print(f"Summary Gen Error: {e}")
+        logger.error(f"Summary Gen Error: {e}")
         return {"summary": "Experienced professional dedicated to delivering high-quality solutions."}
 
 
@@ -2357,7 +2366,7 @@ async def generate_resume(data: ResumeData):
         current_data = data.dict()
         if not current_data.get("summary"):
             try:
-                print("Generating AI Summary automatically...")
+                logger.info("Generating AI Summary automatically...")
                 # Repurpose the prompt logic here or call internal function
                 prompt = f"""
                 You are a world-class Resume Writer. Write a 2-3 sentence professional summary for a candidate with the following details:
@@ -2379,7 +2388,7 @@ async def generate_resume(data: ResumeData):
                 )
                 current_data["summary"] = response.choices[0].message.content.strip()
             except Exception as e:
-                print(f"Auto Gen Summary Error: {e}")
+                logger.error(f"Auto Gen Summary Error: {e}")
 
 
         # 1. Map template_id to filename
@@ -2414,7 +2423,7 @@ async def generate_resume(data: ResumeData):
              subprocess.run(["pdflatex", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
              compiler_found = True
         except FileNotFoundError:
-             print("pdflatex not found.")
+             logger.info("pdflatex not found.")
         
         if compiler_found:
             # compile in the directory to handle aux files
@@ -2428,7 +2437,7 @@ async def generate_resume(data: ResumeData):
                     "preview_image": None
                 }
             else:
-                print("Local compilation failed, trying cloud...")
+                logger.error("Local compilation failed, trying cloud...")
         
         # Cloud Fallback Layer
         cloud_success = False
@@ -2437,7 +2446,7 @@ async def generate_resume(data: ResumeData):
         # 1. Primary: latexonline.cc (POST) - Try with xelatex which might have more packages
         if not cloud_success:
             try:
-                print(f"Cloud attempt 1 (latexonline.cc POST xelatex) for {filename_base}...")
+                logger.info(f"Cloud attempt 1 (latexonline.cc POST xelatex) for {filename_base}...")
                 response = requests.post(
                     "https://latexonline.cc/compile", 
                     params={'engine': 'xelatex'},
@@ -2450,14 +2459,14 @@ async def generate_resume(data: ResumeData):
                         f.write(response.content)
                     cloud_success = True
                 else:
-                    print(f"Cloud 1 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
+                    logger.error(f"Cloud 1 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
             except Exception as e:
-                print(f"Cloud 1 Error: {e}")
+                logger.error(f"Cloud 1 Error: {e}")
 
         # 2. Secondary: texlive.net (Robust Multipart)
         if not cloud_success:
             try:
-                print(f"Cloud attempt 2 (texlive.net Multipart) for {filename_base}...")
+                logger.info(f"Cloud attempt 2 (texlive.net Multipart) for {filename_base}...")
                 # texlive.net requires array syntax [] and 'document.tex' as main
                 payload = {
                     'engine': 'pdflatex',
@@ -2479,14 +2488,14 @@ async def generate_resume(data: ResumeData):
                         f.write(response.content)
                     cloud_success = True
                 else:
-                    print(f"Cloud 2 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
+                    logger.error(f"Cloud 2 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
             except Exception as e:
-                print(f"Cloud 2 Error: {e}")
+                logger.error(f"Cloud 2 Error: {e}")
 
         # 3. Tertiary: latexonline.cc (GET fallback)
         if not cloud_success:
             try:
-                print(f"Cloud attempt 3 (latexonline.cc GET) for {filename_base}...")
+                logger.info(f"Cloud attempt 3 (latexonline.cc GET) for {filename_base}...")
                 response = requests.get(
                     "https://latexonline.cc/compile",
                     params={'text': latex_code, 'engine': 'pdflatex'},
@@ -2498,9 +2507,9 @@ async def generate_resume(data: ResumeData):
                         f.write(response.content)
                     cloud_success = True
                 else:
-                    print(f"Cloud 3 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
+                    logger.error(f"Cloud 3 failed. Status: {response.status_code}, Preview: {response.content[:200]}")
             except Exception as e:
-                print(f"Cloud 3 Error: {e}")
+                logger.error(f"Cloud 3 Error: {e}")
 
         if cloud_success:
             return {
@@ -3274,7 +3283,7 @@ async def generate_interviewer_persona(company: str, round_type: str, experience
             {"role": "user", "content": prompt},
         ], temperature=0.6, max_tokens=400)
     except Exception as e:
-        print(f"Error generating Grok persona: {e}")
+        logger.error(f"Error generating Grok persona: {e}")
         return fallback_persona(company, round_type)
 
 
@@ -3345,7 +3354,7 @@ def analyze_candidate_answer(session: Dict[str, Any], current_round: Dict[str, A
         ], temperature=0.2, max_tokens=450)
         return sanitize_answer_analysis(raw, question, answer, round_type)
     except Exception as exc:
-        print(f"Answer analysis fallback triggered: {exc}")
+        logger.info(f"Answer analysis fallback triggered: {exc}")
         return fallback_answer_analysis(question, answer, round_type)
 
 
@@ -3458,7 +3467,8 @@ async def setup_interview(req: InterviewSetupRequest, x_groq_api_key: Optional[s
             api_key=x_groq_api_key
         )
         first_question = first_q_data["interviewer_text"]
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 3469: {e}")
         first_question = "Welcome. Let's start with a brief overview of your technical background and a project you're most proud of."
 
     session = {
@@ -3593,7 +3603,7 @@ async def interview_chat(req: InterviewInteractionRequest, x_groq_api_key: Optio
             "answer_analysis": recent_analysis,
         }
     except Exception as e:
-        print(f"Chat Error: {e}")
+        logger.error(f"Chat Error: {e}")
         fallback_question = "Could you give me a concrete example with the technical decisions you made?" if round_type == "technical" else "Could you walk me through a specific example and the result?"
         new_history.append({"role": "interviewer", "content": fallback_question, "round_index": req.round_index})
         await interviews_col.update_one(
@@ -3705,7 +3715,7 @@ async def voice_analysis(req: InterviewInteractionRequest, x_groq_api_key: Optio
             "is_round_complete": is_over
         }
     except Exception as e:
-        print(f"Voice Analysis Error: {e}")
+        logger.error(f"Voice Analysis Error: {e}")
         return {"interviewer_response": "I see. Thank you for that. Let's wrap up.", "is_call_over": True, "is_round_complete": True}
 
 
@@ -3812,10 +3822,10 @@ async def get_interview_report(session_id: str):
                 "verdict": str(grok_report.get("verdict") or fallback_report["verdict"]),
             }
         except asyncio.TimeoutError:
-            print(f"Report Generation Timeout (10s) - Using fallback report")
+            logger.info(f"Report Generation Timeout (10s) - Using fallback report")
             report = {**fallback_report, "detailed_analysis": detailed_analysis}
     except Exception as e:
-        print(f"Report Generation Error: {e}")
+        logger.error(f"Report Generation Error: {e}")
         report = {**fallback_report, "detailed_analysis": detailed_analysis}
 
     await interviews_col.update_one(
@@ -3877,7 +3887,9 @@ async def get_admin_stats():
                 c_doc = await courses_col.find_one({"_id": cid})
                 name = c_doc.get("title", cid) if c_doc else cid
                 track_dist[name] = t["count"]
-        except: pass
+        except Exception as e:
+            logger.warning(f"Handled exception at line 3888: {e}")
+            pass
         
         # Fallback for display if empty
         if not track_dist:
@@ -3908,7 +3920,7 @@ async def get_admin_stats():
             ]
         }
     except Exception as e:
-        print(f"Stats Error: {e}")
+        logger.error(f"Stats Error: {e}")
         return {"error": str(e)}
 
 @app.get("/api/admin/students", dependencies=[Depends(admin_required)])
@@ -3922,7 +3934,7 @@ async def get_admin_students():
             students.append(doc)
         return students
     except Exception as e:
-        print(f"Error fetching students: {e}")
+        logger.error(f"Error fetching students: {e}")
         return []
 
 @app.post("/api/admin/register-student", dependencies=[Depends(admin_required)])
@@ -4005,7 +4017,7 @@ async def upload_admin_certificate(file: UploadFile = File(...)):
             "url": f"{BASE_URL}/uploads/certificates/{filename}"
         }
     except Exception as e:
-        print(f"Cert Upload Error: {e}")
+        logger.error(f"Cert Upload Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload certificate")
 
 @app.post("/api/admin/upload-image", dependencies=[Depends(admin_required)])
@@ -4025,7 +4037,7 @@ async def upload_admin_image(file: UploadFile = File(...)):
             "url": f"{BASE_URL}/uploads/lessons/{filename}"
         }
     except Exception as e:
-        print(f"Upload Error: {e}")
+        logger.error(f"Upload Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to upload image")
 
 @app.get("/api/admin/courses", dependencies=[Depends(admin_required)])
@@ -4129,14 +4141,14 @@ async def create_admin_course(data: dict):
 
         return {"status": "success", "id": course_id, "mode": "update" if is_update else "create"}
     except Exception as e:
-        print(f"CRITICAL ERROR in create_admin_course: {e}")
+        logger.error(f"CRITICAL ERROR in create_admin_course: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/api/admin/courses/{course_id}", dependencies=[Depends(admin_required)])
 async def update_admin_course(course_id: str, data: dict):
     """Update an existing course in MongoDB"""
-    print(f"DEBUG: Updating course {course_id}")
+    logger.info(f"DEBUG: Updating course {course_id}")
     # Check if course exists
     existing = await courses_col.find_one({"_id": course_id})
     if not existing:
@@ -4213,7 +4225,7 @@ async def delete_admin_course(course_id: str):
             return {"status": "not_found", "message": "Course not found"}
             
     except Exception as e:
-        print(f"Error deleting course {course_id}: {e}")
+        logger.error(f"Error deleting course {course_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
 
 @app.get("/api/admin/hiring", dependencies=[Depends(admin_required)])
@@ -4257,7 +4269,8 @@ async def get_admin_hiring():
                     user_doc = firestore_db.collection('users').document(item["userId"]).get()
                     if user_doc.exists:
                         item["name"] = user_doc.to_dict().get("displayName", "Candidate")
-                except:
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 4268: {e}")
                     pass
                     
         return {
@@ -4270,7 +4283,7 @@ async def get_admin_hiring():
             }
         }
     except Exception as e:
-        print(f"Hiring Pipeline Error: {e}")
+        logger.error(f"Hiring Pipeline Error: {e}")
         return {"pipeline": [], "metrics": {}}
 
 @app.get("/api/admin/assessments", dependencies=[Depends(admin_required)])
@@ -4289,7 +4302,7 @@ async def get_admin_assessments():
             })
         return assessments
     except Exception as e:
-        print(f"Assessments Error: {e}")
+        logger.error(f"Assessments Error: {e}")
         return []
 
 @app.get("/api/admin/quizzes", dependencies=[Depends(admin_required)])
@@ -4301,7 +4314,7 @@ async def get_admin_quizzes():
             quizzes.append(fix_id(q))
         return quizzes
     except Exception as e:
-        print(f"Quizzes Error: {e}")
+        logger.error(f"Quizzes Error: {e}")
         return []
 
 @app.get("/api/admin/submissions", dependencies=[Depends(admin_required)])
@@ -4449,7 +4462,7 @@ async def get_admin_event_submissions(event_id: str):
             "progress_entries": progress_entries
         }
     except Exception as e:
-        print(f"Error in admin event submissions: {e}")
+        logger.error(f"Error in admin event submissions: {e}")
         return {"error": "internal_error", "detail": str(e)}
 
 @app.post("/api/admin/submissions/review", dependencies=[Depends(admin_required)])
@@ -4551,7 +4564,7 @@ async def get_admin_insights():
         
         return insights
     except Exception as e:
-        print(f"Insights Error: {e}")
+        logger.error(f"Insights Error: {e}")
         return []
 
 # --- RESUME BUILDER ENDPOINTS ---
@@ -4566,7 +4579,7 @@ async def get_user_resume(user_id: str):
         # If not found, return an empty template structure to avoid 404 in frontend logs
         return {"config": {}}
     except Exception as e:
-        print(f"Resume Fetch Error: {e}")
+        logger.error(f"Resume Fetch Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch resume")
 
 @app.post("/api/resume/{user_id}")
@@ -4581,7 +4594,7 @@ async def save_user_resume(user_id: str, data: dict):
         )
         return {"status": "success"}
     except Exception as e:
-        print(f"Resume Save Error: {e}")
+        logger.error(f"Resume Save Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to save resume")
 
 @app.get("/api/admin/mentors", dependencies=[Depends(admin_required)])
@@ -4745,7 +4758,8 @@ async def get_sdl_project(project_id: str):
     from bson import ObjectId
     try:
         doc = await sdl_projects_col.find_one({"_id": ObjectId(project_id)})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4756: {e}")
         doc = await sdl_projects_col.find_one({"_id": project_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -4754,7 +4768,8 @@ async def get_sdl_project(project_id: str):
     # Increment views
     try:
         await sdl_projects_col.update_one({"_id": ObjectId(project_id)}, {"$inc": {"views": 1}})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4765: {e}")
         pass
     
     # Fetch members
@@ -4825,7 +4840,8 @@ async def update_sdl_project(project_id: str, updates: dict):
     updates["updated_at"] = datetime.utcnow()
     try:
         await sdl_projects_col.update_one({"_id": ObjectId(project_id)}, {"$set": updates})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4836: {e}")
         await sdl_projects_col.update_one({"_id": project_id}, {"$set": updates})
     return {"message": "Project updated"}
 
@@ -4848,7 +4864,8 @@ async def update_sdl_task(task_id: str, updates: dict):
     updates["updated_at"] = datetime.utcnow()
     try:
         await sdl_tasks_col.update_one({"_id": ObjectId(task_id)}, {"$set": updates})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4859: {e}")
         await sdl_tasks_col.update_one({"_id": task_id}, {"$set": updates})
     return {"message": "Task updated"}
 
@@ -4889,7 +4906,8 @@ async def handle_sdl_join_request(request_id: str, action: dict):
     
     try:
         jr = await sdl_join_requests_col.find_one({"_id": ObjectId(request_id)})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4900: {e}")
         jr = await sdl_join_requests_col.find_one({"_id": request_id})
     
     if not jr:
@@ -4897,7 +4915,8 @@ async def handle_sdl_join_request(request_id: str, action: dict):
     
     try:
         await sdl_join_requests_col.update_one({"_id": ObjectId(request_id)}, {"$set": {"status": status}})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 4908: {e}")
         await sdl_join_requests_col.update_one({"_id": request_id}, {"$set": {"status": status}})
     
     if status == "accepted":
@@ -4934,7 +4953,8 @@ async def get_user_sdl_projects(user_id: str):
         from bson import ObjectId
         try:
             doc = await sdl_projects_col.find_one({"_id": ObjectId(pid)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 4945: {e}")
             doc = await sdl_projects_col.find_one({"_id": pid})
         if doc and doc.get("owner_id") != user_id:
             doc["_id"] = str(doc["_id"])
@@ -5011,7 +5031,8 @@ async def admin_update_sdl_project(project_id: str, updates: dict):
     updates["updated_at"] = datetime.utcnow()
     try:
         await sdl_projects_col.update_one({"_id": ObjectId(project_id)}, {"$set": updates})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 5022: {e}")
         await sdl_projects_col.update_one({"_id": project_id}, {"$set": updates})
     return {"message": "Project updated by admin"}
 
@@ -5022,7 +5043,8 @@ async def admin_delete_sdl_project(project_id: str):
     from bson import ObjectId
     try:
         pid = ObjectId(project_id)
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 5033: {e}")
         pid = project_id
     await sdl_projects_col.delete_one({"_id": pid})
     await sdl_members_col.delete_many({"project_id": project_id})
@@ -6159,7 +6181,7 @@ async def get_ai_tools():
         tools = await loop.run_in_executor(None, fetch_ai_tools)
         return tools
     except Exception as e:
-        print(f"ERROR fetching AI tools: {e}")
+        logger.error(f"ERROR fetching AI tools: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch AI tools")
 
 @app.get("/api/user/{user_id}/profile")
@@ -7006,7 +7028,7 @@ async def get_institution_stats(institution_id: str):
             "total_submissions": total_submissions
         }
     except Exception as e:
-        print(f"Stats Error: {e}")
+        logger.error(f"Stats Error: {e}")
         return {
             "total_events": 0,
             "total_participants": 0,
@@ -7066,7 +7088,7 @@ async def recalculate_institution_stats(inst_id: str):
         )
         return new_stats
     except Exception as e:
-        print(f"Stats Aggregator Error: {e}")
+        logger.error(f"Stats Aggregator Error: {e}")
         return None
 
 @app.get("/api/search")
@@ -7207,13 +7229,13 @@ async def upload_user_resume(user_id: str, file: UploadFile = File(...)):
                     for page in pdf.pages:
                         text += page.extract_text() or ""
             except Exception as e:
-                print(f"PDF extraction error: {e}")
+                logger.error(f"PDF extraction error: {e}")
         elif file.filename.lower().endswith(".docx"):
             try:
                 doc = docx.Document(io.BytesIO(file_bytes))
                 text = "\n".join([p.text for p in doc.paragraphs])
             except Exception as e:
-                print(f"DOCX extraction error: {e}")
+                logger.error(f"DOCX extraction error: {e}")
                 
         if not text.strip():
             raise HTTPException(status_code=400, detail="Could not extract text from the file.")
@@ -7222,7 +7244,8 @@ async def upload_user_resume(user_id: str, file: UploadFile = File(...)):
         parsed_data_raw = parse_with_groq(text)
         try:
             parsed_data = json.loads(parsed_data_raw)
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 7233: {e}")
             parsed_data = {}
             
         # Compute dynamic ATS Score (simple heuristic for now)
@@ -7262,7 +7285,7 @@ async def upload_user_resume(user_id: str, file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Resume Upload Error: {e}")
+        logger.error(f"Resume Upload Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/events/{event_id}/matchmaking")
@@ -7530,7 +7553,7 @@ async def register_for_event(event_id: str, participant: Participant):
 
         return {"status": "success", "registration_id": str(result.inserted_id)}
     except Exception as e:
-        print(f"Registration Error: {e}")
+        logger.error(f"Registration Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/teams/create")
@@ -7653,11 +7676,11 @@ async def notify_event_participants(event_id: str, message: str, current_user: d
                         ),
                         timeout=10.0
                     )
-                    print(f"DEBUG: Email notification sent for {user_record['email']}")
+                    logger.info(f"DEBUG: Email notification sent for {user_record['email']}")
                 except asyncio.TimeoutError:
-                    print(f"DEBUG: Email sending timed out for {user_record['email']}")
+                    logger.info(f"DEBUG: Email sending timed out for {user_record['email']}")
                 except Exception as e:
-                    print(f"DEBUG: Email sending failed for {user_record['email']}: {str(e)}")
+                    logger.error(f"DEBUG: Email sending failed for {user_record['email']}: {str(e)}")
                 count += 1
 
         # Audit Log
@@ -7743,7 +7766,7 @@ async def secure_proxy(request: Request, user: dict = Depends(get_current_user))
 
     except Exception as e:
         # SANITIZED LOGGING: Log internally, generic error to client
-        print(f"[PROXY_ERROR][{service}]: {str(e)}")
+        logger.error(f"[PROXY_ERROR][{service}]: {str(e)}")
         raise HTTPException(status_code=500, detail="Server transaction failed.")
 
 if __name__ == "__main__":

@@ -17,6 +17,9 @@ from db import (
     judges_col
 )
 from auth_institution import get_auth_user
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/judging", tags=["Hackathon Judging"])
 
@@ -59,7 +62,7 @@ async def list_judges(user: dict = Depends(get_auth_user)):
 async def delete_judge(judge_id: str, user: dict = Depends(get_auth_user)):
     """Remove a judge."""
     inst_id = str(user.get("institution_id") or user.get("user_id"))
-    await judges_col.delete_one({"_id": ObjectId(judge_id), "institution_id": inst_id})
+    await judges_col.delete_one({"_id": (ObjectId(judge_id) if ObjectId.is_valid(judge_id) else judge_id), "institution_id": inst_id})
     return {"status": "success"}
 
 # --- Rubrics ---
@@ -103,7 +106,8 @@ async def get_rubrics(opportunity_id: str, user: dict = Depends(get_auth_user)):
                 async for doc in cursor:
                     doc["_id"] = str(doc["_id"])
                     rubrics.append(doc)
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 106: {e}")
             pass
             
     return rubrics
@@ -155,7 +159,7 @@ async def bulk_assign_judge(data: dict = Body(...), user: dict = Depends(get_aut
     if not submission_ids or not judge_id:
         raise HTTPException(status_code=400, detail="Missing submission_ids or judge_id")
         
-    judge = await judges_col.find_one({"_id": ObjectId(judge_id)})
+    judge = await judges_col.find_one({"_id": (ObjectId(judge_id) if ObjectId.is_valid(judge_id) else judge_id)})
     if not judge:
         raise HTTPException(status_code=404, detail="Judge not found")
         
@@ -179,7 +183,8 @@ async def list_submissions(opportunity_id: str, user: dict = Depends(get_auth_us
         opp = await opportunities_col.find_one({"_id": ObjectId(opportunity_id)})
         if opp:
             event_id = opp.get("event_link_id")
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 182: {e}")
         pass
         
     query = {"$or": [{"opportunity_id": opportunity_id}]}
@@ -243,7 +248,7 @@ async def evaluate_submission(data: dict = Body(...)):
     sd_updated = False
     try:
         sd_res = await submission_data_col.update_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {"$set": {
                 "total_score": total_score,
                 "evaluation_score": total_score,
@@ -257,7 +262,7 @@ async def evaluate_submission(data: dict = Body(...)):
 
     if not sd_updated:
         await submissions_col.update_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {"$set": {
                 "evaluation_status": "Evaluated",
                 "status": "Pending Review",
@@ -271,12 +276,12 @@ async def evaluate_submission(data: dict = Body(...)):
     from stage_access_control import auto_advance_participant_on_score
     # Resolve event_id from the submission
     sub_doc_ev = await submission_data_col.find_one(
-        {"_id": ObjectId(submission_id)},
+        {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
         {"event_id": 1}
     )
     if not sub_doc_ev:
         sub_doc_ev = await submissions_col.find_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {"event_id": 1}
         )
     if sub_doc_ev:
@@ -298,7 +303,8 @@ async def get_leaderboard(opportunity_id: str):
         opp = await opportunities_col.find_one({"_id": ObjectId(opportunity_id)})
         if opp:
             event_id = opp.get("event_link_id")
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 301: {e}")
         pass
         
     query = {"$or": [{"opportunity_id": opportunity_id}]}
@@ -350,7 +356,8 @@ async def get_all_scores(opportunity_id: str):
         opp = await opportunities_col.find_one({"_id": ObjectId(opportunity_id)})
         if opp:
             event_id = opp.get("event_link_id")
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 353: {e}")
         pass
         
     sub_query = {"$or": [{"opportunity_id": opportunity_id}]}
@@ -427,7 +434,7 @@ async def issue_certificates(data: dict = Body(...), user: dict = Depends(get_au
     if not event_id or not winners:
         raise HTTPException(status_code=400, detail="Missing event_id or winners list")
         
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
         

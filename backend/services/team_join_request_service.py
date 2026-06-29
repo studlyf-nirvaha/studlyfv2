@@ -16,6 +16,9 @@ from enum import Enum
 import secrets
 import asyncio
 
+import logging
+logger = logging.getLogger(__name__)
+
 from services.email_service import (
     send_notification_email,
     get_team_join_request_approved_template,
@@ -112,7 +115,7 @@ async def send_join_request(
         }
     
     except Exception as e:
-        print(f"[ERROR] send_join_request: {e}")
+        logger.error(f"[ERROR] send_join_request: {e}")
         return {"error": str(e)}
 
 async def send_join_request_by_code(
@@ -170,7 +173,7 @@ async def send_join_request_by_code(
         )
 
     except Exception as e:
-        print(f"[ERROR] send_join_request_by_code: {e}")
+        logger.error(f"[ERROR] send_join_request_by_code: {e}")
         return {"error": str(e)}
 
 async def approve_join_request(
@@ -280,7 +283,7 @@ async def approve_join_request(
                     team_link=f"{frontend_url}/#/events/{join_request['event_id']}?tab=team",
                 )
         except Exception as email_error:
-            print(f"[WARN] Could not send join approval email: {email_error}")
+            logger.error(f"[WARN] Could not send join approval email: {email_error}")
         
         return {
             "status": "success",
@@ -290,7 +293,7 @@ async def approve_join_request(
         }
     
     except Exception as e:
-        print(f"[ERROR] approve_join_request: {e}")
+        logger.error(f"[ERROR] approve_join_request: {e}")
         return {"error": str(e)}
 
 async def reject_join_request(
@@ -351,7 +354,7 @@ async def reject_join_request(
         }
     
     except Exception as e:
-        print(f"[ERROR] reject_join_request: {e}")
+        logger.error(f"[ERROR] reject_join_request: {e}")
         return {"error": str(e)}
 
 async def withdraw_join_request(
@@ -386,7 +389,7 @@ async def withdraw_join_request(
         }
     
     except Exception as e:
-        print(f"[ERROR] withdraw_join_request: {e}")
+        logger.error(f"[ERROR] withdraw_join_request: {e}")
         return {"error": str(e)}
 
 async def find_join_request(
@@ -409,7 +412,7 @@ async def find_join_request(
         return await find_join_requests_collection().find_one(query)
     
     except Exception as e:
-        print(f"[ERROR] find_join_request: {e}")
+        logger.error(f"[ERROR] find_join_request: {e}")
         return None
 
 async def get_team_join_requests(
@@ -468,7 +471,7 @@ async def get_team_join_requests(
         }
     
     except Exception as e:
-        print(f"[ERROR] get_team_join_requests: {e}")
+        logger.error(f"[ERROR] get_team_join_requests: {e}")
         return {"error": str(e)}
 
 async def get_user_sent_requests(
@@ -499,7 +502,7 @@ async def get_user_sent_requests(
         }
     
     except Exception as e:
-        print(f"[ERROR] get_user_sent_requests: {e}")
+        logger.error(f"[ERROR] get_user_sent_requests: {e}")
         return {"error": str(e)}
 
 def find_join_requests_collection():
@@ -534,5 +537,5 @@ async def create_notification(
         return str(result.inserted_id)
     
     except Exception as e:
-        print(f"[ERROR] create_notification: {e}")
+        logger.error(f"[ERROR] create_notification: {e}")
         return None

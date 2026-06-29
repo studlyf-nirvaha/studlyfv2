@@ -1,5 +1,8 @@
 from datetime import datetime
 from db import audit_logs_col
+import logging
+logger = logging.getLogger(__name__)
+
 
 async def log_admin_action(admin_email: str, action: str, details: str = ""):
     """
@@ -16,5 +19,5 @@ async def log_admin_action(admin_email: str, action: str, details: str = ""):
         await audit_logs_col.insert_one(log_entry)
         return True
     except Exception as e:
-        print(f"Audit Log Error: {e}")
+        logger.error(f"Audit Log Error: {e}")
         return False
