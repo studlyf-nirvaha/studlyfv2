@@ -464,7 +464,7 @@ export default function ResumeBuilder() {
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
     if (step === 'dashboard') {
-        const displayName = resumeData.personalInfo.firstName || user?.displayName?.split(' ')[0] || "User";
+        const displayName = resumeData.personalInfo.firstName || user?.full_name?.split(' ')[0] || "User";
         return (
             <div className="min-h-screen flex flex-col" style={{ background: '#f9fafb' }}>
                 <style>{styles}</style>

@@ -84,12 +84,10 @@ function ConnectionLine({ start, end, color }: {
 }) {
   const points = [new THREE.Vector3(...start), new THREE.Vector3(...end)];
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+  const lineMaterial = new THREE.LineBasicMaterial({ color, linewidth: 2 });
+  const lineObject = new THREE.Line(lineGeometry, lineMaterial);
 
-  return (
-    <line geometry={lineGeometry}>
-      <lineBasicMaterial color={color} linewidth={2} />
-    </line>
-  );
+  return <primitive object={lineObject} />;
 }
 
 // Main 3D Visualizer Component

@@ -33,6 +33,7 @@ interface Submission {
   submission_id?: string;
   submitted_at?: string | null;
   data?: Record<string, any>;
+  judges_feedback?: Array<{ judge_name?: string; comment?: string; score?: number }>;
 }
 
 interface StageField {

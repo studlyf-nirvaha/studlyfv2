@@ -124,6 +124,18 @@ const TeamsManagement: React.FC<TeamsManagementProps> = ({ institutionId }) => {
         }
     };
 
+    const handleNotifyTeam = async (teamId: string) => {
+        try {
+            await fetch(`${API_BASE_URL}/api/teams/${teamId}/notify`, {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' }
+            });
+            alert('Team notified successfully.');
+        } catch (e) {
+            console.error('Failed to notify team:', e);
+        }
+    };
+
     const handleDeleteTeam = async (teamId: string) => {
         if (!window.confirm('Are you sure you want to delete this team?')) return;
         setDeleting(teamId);

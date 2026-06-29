@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, Briefcase, Calendar, MapPin, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, X, Globe, Users, DollarSign, Star, Sparkles, Building2, ArrowRight, Clock, TrendingUp, Target, ShieldCheck, Zap } from 'lucide-react';
+import { Search, Filter, Briefcase, Calendar, MapPin, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, X, Globe, Users, DollarSign, Star, Sparkles, Building2, ArrowRight, Clock, TrendingUp, Target, ShieldCheck, Zap, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, authHeaders } from '../../apiConfig';

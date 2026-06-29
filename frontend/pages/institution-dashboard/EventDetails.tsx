@@ -65,7 +65,7 @@ import {
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.7.284/build/pdf.worker.min.mjs';
 import { motion, AnimatePresence as FramerAnimatePresence } from 'framer-motion';
-import LeaderboardPage from './LeaderboardPage';
+import LeaderboardPage from './LeaderboardPage'; // exported as LiveResultsDashboard, aliased here
 import { useNavigate } from 'react-router-dom';
 import StageBuilder from './components/StageBuilder';
 import AssessmentReviewModal from './components/AssessmentReviewModal';
@@ -5364,7 +5364,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 );
 
             case 'leaderboard':
-                return <LeaderboardPage eventId={eventId} refreshCounter={refreshCounter} submissions={submissions} />;
+                return <LeaderboardPage />;
 
             case 'pipeline':
                 return <PipelineView eventId={eventId} stages={stages} />;

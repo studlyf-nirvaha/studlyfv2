@@ -204,7 +204,7 @@ function LearningPlanSection({ weakAreas, skillId }: { weakAreas: string[]; skil
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type QuestionType = "MCQ";
+type QuestionType = "MCQ" | "CODING";
 
 interface Question {
   id: number;
@@ -256,7 +256,8 @@ const SKILLS = [
 ];
 
 const typeColors: Record<QuestionType, { bg: string; text: string; label: string }> = {
-  MCQ:        { bg: "#EFF6FF", text: "#2563EB", label: "MCQ" },
+  MCQ:    { bg: "#EFF6FF", text: "#2563EB", label: "MCQ" },
+  CODING: { bg: "#F0FDF4", text: "#16A34A", label: "Coding" },
 };
 
 const QUESTION_BANK: Record<string, Question[]> = {

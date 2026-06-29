@@ -563,6 +563,16 @@ const EventHub: React.FC = () => {
                              const submissionStage = activeStage;
                              const isSubmissionType = submissionStage?.type?.toUpperCase() === 'SUBMISSION';
 
+                             // Derived team/field variables used in submission UI
+                             const minTeam = event?.min_team_size ?? 0;
+                             const maxTeam = event?.max_team_size ?? 0;
+                             const memberCount = team?.members?.length ?? 0;
+                             const teamSizeConfigured = minTeam > 0 && maxTeam > 0;
+                             const needsTeam = teamSizeConfigured && (event?.opportunityMode !== 'individual');
+                             const teamMeetsSize = !needsTeam || (memberCount >= minTeam && memberCount <= maxTeam);
+                             const dynamicFields = submissionStage?.config?.fields ?? [];
+                             const hasDynamicFields = dynamicFields.length > 0;
+
                              if (!submissionStage) {
                                 return <div className="text-center p-10 font-bold text-slate-500">No active submission stage found.</div>;
                              }

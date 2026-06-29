@@ -252,7 +252,7 @@ const SDLProjectDetail: React.FC = () => {
         body: JSON.stringify({
           project_id: project._id,
           user_id: user.uid,
-          user_name: user.displayName || user.email || 'Anonymous',
+          user_name: user.full_name || user.email || 'Anonymous',
           content: newComment,
         }),
       });
@@ -273,7 +273,7 @@ const SDLProjectDetail: React.FC = () => {
         body: JSON.stringify({
           project_id: project._id,
           user_id: user.uid,
-          user_name: user.displayName || user.email || 'Anonymous',
+          user_name: user.full_name || user.email || 'Anonymous',
           role_requested: joinRole,
           message: joinMessage || null,
         }),
@@ -964,7 +964,7 @@ const SDLProjectDetail: React.FC = () => {
                 {user && (
                   <div className="flex gap-3 pt-4 border-t border-white/[0.04]">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
-                      <span className="text-[9px] font-bold text-white">{(user.displayName || user.email || 'U').charAt(0)}</span>
+                      <span className="text-[9px] font-bold text-white">{(user.full_name || user.email || 'U').charAt(0)}</span>
                     </div>
                     <div className="flex-grow flex gap-2">
                       <input

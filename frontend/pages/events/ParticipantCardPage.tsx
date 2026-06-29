@@ -27,7 +27,7 @@ const ParticipantCardPage: React.FC = () => {
     const [downloading, setDownloading] = useState(false);
     const posterRef = useRef<HTMLDivElement>(null);
 
-    const participantId = user?.user_id || user?._id || '';
+    const participantId = user?.user_id || '';
 
     const formatDate = (iso: string) => {
         const d = new Date(iso);

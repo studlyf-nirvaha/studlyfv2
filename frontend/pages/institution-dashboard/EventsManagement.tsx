@@ -27,13 +27,13 @@ interface Event {
     startDate: string;
     participants: number;
     image: string;
-    visibility: 'Public' | 'Private';
+    visibility: 'Public' | 'Private' | 'Unknown';
     registrationStatus: 'Open' | 'Close';
 }
 
 interface EventsManagementProps {
     institutionId?: string;
-    onViewEvent: (id: string, status?: string) => void;
+    onViewEvent: (id: string, status?: string, tab?: string) => void;
     onCreateEvent: () => void;
 }
 

@@ -11,7 +11,7 @@ interface ResourcesTabProps {
   resources: Resource[];
 }
 
-const iconMap: Record<Resource['type'], JSX.Element> = {
+const iconMap: Record<Resource['type'], React.ReactElement> = {
   link: <LinkIcon size={20} />,
   pdf: <FileText size={20} />,
   video: <PlayCircle size={20} />,

@@ -12,6 +12,7 @@ import { API_BASE_URL } from '../../apiConfig';
 
 interface DownloadsPageProps {
     onNavigate: (tab: string) => void;
+    institutionId?: string;
 }
 
 const DownloadsPage: React.FC<DownloadsPageProps> = ({ onNavigate }) => {

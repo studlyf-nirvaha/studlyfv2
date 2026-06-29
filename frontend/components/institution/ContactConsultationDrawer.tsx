@@ -7,6 +7,7 @@ interface ContactConsultationDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     user?: any;
+    institutionId?: string;
 }
 
 const ContactConsultationDrawer: React.FC<ContactConsultationDrawerProps> = ({ isOpen, onClose, user }) => {

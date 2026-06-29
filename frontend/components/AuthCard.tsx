@@ -10,6 +10,8 @@ interface AuthCardProps {
     maxWidth?: string;
     className?: string;
     transparent?: boolean;
+    /** Reduces internal padding for tighter layouts */
+    compact?: boolean;
 }
 
 const AuthCard: React.FC<AuthCardProps> = ({
@@ -19,6 +21,7 @@ const AuthCard: React.FC<AuthCardProps> = ({
     maxWidth = 'max-w-lg',
     className = 'w-full',
     transparent = false,
+    compact = false,
 }) => {
     return (
         <motion.div
@@ -30,7 +33,7 @@ const AuthCard: React.FC<AuthCardProps> = ({
                 maxWidth,
                 transparent
                     ? 'bg-transparent border-none shadow-none p-0'
-                    : 'shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 p-6 sm:p-8 lg:p-10 backdrop-blur-sm bg-white/95',
+                    : `shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 ${compact ? 'p-4 sm:p-6' : 'p-6 sm:p-8 lg:p-10'} backdrop-blur-sm bg-white/95`,
                 className,
             ].join(' ')}
         >

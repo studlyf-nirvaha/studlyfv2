@@ -1,4 +1,4 @@
-import { CURRICULUM_DATA, ModuleData } from '../data/curriculumData';
+import { CURRICULUM_DATA, ModuleData, Topic } from '../data/curriculumData';
 import { GFG_CURRICULUM_DATA } from '../data/gfgCurriculumData';
 import { AI_AUTOMATION_CURRICULUM } from '../data/aiAutomationCurriculum';
 
@@ -33,10 +33,8 @@ export const getDetailedCurriculum = (courseId: string): ModuleData[] => {
   if (resolvedId.includes('ai-automation')) {
     return AI_AUTOMATION_CURRICULUM.map(mod => ({
       title: mod.title,
-      description: mod.description,
-      duration: mod.duration,
       topics: mod.topics.map(t => ({
-        type: t.type || 'text',
+        type: (t.type || 'text') as Topic['type'],
         title: t.title,
         content: t.content
       }))

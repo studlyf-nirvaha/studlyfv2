@@ -86,8 +86,8 @@ const SDLProjectCreate: React.FC = () => {
     try {
       const payload = {
         owner_id: user.uid,
-        owner_name: user.displayName || user.email || 'Anonymous',
-        owner_avatar: user.photoURL || null,
+        owner_name: user.full_name || user.email || 'Anonymous',
+        owner_avatar: user.profilePhoto || null,
         title,
         project_type: projectType,
         problem_statement: problemStatement,

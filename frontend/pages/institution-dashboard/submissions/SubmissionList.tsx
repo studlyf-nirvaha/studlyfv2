@@ -63,8 +63,9 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
 
     useEffect(() => {
         const fetchCriteriaForSubmissions = async () => {
-            if (filteredSubmissions.length > 0) {
-                const firstSub = filteredSubmissions[0];
+            const allSubs: any[] = submissions?.all || [];
+            if (allSubs.length > 0) {
+                const firstSub = allSubs[0];
                 if (firstSub.hackathonId) {
                     try {
                         const res = await fetch(`${API_BASE_URL}/api/events/${firstSub.hackathonId}`, { headers: authHeaders() });
@@ -79,7 +80,7 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
             }
         };
         fetchCriteriaForSubmissions();
-    }, [filteredSubmissions[0]?.hackathonId]);
+    }, [submissions?.all?.[0]?.hackathonId]);
 
     useEffect(() => {
         const userData = localStorage.getItem('user');

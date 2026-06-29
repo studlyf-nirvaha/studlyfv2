@@ -17,6 +17,7 @@ export interface IStageConfig {
     allow_individual_registration?: boolean;
     allow_cross_college_teams?: boolean;
     team_formation_instructions?: string;
+    description?: string;
 }
 
 export interface IStageCommunication {
@@ -44,6 +45,10 @@ export interface IStage {
     config?: IStageConfig;
     communication?: IStageCommunication;
     fields?: IStageField[];
+    // Runtime flags injected by backend per-user
+    can_access?: boolean;
+    is_completed?: boolean;
+    is_current?: boolean;
 }
 
 export interface IEvent {
@@ -78,6 +83,7 @@ export interface IEvent {
     prize_pool?: string;
     registration_settings?: any;
     created_at?: string;
+    participationType?: 'individual' | 'team' | 'both';
 }
 
 export interface ITeamMember {

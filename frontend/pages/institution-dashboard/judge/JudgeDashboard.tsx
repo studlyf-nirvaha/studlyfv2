@@ -245,7 +245,7 @@ const JudgeDashboard: React.FC = () => {
                     <h1 className="text-3xl font-black text-white tracking-tight">Evaluator Command Center</h1>
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 flex items-center gap-2">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        Network Status: Synchronized • Welcome back, {user?.full_name || user?.name || 'Judge'}
+                        Network Status: Synchronized • Welcome back, {user?.full_name || 'Judge'}
                     </p>
                 </div>
                 
@@ -418,7 +418,7 @@ const JudgeDashboard: React.FC = () => {
                                         <div className="text-center">
                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Score</p>
                                             <div className="text-3xl font-black text-emerald-400 tracking-tighter">
-                                                {(Object.values(sub.existing_scores.scores || {}).reduce((a:any,b:any)=>a+b, 0) / Object.keys(sub.existing_scores.scores || {}).length).toFixed(1)}
+                                                {(Number(Object.values(sub.existing_scores.scores || {}).reduce((a:any,b:any)=>a+b, 0)) / Object.keys(sub.existing_scores.scores || {}).length).toFixed(1)}
                                             </div>
                                         </div>
                                     ) : (

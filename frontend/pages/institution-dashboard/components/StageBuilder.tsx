@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { IStage } from '../../../types/event';
 import { 
     Plus, 
     Trash2, 

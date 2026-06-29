@@ -105,6 +105,8 @@ const CoursePlayer: React.FC = () => {
   const [moduleDetails, setModuleDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [courseData, setCourseData] = useState<any>(null);
+  const [modules, setModules] = useState<any[]>([]);
+  const [courseCurriculum, setCourseCurriculum] = useState<any[]>([]);
 
   // Sidebar and UI state
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
@@ -123,8 +125,10 @@ const CoursePlayer: React.FC = () => {
     getModuleProgressPercent,
     markLessonComplete,
     submitGradedQuiz,
-    updateModules,
   } = useCourseProgress({ userId: user?.uid, courseId: resolvedCourseId });
+
+  // Sync modules into progress hook when they change
+  const updateModules = (newModules: any[]) => setModules(newModules);
 
   useEffect(() => {
     if (resolvedCourseId) {
@@ -1372,7 +1376,7 @@ const CoursePlayer: React.FC = () => {
               </button>
               <button
                 className="cp-bottom-nav-btn"
-                disabled={currentFlatIndex >= flatLessons.length - 1 || activeStage === 'result' || activeStage === 'capstone'}
+                disabled={currentFlatIndex >= flatLessons.length - 1 || (activeStage as string) === 'result' || (activeStage as string) === 'capstone'}
                 onClick={goToNextLesson}
               >
                 Next Lesson →
@@ -1489,7 +1493,7 @@ const CoursePlayer: React.FC = () => {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               style={{ padding: '48px 32px', textAlign: 'center', borderRadius: 24, boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}
             >
-              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justify_content: 'center' }}>
+              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: '#F5F3FF', borderRadius: '50%', transform: 'scale(1.2)' }} />
                 <Award size={64} style={{ color: '#7C3AED', position: 'relative', zIndex: 2, margin: '18px auto' }} />
                 <div style={{ position: 'absolute', bottom: -5, right: -5, background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800 }}>MODULE COMPLETED</div>

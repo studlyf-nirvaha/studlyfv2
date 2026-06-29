@@ -136,7 +136,7 @@ const OpportunityDetails: React.FC = () => {
     const [sidebarProfilePhoto, setSidebarProfilePhoto] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
-        name: user?.full_name || user?.name || '',
+        name: user?.full_name || '',
         email: user?.email || '',
         resume: null as File | null,
         interest: ''
@@ -620,7 +620,7 @@ const OpportunityDetails: React.FC = () => {
     const canEditSubmittedRegistration = !submitted || !registrationDeadlineDate || new Date() <= registrationDeadlineDate;
 
     const buildLegacyPayload = () => {
-        const name = formData.name || user?.full_name || user?.name || 'Anonymous Applicant';
+        const name = formData.name || user?.full_name || 'Anonymous Applicant';
         const email = formData.email || user?.email || '';
         return {
             name,
@@ -634,7 +634,7 @@ const OpportunityDetails: React.FC = () => {
 
     const buildInstitutionPayload = () => {
         const responses: { field_id: string; label: string; value: string }[] = [];
-        let derivedName = user?.full_name || user?.name || '';
+        let derivedName = user?.full_name || '';
         let derivedEmail = user?.email || '';
         let derivedInterest = '';
         let derivedResume = '';
@@ -1700,7 +1700,7 @@ const OpportunityDetails: React.FC = () => {
                                     const IconComponent = (() => {
                                         const iconName = status.icon;
                                         if (iconName === 'calendar-plus') return CalendarPlus;
-                                        if (iconName === 'calendar-x') return CalendarX;
+                                        if (iconName === 'calendar-x') return Calendar;
                                         if (iconName === 'clock') return Clock;
                                         if (iconName === 'check-circle') return CheckCircle2;
                                         if (iconName === 'x-circle') return XCircle;
@@ -2916,7 +2916,7 @@ const OpportunityDetails: React.FC = () => {
                             console.log("Backdrop clicked");
                         }}
                     >
-                        {console.log("Registration modal rendering...")}
+                        {/* debug: Registration modal rendering */}
                         <motion.div
                             className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -3249,7 +3249,7 @@ const OpportunityDetails: React.FC = () => {
                                                                         value={regAnswers[field.id] ?? field.prefilled_value ?? ''}
                                                                         onChange={e => setRegAnswers(p => ({ ...p, [field.id]: e.target.value }))}
                                                                         readOnly={isEmail}
-                                                                        placeholder={field.placeholder || (field.id === 'college' ? ((user?.role === 'professional' || user?.isProfessional) ? 'e.g. Google, Stripe' : 'e.g. Stanford University') : '')}
+                                                                        placeholder={field.placeholder || (field.id === 'college' ? (((user?.role as string) === 'professional' || (user as any)?.isProfessional) ? 'e.g. Google, Stripe' : 'e.g. Stanford University') : '')}
                                                                         className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm focus:border-[#6C3BFF] transition-colors"
                                                                     />
                                                                 )}

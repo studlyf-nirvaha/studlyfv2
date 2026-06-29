@@ -9,14 +9,15 @@ interface InstitutionData {
     events: any[];
     stats: any | null;
     loading: boolean;
+    refresh: () => void;
 }
 
-// ... existing provider logic
+const InstitutionDataContext = createContext<InstitutionData | null>(null);
 export const InstitutionDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();
     const institutionId = user?.institution_id;
     // State is now maintained here, surviving component unmounts
-    const [data, setData] = useState<InstitutionData>({ profile: null, notifications: [], events: [], stats: null, loading: true });
+    const [data, setData] = useState<InstitutionData>({ profile: null, notifications: [], events: [], stats: null, loading: true, refresh: () => {} });
 
     const fetchData = async () => {
         if (!institutionId) return;
@@ -49,7 +50,7 @@ export const InstitutionDataProvider: React.FC<{ children: ReactNode }> = ({ chi
             const events = eventsRes.ok ? await eventsRes.json() : [];
             const stats = statsRes.ok ? await statsRes.json() : null;
 
-            setData({ profile, notifications, events, stats, loading: false });
+            setData(prev => ({ ...prev, profile, notifications, events, stats, loading: false }));
         } catch (error) {
             try { console.error("Failed to fetch shared institution data:", error instanceof Error ? error.message : String(error)); } catch (_) {}
             setData(prev => ({ ...prev, loading: false }));

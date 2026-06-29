@@ -107,7 +107,7 @@ const OpportunitiesManagement: React.FC<OpportunitiesManagementProps> = ({ insti
     const [showConfirm, setShowConfirm] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<string | null>(null);
 
-    const categories = ['All', ...new Set(events.map(e => e.category || e.type || '').filter(Boolean))];
+    const categories = ['All', ...(Array.from(new Set(events.map((e: any) => (e.category || e.type || '') as string).filter(Boolean))) as string[])];
 
     const handleDeleteClick = (id: string) => {
         setEventToDelete(id);

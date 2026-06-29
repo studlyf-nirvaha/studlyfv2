@@ -76,7 +76,7 @@ const ParticipantPortal: React.FC = () => {
 
     const [modalProblem, setModalProblem] = useState<Problem | null>(null);
     const [modalEmail, setModalEmail] = useState(user?.email || '');
-    const [modalMobile, setModalMobile] = useState(user?.mobile || (user as any)?.phone || '');
+    const [modalMobile, setModalMobile] = useState((user as any)?.mobile || (user as any)?.phone || '');
 
     const fetchPortal = async () => {
         if (!eventId) return;
@@ -243,7 +243,7 @@ const ParticipantPortal: React.FC = () => {
                             </div>
                             <div className="p-4 rounded-2xl bg-white/10 border border-white/10">
                                 <p className="text-white/60 text-xs font-bold uppercase tracking-widest">User</p>
-                                <p className="text-sm font-bold mt-2 truncate">{user?.full_name || user?.name || user?.email || 'Participant'}</p>
+                                <p className="text-sm font-bold mt-2 truncate">{user?.full_name || user?.email || 'Participant'}</p>
                             </div>
                         </div>
                         {config.countdown_target && (

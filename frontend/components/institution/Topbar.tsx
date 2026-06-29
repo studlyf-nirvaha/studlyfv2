@@ -10,7 +10,7 @@ import { institutionIdFromUser } from '../../utils/institutionScope';
 const Topbar: React.FC<{ onNavigateToSettings?: () => void }> = ({ onNavigateToSettings }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const displayName = user?.full_name || user?.displayName || 'User';
+    const displayName = user?.full_name || 'User';
     const institutionId = institutionIdFromUser(user);
     
     const [notifCount, setNotifCount] = useState(0);
