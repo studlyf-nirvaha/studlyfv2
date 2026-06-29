@@ -1244,7 +1244,7 @@ function QuestionScreen({
               <div className="bg-[#F9FAFB] rounded-xl p-3 sm:p-4 border border-[#e5e7eb]">
                 <div className="text-[9px] font-bold text-[#9CA3AF] tracking-wide mb-1.5 uppercase">Your Answer</div>
                 <div className="text-xs sm:text-sm text-[#374151] leading-relaxed overflow-hidden break-words"
-                  style={{ fontFamily: q.type === "CODING" ? "monospace" : "inherit", whiteSpace: "pre-wrap", maxHeight: 120 }}>
+                  style={{ fontFamily: (q.type as string) === "CODING" ? "monospace" : "inherit", whiteSpace: "pre-wrap", maxHeight: 120 }}>
                   {curAnswer}
                 </div>
               </div>

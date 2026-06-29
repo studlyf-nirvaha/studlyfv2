@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Filter, Search, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
-import { API_BASE_URL } from '@/config';
+import { API_BASE_URL } from '../apiConfig';
 
 interface Registration {
   _id: string;

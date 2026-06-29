@@ -522,7 +522,7 @@ const PostJobModal: React.FC<PostJobModalProps> = ({ isOpen, onClose, institutio
                                         Next Step
                                     </button>
                                 ) : (
-                                    <button onClick={handleSubmit} disabled={loading} className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2">
+                                    <button onClick={() => handleSubmit()} disabled={loading} className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 flex items-center gap-2">
                                         {loading ? 'Posting...' : <><CheckCircle size={18} /> Post Job</>}
                                     </button>
                                 )}

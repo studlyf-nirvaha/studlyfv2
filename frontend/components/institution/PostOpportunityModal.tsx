@@ -222,7 +222,11 @@ const PostOpportunityModal: React.FC<PostOpportunityModalProps> = ({ isOpen, onC
                         { id: '2', label: 'Email ID', type: 'email', required: true, isFixed: true },
                         { id: '3', label: 'College Name', type: 'text', required: true, isFixed: false },
                         { id: '4', label: 'Mobile Number', type: 'tel', required: true, isFixed: false }
-                    ]
+                    ],
+                    eventStartDate: '',
+                    eventEndDate: '',
+                    stages: [],
+                    contacts: []
                 });
                 setLogoPreview(null);
                 setOpportunityBannerPreview(null);

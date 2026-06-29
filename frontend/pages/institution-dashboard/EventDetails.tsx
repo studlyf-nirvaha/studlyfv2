@@ -5364,7 +5364,7 @@ const EventDetails: React.FC<EventDetailsProps> = ({ eventId, onBack, institutio
                 );
 
             case 'leaderboard':
-                return <LeaderboardPage eventId={eventId} refreshCounter={refreshCounter} submissions={submissions} />;
+                return <LeaderboardPage />;
 
             case 'pipeline':
                 return <PipelineView eventId={eventId} stages={stages} />;

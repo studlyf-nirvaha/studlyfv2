@@ -105,6 +105,7 @@ const CoursePlayer: React.FC = () => {
   const [moduleDetails, setModuleDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [courseData, setCourseData] = useState<any>(null);
+  const [modules, setModules] = useState<Module[]>([]);
 
   // Sidebar and UI state
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set());
@@ -140,6 +141,13 @@ const CoursePlayer: React.FC = () => {
     modules.forEach((_, idx) => all.add(idx));
     setExpandedModules(all);
   }, [modules]);
+
+  // Sync modules with useCourseProgress hook
+  useEffect(() => {
+    if (updateModules) {
+      updateModules(modules);
+    }
+  }, [modules, updateModules]);
 
   // Quizzes State
   const [practiceAnswers, setPracticeAnswers] = useState<Record<string, number>>({});
@@ -238,7 +246,7 @@ const CoursePlayer: React.FC = () => {
         const p = mod.progress;
         if (p) {
           if (p.status === 'completed') {
-            const curChapter = courseCurriculum[modIdx] || courseCurriculum[modIdx % courseCurriculum.length];
+            const curChapter = curriculumSource[modIdx] || curriculumSource[modIdx % curriculumSource.length];
             curChapter.topics.forEach((_, tIdx) => {
               initialCompleted[`${modIdx}_${tIdx}`] = true;
             });
@@ -271,14 +279,14 @@ const CoursePlayer: React.FC = () => {
     } catch (err) {
       try { console.error('Error fetching modules:', err instanceof Error ? err.message : String(err)); } catch (_) {}
       let fetched: any[] = [];
-      if (courseCurriculum && courseCurriculum.length > 0) {
-        fetched = courseCurriculum.map((_, i) => ({
+      if (curriculumSource && curriculumSource.length > 0) {
+        fetched = curriculumSource.map((_, i) => ({
           _id: `dummy-mod-${i}`,
           progress: null
         }));
       }
       const formatted = fetched.map((mod: any, i: number) => {
-        const curChapter = courseCurriculum[i] || courseCurriculum[i % courseCurriculum.length];
+        const curChapter = curriculumSource[i] || curriculumSource[i % curriculumSource.length];
         return {
           ...mod,
           title: curChapter?.title || `Module ${i + 1}`,
@@ -294,7 +302,7 @@ const CoursePlayer: React.FC = () => {
       setLoading(false);
       return formatted;
     }
-  }, [resolvedCourseId, user, courseCurriculum]);
+  }, [resolvedCourseId, user, curriculumSource]);
 
   // ✅ PERF FIX: Track last fetched module to avoid redundant detail fetches
   const lastFetchedModuleIdRef = useRef<string | null>(null);
@@ -330,7 +338,7 @@ const CoursePlayer: React.FC = () => {
     setModuleDetails(data);
     
     // Fetch dynamic questions count from the current chapter topic
-    const activeChapter = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+    const activeChapter = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
     const quizTopic = activeChapter?.topics?.find(t => t.type === 'graded_quiz');
     const gradedQs = quizTopic?.graded || [];
     setQuizAnswers(gradedQs.map(() => []));
@@ -377,7 +385,7 @@ const CoursePlayer: React.FC = () => {
     }
   };
 
-  const activeChapterData = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+  const activeChapterData = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
   const activeTopicData = activeChapterData?.topics?.[activeLessonIndex];
 
   /* ── Graded Quiz Submission ── */
@@ -544,13 +552,16 @@ const CoursePlayer: React.FC = () => {
         : 'Loading...';
 
   const activeContentDb = modules.length > 0 && activeModuleIndex >= 0
-    ? {
-        overview: activeTopicData?.overview || activeTopicData?.content || `### ${activeTopicData?.title}\n\nNo overview content loaded.`,
-        reading: activeTopicData?.reading || activeTopicData?.content || `### ${activeTopicData?.title}\n\nNo reading content loaded.`,
-        practice: activeTopicData?.practice || [],
-        graded: activeTopicData?.graded || [],
-        resources: activeTopicData?.resources || []
-      }
+    ? (() => {
+        const td = activeTopicData as any;
+        return {
+          overview: td?.overview || td?.content || `### ${td?.title}\n\nNo overview content loaded.`,
+          reading: td?.reading || td?.content || `### ${td?.title}\n\nNo reading content loaded.`,
+          practice: td?.practice || [],
+          graded: td?.graded || [],
+          resources: td?.resources || []
+        };
+      })()
     : null;
 
   if (loading) return (
@@ -1372,7 +1383,7 @@ const CoursePlayer: React.FC = () => {
               </button>
               <button
                 className="cp-bottom-nav-btn"
-                disabled={currentFlatIndex >= flatLessons.length - 1 || activeStage === 'result' || activeStage === 'capstone'}
+                disabled={currentFlatIndex >= flatLessons.length - 1}
                 onClick={goToNextLesson}
               >
                 Next Lesson →
@@ -1440,7 +1451,7 @@ const CoursePlayer: React.FC = () => {
 
               {activeToolTab === 'resources' && (
                 <div className="cp-transcript-block" style={{ padding: 0 }}>
-                  <ResourcesTab resources={activeContentDb?.resources || []} />
+                  <ResourcesTab resources={(activeContentDb?.resources || []) as any} />
                   
                   <div style={{ padding: '0 16px 16px' }}>
                     <button className="cp-ask-btn" style={{ width: '100%' }}>
@@ -1489,7 +1500,7 @@ const CoursePlayer: React.FC = () => {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               style={{ padding: '48px 32px', textAlign: 'center', borderRadius: 24, boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}
             >
-              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justify_content: 'center' }}>
+              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: '#F5F3FF', borderRadius: '50%', transform: 'scale(1.2)' }} />
                 <Award size={64} style={{ color: '#7C3AED', position: 'relative', zIndex: 2, margin: '18px auto' }} />
                 <div style={{ position: 'absolute', bottom: -5, right: -5, background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800 }}>MODULE COMPLETED</div>

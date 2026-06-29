@@ -128,7 +128,7 @@ const MentorCredibility: React.FC = () => {
                                     className="w-full h-full object-contain relative z-10 transition-all duration-500 group-hover:drop-shadow-md"
                                     decoding="async"
                                     loading={index < 8 ? "eager" : "lazy"}
-                                    fetchpriority={index < 8 ? "high" : "low"}
+                                    fetchPriority={index < 8 ? "high" : "low"}
                                     style={{
                                         filter: 'grayscale(0%) brightness(1) opacity(1)'
                                     }}

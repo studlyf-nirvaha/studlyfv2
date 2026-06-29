@@ -15,6 +15,7 @@ import AvatarImage from '../components/AvatarImage';
 
 const MyProfile: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('basic');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -91,9 +92,9 @@ const MyProfile: React.FC = () => {
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const shareTemplateRef = useRef<HTMLDivElement>(null);
 
-  const [sectionStatus, setSectionStatus] = useState<Record<string, 'saving' | 'saved' | 'error' | null>>({});
+  const [sectionStatus, setSectionStatus] = useState<{ section: string; type: 'success' | 'error' | 'saving' | 'saved'; message: string } | null>(null);
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{ target: string; type: 'success' | 'error'; message: string } | null>(null);
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
   const [githubError, setGithubError] = useState<string | null>(null);
   const [githubAnalytics, setGithubAnalytics] = useState<any>(null);

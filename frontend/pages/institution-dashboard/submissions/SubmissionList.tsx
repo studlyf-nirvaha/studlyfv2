@@ -61,25 +61,7 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
 
     const [eventCriteria, setEventCriteria] = useState<any[]>([]);
 
-    useEffect(() => {
-        const fetchCriteriaForSubmissions = async () => {
-            if (filteredSubmissions.length > 0) {
-                const firstSub = filteredSubmissions[0];
-                if (firstSub.hackathonId) {
-                    try {
-                        const res = await fetch(`${API_BASE_URL}/api/events/${firstSub.hackathonId}`, { headers: authHeaders() });
-                        if (res.ok) {
-                            const data = await res.json();
-                            setEventCriteria(data.judging_criteria || []);
-                        }
-                    } catch (e) {
-                        console.error('Failed to fetch criteria', e);
-                    }
-                }
-            }
-        };
-        fetchCriteriaForSubmissions();
-    }, [filteredSubmissions[0]?.hackathonId]);
+    // Note: fetchCriteriaForSubmissions effect moved below filteredSubmissions declaration
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -376,6 +358,27 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
     const assetTotalPages = Math.max(1, Math.ceil(stageSubmissions.length / limit));
     const safeAssetPage = Math.min(assetPage, assetTotalPages);
     const paginatedAssets = stageSubmissions.slice((safeAssetPage - 1) * limit, safeAssetPage * limit);
+
+    useEffect(() => {
+        const fetchCriteriaForSubmissions = async () => {
+            if (filteredSubmissions.length > 0) {
+                const firstSub = filteredSubmissions[0];
+                if (firstSub.hackathonId) {
+                    try {
+                        const res = await fetch(`${API_BASE_URL}/api/events/${firstSub.hackathonId}`, { headers: authHeaders() });
+                        if (res.ok) {
+                            const data = await res.json();
+                            setEventCriteria(data.judging_criteria || []);
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch criteria', e);
+                    }
+                }
+            }
+        };
+        fetchCriteriaForSubmissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredSubmissions[0]?.hackathonId]);
 
     if (loading) return (
         <div className="h-96 flex flex-col items-center justify-center gap-4">

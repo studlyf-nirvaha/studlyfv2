@@ -45,6 +45,9 @@ class DatabaseIndexManager:
             await self._create_audit_logs_indexes()
             
             logger.info("All indexes created successfully")
+        except Exception as e:
+            logger.error(f"Error creating indexes: {e}")
+            raise
 
     async def _create_submission_indexes(self):
         """Indexes for submission collections"""
@@ -62,10 +65,6 @@ class DatabaseIndexManager:
             await col.create_index([("event_id", ASCENDING), ("stage_id", ASCENDING)])
             
         logger.info("✓ Submission indexes created")
-        
-        except Exception as e:
-            logger.error(f"Error creating indexes: {e}")
-            raise
     
     async def _create_users_indexes(self):
         """Indexes for users collection"""

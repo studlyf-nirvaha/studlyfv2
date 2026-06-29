@@ -9,6 +9,12 @@ interface User {
     role: UserRole;
     user_id: string;
     uid?: string; // Backwards compatibility for Firebase UID format
+    displayName?: string;
+    photoURL?: string;
+    name?: string;
+    _id?: string;
+    mobile?: string;
+    isProfessional?: boolean;
     institution_id?: string;
     institution_name?: string;
     college_name?: string;

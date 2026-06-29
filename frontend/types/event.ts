@@ -17,6 +17,7 @@ export interface IStageConfig {
     allow_individual_registration?: boolean;
     allow_cross_college_teams?: boolean;
     team_formation_instructions?: string;
+    description?: string;
 }
 
 export interface IStageCommunication {
@@ -44,6 +45,9 @@ export interface IStage {
     config?: IStageConfig;
     communication?: IStageCommunication;
     fields?: IStageField[];
+    can_access?: boolean;
+    is_completed?: boolean;
+    is_current?: boolean;
 }
 
 export interface IEvent {
@@ -58,6 +62,7 @@ export interface IEvent {
     opportunity_id?: string;
     min_team_size?: number;
     max_team_size?: number;
+    participationType?: 'individual' | 'team';
     external_registration_link?: string;
     logo_url?: string;
     banner_url?: string;

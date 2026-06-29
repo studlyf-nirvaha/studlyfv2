@@ -649,7 +649,7 @@ export default function AchievementRegistry() {
                             </td>
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-center space-x-2 text-indigo-600">
-                                <Eye className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => setSelectedCertificate(c)} title="Preview" />
+                                <Eye className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => setSelectedCertificate(c)} aria-label="Preview" />
                                 <Download className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Download certificate: ' + (c.certificate_id || c._id))} />
                                 <Mail className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Send email to: ' + c.email)} />
                                 {(c.status || '').toLowerCase() !== 'revoked' && (
@@ -664,7 +664,7 @@ export default function AchievementRegistry() {
                                       setRegistry(prev => prev.map(r => r._id === c._id ? { ...r, status: 'Revoked' } : r));
                                       if (selectedCertificate?._id === c._id) setSelectedCertificate({ ...c, status: 'Revoked' });
                                     } catch (e) { console.error(e); }
-                                  }} title="Revoke" />
+                                  }} aria-label="Revoke" />
                                 )}
                               </div>
                             </td>
@@ -908,7 +908,9 @@ const AchievementRulesManager: React.FC<{ institutionId: string; onClose: () => 
   const [saving, setSaving] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    rule_name: string; rule_description: string; certificate_type: string; rule_type: string; rule_config: Record<string, any>; status: string;
+  }>({
     rule_name: '', rule_description: '', certificate_type: 'winner', rule_type: 'top_n', rule_config: { top_n: 1 }, status: 'active',
   });
   const [ruleIdCounter, setRuleIdCounter] = useState(1);
@@ -1158,7 +1160,7 @@ const AchievementRulesManager: React.FC<{ institutionId: string; onClose: () => 
                   onChange={(e) => {
                     const val = e.target.value;
                     try { setFormData(f => ({ ...f, rule_config: JSON.parse(val) })); }
-                    catch { setFormData(f => ({ ...f, rule_config: val })); }
+                    catch { setFormData(f => ({ ...f, rule_config: val as any })); }
                   }}
                   rows={4} placeholder='{"key": "value"}' className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 font-mono focus:ring-2 focus:ring-purple-100 focus:border-[#6C3BFF] outline-none" />
               </div>

@@ -749,7 +749,7 @@ const CourseManagement: React.FC = () => {
                                                                      </div>
 
                                                                     <div className="flex items-center gap-1.5 ml-2 border-l border-white/10 pl-3">
-                                                                        <button z
+                                                                        <button
                                                                             type="button"
                                                                             onClick={() => insertAtCursor(mod._id || mod.id, lessonIndex, "\n# Your Heading\n")}
                                                                             className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded text-[10px] text-white/40 hover:text-white font-bold"

@@ -144,6 +144,10 @@ const TeamsManagement: React.FC<TeamsManagementProps> = ({ institutionId }) => {
         }
     };
 
+    const handleNotifyTeam = (teamId: string) => {
+        alert(`Notification feature for team ${teamId} coming soon.`);
+    };
+
     const filteredTeams = teams.filter(t => {
         const matchesSearch = t.team_name?.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = filterStatus === 'All' || t.status === filterStatus.toLowerCase();

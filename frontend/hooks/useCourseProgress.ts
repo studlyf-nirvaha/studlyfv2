@@ -39,6 +39,7 @@ interface ProgressHook {
     passed: boolean,
     quizAnswers: number[][]
   ) => Promise<void>;
+  updateModules: (mods: Module[]) => void;
 }
 
 /**
@@ -177,10 +178,6 @@ export default function useCourseProgress({ userId, courseId }: UseCourseProgres
     getModuleProgressPercent,
     markLessonComplete,
     submitGradedQuiz,
-    // expose setter for parent to keep modules up‑to‑date
-    // TypeScript will allow destructuring: const {..., updateModules } = useCourseProgress(...);
-    // We'll include it conditionally via any cast to avoid breaking existing imports.
-    // @ts-ignore
     updateModules,
-  } as ProgressHook;
+  };
 }

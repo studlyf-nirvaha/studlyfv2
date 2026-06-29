@@ -40,7 +40,7 @@ export const getDetailedCurriculum = (courseId: string): ModuleData[] => {
         title: t.title,
         content: t.content
       }))
-    }));
+    })) as unknown as ModuleData[];
   }
   
   // Normalize the default CURRICULUM_DATA to ensure topics are strings

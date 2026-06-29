@@ -20,10 +20,19 @@ interface PostSelectionModalProps {
     onSelect: (type: string) => void;
 }
 
+interface OptionItem {
+    id: string;
+    title: string;
+    desc: string;
+    icon: React.ReactNode;
+    color: string;
+    hasSub?: boolean;
+}
+
 const PostSelectionModal: React.FC<PostSelectionModalProps> = ({ isOpen, onClose, onSelect }) => {
     const [view, setView] = useState<'main' | 'opportunity'>('main');
 
-    const mainOptions = [
+    const mainOptions: OptionItem[] = [
         {
             id: 'job',
             title: 'Post a Job',
@@ -48,7 +57,7 @@ const PostSelectionModal: React.FC<PostSelectionModalProps> = ({ isOpen, onClose
         }
     ];
 
-    const opportunityOptions = [
+    const opportunityOptions: OptionItem[] = [
         {
             id: 'competition',
             title: 'General & Case Competitions',

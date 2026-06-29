@@ -119,7 +119,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, transparent = f
     const labelClasses = "block text-[10px] font-extrabold text-gray-400 uppercase tracking-widest mb-1.5 ml-1";
 
     return (
-        <AuthCard title="Welcome Back" maxWidth="max-w-[450px]" transparent={transparent} compact={true}>
+        <AuthCard title="Welcome Back" maxWidth="max-w-[450px]" transparent={transparent}>
             <div className="relative overflow-visible">
                 <AnimatePresence>
                     {showTerms && <TermsOverlay onClose={() => setShowTerms(false)} />}

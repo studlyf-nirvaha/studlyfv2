@@ -248,7 +248,7 @@ const InstitutionDashboard: React.FC = () => {
             case 'invite-audit':
                 return <InviteAudit />;
             case 'downloads':
-                return <DownloadsPage institutionId={institutionId} onNavigate={setActiveTab} />;
+                return <DownloadsPage onNavigate={setActiveTab} />;
             case 'certificates':
                 return <CertificatesPage institutionId={institutionId} onNavigate={handleTabChange} />;
             case 'settings':
@@ -384,7 +384,6 @@ const InstitutionDashboard: React.FC = () => {
             <ContactConsultationDrawer 
                 isOpen={isConsultationOpen}
                 onClose={() => setIsConsultationOpen(false)}
-                institutionId={institutionId} 
             />
 
             <CreditBalanceModal 

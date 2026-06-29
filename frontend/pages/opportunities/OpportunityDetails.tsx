@@ -41,6 +41,7 @@ import {
     HelpCircle,
     AlertCircle,
     Copy,
+    CalendarX,
 } from 'lucide-react';
 import { getStatusById, getStatusColor, getStatusLabel } from '../../utils/calendarStatuses';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -2916,7 +2917,6 @@ const OpportunityDetails: React.FC = () => {
                             console.log("Backdrop clicked");
                         }}
                     >
-                        {console.log("Registration modal rendering...")}
                         <motion.div
                             className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -3249,7 +3249,7 @@ const OpportunityDetails: React.FC = () => {
                                                                         value={regAnswers[field.id] ?? field.prefilled_value ?? ''}
                                                                         onChange={e => setRegAnswers(p => ({ ...p, [field.id]: e.target.value }))}
                                                                         readOnly={isEmail}
-                                                                        placeholder={field.placeholder || (field.id === 'college' ? ((user?.role === 'professional' || user?.isProfessional) ? 'e.g. Google, Stripe' : 'e.g. Stanford University') : '')}
+                                                                        placeholder={field.placeholder || (field.id === 'college' ? (((user?.role as string) === 'professional' || user?.isProfessional) ? 'e.g. Google, Stripe' : 'e.g. Stanford University') : '')}
                                                                         className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none text-sm focus:border-[#6C3BFF] transition-colors"
                                                                     />
                                                                 )}

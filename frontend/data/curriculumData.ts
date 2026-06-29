@@ -2,7 +2,7 @@
 // Do not modify UI components; this file provides data consumed by CoursePlayer.
 
 export interface Topic {
-  type: 'overview' | 'text' | 'practice_quiz' | 'graded_quiz' | 'image';
+  type: 'overview' | 'text' | 'practice_quiz' | 'graded_quiz' | 'image' | 'theory' | 'quiz';
   title: string;
   content?: string;
   image?: { src: string; caption?: string };

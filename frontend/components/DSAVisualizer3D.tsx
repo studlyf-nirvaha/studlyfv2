@@ -82,14 +82,14 @@ function ConnectionLine({ start, end, color }: {
   end: [number, number, number];
   color: string;
 }) {
-  const points = [new THREE.Vector3(...start), new THREE.Vector3(...end)];
-  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+  const points = React.useMemo(() => [new THREE.Vector3(...start), new THREE.Vector3(...end)], [start, end]);
+  const lineGeometry = React.useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
+  const line = React.useMemo(() => {
+    const material = new THREE.LineBasicMaterial({ color });
+    return new THREE.Line(lineGeometry, material);
+  }, [lineGeometry, color]);
 
-  return (
-    <line geometry={lineGeometry}>
-      <lineBasicMaterial color={color} linewidth={2} />
-    </line>
-  );
+  return <primitive object={line} />;
 }
 
 // Main 3D Visualizer Component

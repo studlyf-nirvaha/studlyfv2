@@ -17,6 +17,7 @@ interface CertificateRecord {
   team_name?: string; event_title?: string; stage_name?: string; type?: string; category?: string; achievement_type?: string; achievement_key?: string;
   issued_on?: string; issue_date?: string; issued_date?: string; status?: string; verification_code?: string; email?: string;
   rank?: number; score?: number;
+  user_id?: string; participant_id?: string;
 }
 
 const parseDate = (d?: string) => {
@@ -623,7 +624,7 @@ const CertificatesPage: React.FC<{ institutionId: string; onNavigate?: (tab: str
       ) : showTemplateBuilder ? (
         <div className="fixed inset-0 z-50 bg-white p-8 overflow-y-auto">
           <button onClick={() => setShowTemplateBuilder(false)} className="mb-4 flex items-center text-sm text-slate-500 hover:text-indigo-600"><XCircle className="w-4 h-4 mr-2" /> Back to Dashboard</button>
-          <CertificateTemplateBuilder templates={templates} onSelect={selectTemplate} onUpdate={updateTemplate} onSave={saveTemplate} onDelete={deleteTemplate} selectedTemplate={selectedTemplate} />
+          <CertificateTemplateBuilder institutionId={institutionId} />
         </div>
       ) : (
         <>
@@ -798,9 +799,9 @@ const CertificatesPage: React.FC<{ institutionId: string; onNavigate?: (tab: str
                             <td className="py-3 px-4"><div className="flex items-center space-x-1">{isPending ? <span className="text-xs text-slate-400">---</span> : <><span className="text-xs font-mono">{c.verification_code || (c.certificate_id || '').slice(-8) || '------'}</span><div className="w-3 h-3 bg-slate-200 rounded-sm" /></>}</div></td>
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-center space-x-2 text-indigo-600">
-                                <Eye className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => setSelectedCertificate(c)} title="Preview Certificate" />
-                                {!isPending && <><Download className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Download certificate: ' + (c.certificate_id || c._id))} title="Download PDF" />
-                                <Mail className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Send email to: ' + c.email)} title="Email Certificate" /></>}
+                                <Eye className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => setSelectedCertificate(c)} aria-label="Preview Certificate" />
+                                {!isPending && <><Download className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Download certificate: ' + (c.certificate_id || c._id))} aria-label="Download PDF" />
+                                <Mail className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Send email to: ' + c.email)} aria-label="Email Certificate" /></>}
                                 <MoreVertical className="w-4 h-4 cursor-pointer text-slate-400" />
                               </div>
                             </td>
@@ -1151,7 +1152,10 @@ const CertificateRulesManager: React.FC<{ institutionId: string; onClose: () => 
   const [saving, setSaving] = useState(false);
   const [editingRule, setEditingRule] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    rule_name: string; rule_description: string; certificate_type: string;
+    rule_type: string; rule_config: Record<string, any>; status: string;
+  }>({
     rule_name: '',
     rule_description: '',
     certificate_type: 'winner',
@@ -1421,7 +1425,7 @@ const CertificateRulesManager: React.FC<{ institutionId: string; onClose: () => 
                   onChange={(e) => {
                     const val = e.target.value;
                     try { setFormData(f => ({ ...f, rule_config: JSON.parse(val) })); }
-                    catch { setFormData(f => ({ ...f, rule_config: val })); }
+                    catch { setFormData(f => ({ ...f, rule_config: val as any })); }
                   }}
                   rows={4} placeholder='{"key": "value"}' className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 font-mono focus:ring-2 focus:ring-purple-100 focus:border-[#6C3BFF] outline-none" />
               </div>

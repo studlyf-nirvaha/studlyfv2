@@ -418,7 +418,7 @@ const JudgeDashboard: React.FC = () => {
                                         <div className="text-center">
                                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Score</p>
                                             <div className="text-3xl font-black text-emerald-400 tracking-tighter">
-                                                {(Object.values(sub.existing_scores.scores || {}).reduce((a:any,b:any)=>a+b, 0) / Object.keys(sub.existing_scores.scores || {}).length).toFixed(1)}
+                                                {((Object.values(sub.existing_scores.scores || {}) as number[]).reduce((a,b)=>a+b, 0) / Object.keys(sub.existing_scores.scores || {}).length).toFixed(1)}
                                             </div>
                                         </div>
                                     ) : (

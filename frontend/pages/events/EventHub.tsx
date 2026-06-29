@@ -551,7 +551,24 @@ const EventHub: React.FC = () => {
                         )}
 
                         {activeTab === 'submissions' && (() => {
-                             // ... (existing team size calculation logic)
+                             // Team size enforcement variables
+                             const needsTeam = event?.participationType === 'team' || ((event?.min_team_size ?? 0) > 1);
+                             const minTeam = event?.min_team_size ?? 0;
+                             const maxTeam = event?.max_team_size ?? 0;
+                             const teamSizeConfigured = minTeam > 0 && maxTeam > 0;
+                             const memberCount = team?.members?.length ?? 0;
+                             const teamMeetsSize = !needsTeam || (teamSizeConfigured ? memberCount >= minTeam : !!team);
+
+                             // Dynamic fields from submission stage config
+                             const pendingStage = (event?.stages || []).find(
+                                 (s: any) => s.is_current === true && s.can_access === true
+                             ) || (event?.stages || []).find(
+                                 (s: any) => s.can_access === true && !s.is_completed
+                             );
+                             const dynamicFields: any[] = Array.isArray(pendingStage?.config?.fields)
+                                 ? pendingStage.config.fields
+                                 : [];
+                             const hasDynamicFields = dynamicFields.length > 0;
 
                              // Determine active stage using backend access flags
                              const activeStage = (event?.stages || []).find(
