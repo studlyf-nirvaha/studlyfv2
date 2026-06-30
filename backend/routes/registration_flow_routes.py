@@ -30,11 +30,12 @@ async def resolve_event_id(event_id: str) -> str:
     Returns the resolved event_id as a string.
     """
     try:
-        ev_id = ObjectId(event_id)
+        ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         ev = await events_col.find_one({"_id": ev_id})
         if ev:
             return str(ev["_id"])
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 37: {e}")
         pass
         
     ev = await events_col.find_one({"event_id": event_id})
@@ -44,9 +45,10 @@ async def resolve_event_id(event_id: str) -> str:
     # Attempt resolving via opportunities collection
     opp = None
     try:
-        opp_id = ObjectId(event_id)
+        opp_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         opp = await opportunities_col.find_one({"_id": opp_id})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 49: {e}")
         pass
         
     if not opp:
@@ -63,7 +65,8 @@ async def resolve_event_id(event_id: str) -> str:
             ev = await events_col.find_one({"_id": ev_id})
             if ev:
                 return str(ev["_id"])
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 66: {e}")
             pass
         return link_val
         
@@ -579,7 +582,7 @@ async def get_registration_form_config(event_id: str, user: dict = Depends(get_a
     try:
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
         
@@ -702,7 +705,7 @@ async def check_event_eligibility(event_id: str, user: dict = Depends(get_auth_u
     try:
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -730,7 +733,7 @@ async def preview_eligible_recipients(event_id: str, limit: int = 50, user: dict
         # Resolve event
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -778,7 +781,7 @@ async def announce_sample(event_id: str, payload: dict = Body(...), user: dict =
 
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -831,7 +834,7 @@ async def announce_event(event_id: str, payload: dict = Body(...), user: dict = 
 
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -859,7 +862,7 @@ async def announce_event(event_id: str, payload: dict = Body(...), user: dict = 
 async def list_announcements(event_id: str, user: dict = Depends(get_auth_user)):
     try:
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -893,7 +896,7 @@ async def list_announcements(event_id: str, user: dict = Depends(get_auth_user))
 async def announcement_audit(event_id: str, announcement_id: str, limit: int = 100, user: dict = Depends(get_auth_user)):
     try:
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
 
@@ -929,10 +932,11 @@ async def get_user_registration_status(event_id: str, user: dict = Depends(get_a
     if not reg:
         # Fallback check for legacy registrations stored with event_link_id (human-readable string)
         try:
-            ev = await events_col.find_one({"_id": ObjectId(event_id)})
+            ev = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
             if ev and ev.get("event_id"):
                 reg = await registrations_col.find_one({"event_id": str(ev["event_id"]), "user_id": user["user_id"]})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 935: {e}")
             pass
             
     if not reg:
@@ -949,7 +953,7 @@ async def submit_event_registration(event_id: str, request: ApplyRegistrationReq
     try:
         event_id = await resolve_event_id(event_id)
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
         
@@ -1186,7 +1190,7 @@ async def list_registrations_admin(
     """
     try:
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             
@@ -1258,7 +1262,7 @@ async def update_registration_status_admin(
     """
     try:
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             
@@ -1276,7 +1280,7 @@ async def update_registration_status_admin(
             raise HTTPException(status_code=400, detail=f"Invalid status value. Must be one of: {allowed_statuses}")
             
         try:
-            reg_obj_id = ObjectId(registration_id)
+            reg_obj_id = (ObjectId(registration_id) if ObjectId.is_valid(registration_id) else registration_id)
         except Exception:
             reg_obj_id = registration_id
             
@@ -1326,7 +1330,7 @@ async def get_event_roster(
     """
     try:
         try:
-            ev_id = ObjectId(event_id)
+            ev_id = (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)
         except Exception:
             ev_id = event_id
             
@@ -1440,7 +1444,7 @@ async def mark_participant_notified(
     from datetime import datetime, timezone
     # 1. Update the record
     result = await registrations_col.update_one(
-        {"_id": ObjectId(registration_id), "event_id": event_id},
+        {"_id": (ObjectId(registration_id) if ObjectId.is_valid(registration_id) else registration_id), "event_id": event_id},
         {"$set": {"notified_at": datetime.now(timezone.utc)}}
     )
     if result.modified_count == 0:

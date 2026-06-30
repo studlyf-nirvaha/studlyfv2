@@ -23,7 +23,7 @@ async def generate_event_certificates(
     if role not in ("institution", "admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Institution access required")
 
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 

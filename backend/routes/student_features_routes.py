@@ -335,7 +335,7 @@ async def list_blogs():
 
 @router.get("/blogs/{blog_id}")
 async def get_blog(blog_id: str):
-    b = await blogs_col.find_one({"_id": ObjectId(blog_id) if len(blog_id) == 24 else blog_id})
+    b = await blogs_col.find_one({"_id": (ObjectId(blog_id) if ObjectId.is_valid(blog_id) else blog_id) if len(blog_id) == 24 else blog_id})
     if not b:
         blogs = await list_blogs()
         for blog in blogs:

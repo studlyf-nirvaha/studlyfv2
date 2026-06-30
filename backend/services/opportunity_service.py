@@ -450,7 +450,7 @@ async def get_all_opportunities(filters: dict = None) -> List[dict]:
         filtered = await _filter_public_opportunities(opportunities)
         return await _hydrate_opportunity_list_from_events(filtered)
     except Exception as e:
-        print(f"[CRITICAL] get_all_opportunities failed: {e}")
+        logger.error(f"[CRITICAL] get_all_opportunities failed: {e}")
         import traceback
         traceback.print_exc()
         raise e
@@ -470,7 +470,8 @@ async def get_opportunity_by_id(
         # Try finding by direct ID first
         try:
             doc = await opportunities_col.find_one({"_id": ObjectId(opportunity_id)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 473: {e}")
             pass
             
         # Fallback to searching by event_link_id if not found or ID was invalid
@@ -485,7 +486,7 @@ async def get_opportunity_by_id(
             try:
                 ev = await events_col.find_one({"_id": ObjectId(str(eid))})
             except Exception as e:
-                print(f"[ERROR] Failed to fetch event {eid}: {e}")
+                logger.error(f"[ERROR] Failed to fetch event {eid}: {e}")
                 ev = None
             if not ev:
                 # Return the opportunity without event data if event not found
@@ -538,7 +539,7 @@ async def get_opportunity_by_id(
         _strip_payload_bloat(doc)
         return doc
     except Exception as e:
-        print(f"[ERROR] get_opportunity_by_id failed: {e}")
+        logger.error(f"[ERROR] get_opportunity_by_id failed: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -551,7 +552,8 @@ async def apply_for_opportunity(application_data: dict) -> dict:
     if oid:
         try:
             opp = await opportunities_col.find_one({"_id": ObjectId(oid)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 554: {e}")
             opp = None
         # Fetch user profile for eligibility checks
         user_profile = None
@@ -634,7 +636,8 @@ async def apply_for_opportunity(application_data: dict) -> dict:
                     try:
                         # Use _safe_dt for robust conversion
                         deadline = _safe_dt(deadline)
-                    except:
+                    except Exception as e:
+                        logger.warning(f"Handled exception at line 637: {e}")
                         deadline = None
                 
                 if deadline:
@@ -648,7 +651,7 @@ async def apply_for_opportunity(application_data: dict) -> dict:
                         if datetime.utcnow() > deadline_dt:
                             raise ValueError("Registration deadline has passed")
                     except Exception as e:
-                        print(f"Deadline validation error: {e}")
+                        logger.error(f"Deadline validation error: {e}")
                         # Continue with application if deadline validation fails
 
     if oid and uid:
@@ -706,7 +709,7 @@ async def apply_for_opportunity(application_data: dict) -> dict:
                         }
                     )
     except Exception as e:
-        print(f"[WARNING] Could not mirror participant for opportunity application: {e}")
+        logger.warning(f"[WARNING] Could not mirror participant for opportunity application: {e}")
 
     # Send Registration Confirmation Email
     try:
@@ -718,7 +721,7 @@ async def apply_for_opportunity(application_data: dict) -> dict:
             body = get_registration_template(user_name, opp_title)
             asyncio.create_task(send_notification_email(user_email, subj, body))
     except Exception as e:
-        print(f"Error sending registration email: {e}")
+        logger.error(f"Error sending registration email: {e}")
 
     application_data["_id"] = str(result.inserted_id)
     return application_data
@@ -741,9 +744,9 @@ async def get_user_applications(user_id: str) -> List[dict]:
                 if ObjectId.is_valid(oid):
                     opp_ids.append(ObjectId(oid))
                 else:
-                    print(f"Invalid ObjectId found for opportunity_id: {oid}")
+                    logger.info(f"Invalid ObjectId found for opportunity_id: {oid}")
             except Exception as e:
-                print(f"Error processing ObjectId {oid}: {e}")
+                logger.error(f"Error processing ObjectId {oid}: {e}")
                 continue
             
     opp_map = {}
@@ -837,9 +840,9 @@ async def get_learner_opportunity_overview(user_id: str, limit: int = 8) -> dict
                 if ObjectId.is_valid(oid):
                     opp_ids.append(ObjectId(oid))
                 else:
-                    print(f"Invalid ObjectId found for opportunity_id: {oid}")
+                    logger.info(f"Invalid ObjectId found for opportunity_id: {oid}")
             except Exception as e:
-                print(f"Error processing ObjectId {oid}: {e}")
+                logger.error(f"Error processing ObjectId {oid}: {e}")
                 continue
 
     opp_map = {}

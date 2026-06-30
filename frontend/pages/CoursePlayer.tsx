@@ -1,14 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import useCourseProgress from '../hooks/useCourseProgress';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../AuthContext';
 import { API_BASE_URL } from '../apiConfig';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+const CourseContent = lazy(() => import('../components/CourseContent'));
 import {
   ChevronDown, ChevronLeft, ChevronRight, FileText, HelpCircle,
   CheckCircle2, Menu, X, BookOpen, MessageCircle, StickyNote,
@@ -103,6 +99,7 @@ const CoursePlayer: React.FC = () => {
   const [activeToolTab, setActiveToolTab] = useState<'notes' | 'transcript' | 'resources'>('notes');
 
   const [moduleDetails, setModuleDetails] = useState<any>(null);
+  const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [courseData, setCourseData] = useState<any>(null);
 
@@ -124,7 +121,11 @@ const CoursePlayer: React.FC = () => {
     markLessonComplete,
     submitGradedQuiz,
     updateModules,
-  } = useCourseProgress({ userId: user?.uid, courseId: resolvedCourseId });
+  } = useCourseProgress({ userId: user?.user_id, courseId: resolvedCourseId });
+
+  useEffect(() => {
+    updateModules(modules);
+  }, [modules, updateModules]);
 
   useEffect(() => {
     if (resolvedCourseId) {
@@ -192,8 +193,8 @@ const CoursePlayer: React.FC = () => {
     try {
       // ✅ PERF FIX: Parallel API calls instead of sequential
       const [modulesRes, courseRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/courses/${resolvedCourseId}/modules?user_id=${user?.uid || ''}`),
-        fetch(`${API_BASE_URL}/api/course/${resolvedCourseId}/details?user_id=${user?.uid || ''}`)
+        fetch(`${API_BASE_URL}/api/courses/${resolvedCourseId}/modules?user_id=${user?.user_id || ''}`),
+        fetch(`${API_BASE_URL}/api/course/${resolvedCourseId}/details?user_id=${user?.user_id || ''}`)
       ]);
 
       const data = await modulesRes.json().catch(() => []);
@@ -238,7 +239,7 @@ const CoursePlayer: React.FC = () => {
         const p = mod.progress;
         if (p) {
           if (p.status === 'completed') {
-            const curChapter = courseCurriculum[modIdx] || courseCurriculum[modIdx % courseCurriculum.length];
+            const curChapter = curriculumSource[modIdx] || curriculumSource[modIdx % curriculumSource.length];
             curChapter.topics.forEach((_, tIdx) => {
               initialCompleted[`${modIdx}_${tIdx}`] = true;
             });
@@ -271,14 +272,14 @@ const CoursePlayer: React.FC = () => {
     } catch (err) {
       try { console.error('Error fetching modules:', err instanceof Error ? err.message : String(err)); } catch (_) {}
       let fetched: any[] = [];
-      if (courseCurriculum && courseCurriculum.length > 0) {
-        fetched = courseCurriculum.map((_, i) => ({
+      if (curriculumSource && curriculumSource.length > 0) {
+        fetched = curriculumSource.map((_, i) => ({
           _id: `dummy-mod-${i}`,
           progress: null
         }));
       }
       const formatted = fetched.map((mod: any, i: number) => {
-        const curChapter = courseCurriculum[i] || courseCurriculum[i % courseCurriculum.length];
+        const curChapter = curriculumSource[i] || curriculumSource[i % curriculumSource.length];
         return {
           ...mod,
           title: curChapter?.title || `Module ${i + 1}`,
@@ -294,7 +295,7 @@ const CoursePlayer: React.FC = () => {
       setLoading(false);
       return formatted;
     }
-  }, [resolvedCourseId, user, courseCurriculum]);
+  }, [resolvedCourseId, user, curriculumSource]);
 
   // ✅ PERF FIX: Track last fetched module to avoid redundant detail fetches
   const lastFetchedModuleIdRef = useRef<string | null>(null);
@@ -330,7 +331,7 @@ const CoursePlayer: React.FC = () => {
     setModuleDetails(data);
     
     // Fetch dynamic questions count from the current chapter topic
-    const activeChapter = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+    const activeChapter = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
     const quizTopic = activeChapter?.topics?.find(t => t.type === 'graded_quiz');
     const gradedQs = quizTopic?.graded || [];
     setQuizAnswers(gradedQs.map(() => []));
@@ -364,7 +365,7 @@ const CoursePlayer: React.FC = () => {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          user_id: user?.uid, 
+          user_id: user?.user_id, 
           course_id: resolvedCourseId, 
           module_id: modules[activeModuleIndex]?._id, 
           updates 
@@ -373,11 +374,10 @@ const CoursePlayer: React.FC = () => {
       const data = await res.json();
       return data;
     } catch (err) {
-      console.warn("Failed to sync progress with database, persisting locally.", err);
     }
   };
 
-  const activeChapterData = courseCurriculum[activeModuleIndex] || courseCurriculum[activeModuleIndex % courseCurriculum.length];
+  const activeChapterData = curriculumSource[activeModuleIndex] || curriculumSource[activeModuleIndex % curriculumSource.length];
   const activeTopicData = activeChapterData?.topics?.[activeLessonIndex];
 
   /* ── Graded Quiz Submission ── */
@@ -816,27 +816,15 @@ const CoursePlayer: React.FC = () => {
                       {estimateReadingTime(activeContentDb.overview)} min read
                     </span>
                   </div>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}
-                    components={{
-                      h1: ({ children }) => <h1 className="text-3xl font-extrabold text-gray-900 mb-6">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-2xl font-bold text-gray-800 border-b pb-2 mb-4 mt-8">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-xl font-bold text-[#7C3AED] mb-4 mt-6">{children}</h3>,
-                      p: ({ children }) => <p className="text-base text-gray-600 leading-relaxed mb-4">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc pl-6 mb-6 space-y-2">{children}</ul>,
-                      li: ({ children }) => <li className="text-base text-gray-700 font-medium">{children}</li>
-                    }}
-                  >
-                    {activeContentDb.overview}
-                  </ReactMarkdown>
-                  
-                  {!isCurrentLessonComplete && (
-                    <div style={{ marginTop: 40, paddingTop: 30, borderTop: '1px solid #e5e7eb' }}>
-                      <button className="cp-bottom-nav-btn next" style={{ width: '100%', justifyContent: 'center', padding: '16px', borderRadius: '12px' }} onClick={handleMarkComplete}>
-                        <CheckCircle2 size={18} />
-                        I'm Ready! Mark Complete & Start Reading
-                      </button>
-                    </div>
-                  )}
+
+                  <Suspense fallback={<div className="text-sm text-gray-400">Loading lesson content...</div>}>
+                    <CourseContent
+                      activeStage="overview"
+                      activeContentDb={activeContentDb}
+                      isCurrentLessonComplete={isCurrentLessonComplete}
+                      handleMarkComplete={handleMarkComplete}
+                    />
+                  </Suspense>
                 </motion.div>
               )}
 
@@ -862,42 +850,15 @@ const CoursePlayer: React.FC = () => {
                       {estimateReadingTime(activeContentDb.reading)} min read
                     </span>
                   </div>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}
-                    components={{
-                      h1: ({ children }) => <h1 className="text-3xl font-extrabold text-gray-900 mb-6">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-2xl font-bold text-gray-800 border-b pb-2 mb-4 mt-8">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-xl font-bold text-[#7C3AED] mb-4 mt-6">{children}</h3>,
-                      p: ({ children }) => <p className="text-base text-gray-600 leading-relaxed mb-4">{children}</p>,
-                      blockquote: ({ children }) => (
-                        <blockquote className="border-l-4 border-[#7C3AED] bg-purple-50 p-4 my-6 italic text-gray-700 rounded-r-xl">
-                          {children}
-                        </blockquote>
-                      ),
-                      pre: ({ children }) => <div className="my-6 rounded-xl overflow-hidden shadow-lg border border-gray-200">{children}</div>,
-                      code({ node, inline, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        return !inline && match ? (
-                          <SyntaxHighlighter
-                            style={atomDark}
-                            language={match[1]}
-                            PreTag="div"
-                            {...props}
-                            customStyle={{ margin: 0, padding: '20px', fontSize: '14px', borderRadius: '0' }}
-                          >
-                            {String(children).replace(/\n$/, '')}
-                          </SyntaxHighlighter>
-                        ) : (
-                          <code className="bg-gray-100 text-[#7C3AED] px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                            {children}
-                          </code>
-                        );
-                      },
-                      ul: ({ children }) => <ul className="list-disc pl-6 mb-6 space-y-2">{children}</ul>,
-                      li: ({ children }) => <li className="text-base text-gray-700">{children}</li>
-                    }}
-                  >
-                    {activeContentDb.reading}
-                  </ReactMarkdown>
+
+                  <Suspense fallback={<div className="text-sm text-gray-400">Loading lesson theory...</div>}>
+                    <CourseContent
+                      activeStage={activeStage}
+                      activeContentDb={activeContentDb}
+                      isCurrentLessonComplete={isCurrentLessonComplete}
+                      handleMarkComplete={handleMarkComplete}
+                    />
+                  </Suspense>
 
                   {!isCurrentLessonComplete && (
                     <div style={{ marginTop: 40, paddingTop: 30, borderTop: '1px solid #e5e7eb' }}>
@@ -1276,7 +1237,7 @@ const CoursePlayer: React.FC = () => {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                user_id: user?.uid,
+                                user_id: user?.user_id,
                                 course_id: resolvedCourseId,
                                 updates: { 
                                   github_link: githubLink, 
@@ -1297,7 +1258,6 @@ const CoursePlayer: React.FC = () => {
                             setActiveStage('result');
                             scrollContentTop();
                           } catch (err) {
-                            console.warn("Failed to sync project with server, graduated locally.", err);
                             alert("Project submitted locally! Your certificate has been unlocked!");
                             setActiveModuleIndex(-3);
                             setActiveStage('result');
@@ -1361,7 +1321,7 @@ const CoursePlayer: React.FC = () => {
               )}
 
             </AnimatePresence>
-          {activeStage !== 'result' && activeStage !== 'capstone' && (
+          {(activeStage as string) !== 'result' && (activeStage as string) !== 'capstone' && (
             <div className="cp-lesson-navigation" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
               <button
                 className="cp-bottom-nav-btn"
@@ -1372,7 +1332,7 @@ const CoursePlayer: React.FC = () => {
               </button>
               <button
                 className="cp-bottom-nav-btn"
-                disabled={currentFlatIndex >= flatLessons.length - 1 || activeStage === 'result' || activeStage === 'capstone'}
+                disabled={currentFlatIndex >= flatLessons.length - 1 || (activeStage as string) === 'result' || (activeStage as string) === 'capstone'}
                 onClick={goToNextLesson}
               >
                 Next Lesson →
@@ -1489,7 +1449,7 @@ const CoursePlayer: React.FC = () => {
               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               style={{ padding: '48px 32px', textAlign: 'center', borderRadius: 24, boxShadow: '0 25px 50px rgba(0,0,0,0.15)' }}
             >
-              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justify_content: 'center' }}>
+              <div style={{ position: 'relative', width: 100, height: 100, margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ position: 'absolute', inset: 0, background: '#F5F3FF', borderRadius: '50%', transform: 'scale(1.2)' }} />
                 <Award size={64} style={{ color: '#7C3AED', position: 'relative', zIndex: 2, margin: '18px auto' }} />
                 <div style={{ position: 'absolute', bottom: -5, right: -5, background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 800 }}>MODULE COMPLETED</div>

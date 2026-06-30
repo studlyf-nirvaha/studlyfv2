@@ -11,6 +11,12 @@ interface InstitutionData {
     loading: boolean;
 }
 
+interface InstitutionDataContextType extends InstitutionData {
+    refresh: () => Promise<void>;
+}
+
+const InstitutionDataContext = createContext<InstitutionDataContextType | undefined>(undefined);
+
 // ... existing provider logic
 export const InstitutionDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { user } = useAuth();

@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from db import event_certificates_col, cert_templates_col, certificate_jobs_col
 from services.email_template_service import get_active_template, render_template
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 ACHIEVEMENT_TYPES = {
@@ -247,10 +250,10 @@ class InstitutionalCertificateService:
                         cert_type=achievement_type,
                     )
                 except Exception as e:
-                    print(f"[TEMPLATE ERROR] Rendering failed for template {template_id}: {e}")
+                    logger.error(f"[TEMPLATE ERROR] Rendering failed for template {template_id}: {e}")
                     html = None
             else:
-                print(f"[TEMPLATE ERROR] Template {template_id} not found or no content")
+                logger.error(f"[TEMPLATE ERROR] Template {template_id} not found or no content")
 
         if not html:
             template_path = os.path.join(os.path.dirname(__file__), '../templates/professional_certificate.html')
@@ -451,7 +454,7 @@ class InstitutionalCertificateService:
                     )
                     await send_notification_email(recipient["email"], feedback_subject, feedback_body)
                 except Exception as e:
-                    print(f"[CERT EMAIL FAIL] {recipient['user_id']}: {e}")
+                    logger.info(f"[CERT EMAIL FAIL] {recipient['user_id']}: {e}")
 
         return issued_records
 
@@ -545,7 +548,7 @@ async def process_certificate_jobs():
                         from services.email_service import send_notification_email
                         await send_notification_email(email, subj, body)
                     except Exception as e:
-                        print(f"[CERT BG EMAIL FAIL] batch-send: {e}")
+                        logger.info(f"[CERT BG EMAIL FAIL] batch-send: {e}")
                 processed += len(pending_records)
                 await certificate_jobs_col.update_one(
                     {"_id": job["_id"]},
@@ -619,7 +622,7 @@ async def process_certificate_jobs():
                             )
                         pending_email_jobs.append((pemail, subj, body))
                 except Exception as e:
-                    print(f"[CERT BG EMAIL FAIL] {pid}: {e}")
+                    logger.info(f"[CERT BG EMAIL FAIL] {pid}: {e}")
 
                 if len(pending_records) >= batch_size:
                     await flush_pending_batch()
@@ -634,7 +637,7 @@ async def process_certificate_jobs():
         except asyncio.CancelledError:
             break
         except Exception as e:
-            print(f"[CERT QUEUE ERROR] {e}")
+            logger.error(f"[CERT QUEUE ERROR] {e}")
             await asyncio.sleep(10)
 
 

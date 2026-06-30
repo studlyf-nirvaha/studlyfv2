@@ -60,10 +60,22 @@ const getSizeClasses = (size: string) => {
 
 const MentorCredibility: React.FC = () => {
     const [hoveredLogo, setHoveredLogo] = useState<string | null>(null);
-    const [isLoaded, setIsLoaded] = useState(false);
+    const [viewport, setViewport] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
 
     useEffect(() => {
-        setIsLoaded(true);
+        const handleResize = () => {
+            const width = window.innerWidth;
+            if (width < 768) {
+                setViewport('mobile');
+            } else if (width >= 768 && width < 1024) {
+                setViewport('tablet');
+            } else {
+                setViewport('desktop');
+            }
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     return (
@@ -75,69 +87,71 @@ const MentorCredibility: React.FC = () => {
             </div>
 
             {/* Desktop: Premium Floating Bubbles */}
-            <div className="hidden lg:block absolute inset-0 pointer-events-none">
-                <div className="relative w-full h-full max-w-7xl mx-auto">
-                    {companyLogos.map((logo, index) => (
-                        <motion.div
-                            key={logo.name}
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{
-                                opacity: 1,
-                                scale: 1,
-                                y: [0, -15, 0],
-                                x: [0, 10, 0]
-                            }}
-                            transition={{
-                                opacity: { duration: 1, delay: logo.delay },
-                                scale: { duration: 1, delay: logo.delay },
-                                y: {
-                                    duration: 5 + Math.random() * 5,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                    delay: Math.random() * 2
-                                },
-                                x: {
-                                    duration: 4 + Math.random() * 4,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                    delay: Math.random() * 2
-                                }
-                            }}
-                            className="absolute pointer-events-auto"
-                            style={logo.position}
-                            onMouseEnter={() => setHoveredLogo(logo.name)}
-                            onMouseLeave={() => setHoveredLogo(null)}
-                        >
-                            <div
-                                className={`
-                                    ${getSizeClasses(logo.size)}
-                                    bg-white/40 backdrop-blur-lg rounded-full 
-                                    shadow-[0_8px_32px_rgba(0,0,0,0.06)] 
-                                    border border-white/80
-                                    flex items-center justify-center
-                                    transition-all duration-500 ease-out
-                                    ${hoveredLogo === logo.name ? 'scale-115 shadow-2xl border-purple-200 z-50' : 'z-10'}
-                                    cursor-pointer p-4 group
-                                `}
-                                onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
+            {viewport === 'desktop' && (
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="relative w-full h-full max-w-7xl mx-auto">
+                        {companyLogos.map((logo, index) => (
+                            <motion.div
+                                key={logo.name}
+                                initial={{ opacity: 0, scale: 0.5 }}
+                                animate={{
+                                    opacity: 1,
+                                    scale: 1,
+                                    y: [0, -15, 0],
+                                    x: [0, 10, 0]
+                                }}
+                                transition={{
+                                    opacity: { duration: 1, delay: logo.delay },
+                                    scale: { duration: 1, delay: logo.delay },
+                                    y: {
+                                        duration: 5 + Math.random() * 5,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        delay: Math.random() * 2
+                                    },
+                                    x: {
+                                        duration: 4 + Math.random() * 4,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        delay: Math.random() * 2
+                                    }
+                                }}
+                                className="absolute pointer-events-auto"
+                                style={logo.position}
+                                onMouseEnter={() => setHoveredLogo(logo.name)}
+                                onMouseLeave={() => setHoveredLogo(null)}
                             >
-                                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                <img
-                                    src={`/images-optimized/${logo.fileName}`}
-                                    alt={`${logo.name} logo`}
-                                    className="w-full h-full object-contain relative z-10 transition-all duration-500 group-hover:drop-shadow-md"
-                                    decoding="async"
-                                    loading={index < 8 ? "eager" : "lazy"}
-                                    fetchpriority={index < 8 ? "high" : "low"}
-                                    style={{
-                                        filter: 'grayscale(0%) brightness(1) opacity(1)'
-                                    }}
-                                />
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div
+                                    className={`
+                                        ${getSizeClasses(logo.size)}
+                                        bg-white/40 backdrop-blur-lg rounded-full 
+                                        shadow-[0_8px_32px_rgba(0,0,0,0.06)] 
+                                        border border-white/80
+                                        flex items-center justify-center
+                                        transition-all duration-500 ease-out
+                                        ${hoveredLogo === logo.name ? 'scale-115 shadow-2xl border-purple-200 z-50' : 'z-10'}
+                                        cursor-pointer p-4 group
+                                    `}
+                                    onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
+                                >
+                                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                    <img
+                                        src={`/images-optimized/${logo.fileName}`}
+                                        alt={`${logo.name} logo`}
+                                        className="w-full h-full object-contain relative z-10 transition-all duration-500 group-hover:drop-shadow-md"
+                                        decoding="async"
+                                        loading={index < 8 ? "eager" : "lazy"}
+                                        fetchpriority={index < 8 ? "high" : "low"}
+                                        style={{
+                                            filter: 'grayscale(0%) brightness(1) opacity(1)'
+                                        }}
+                                    />
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Central Content */}
             <div className="relative z-30 max-w-4xl mx-auto px-6 text-center">
@@ -170,54 +184,58 @@ const MentorCredibility: React.FC = () => {
                 </motion.div>
 
                 {/* Tablet: Bubble Grid */}
-                <div className="hidden md:block lg:hidden mt-20 max-w-5xl mx-auto">
-                    <div className="grid grid-cols-4 gap-8">
-                        {companyLogos.slice(0, 16).map((logo) => (
-                            <motion.div
-                                key={logo.name}
-                                whileInView={{ opacity: 1, scale: 1 }}
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                transition={{ duration: 0.5 }}
-                                className="flex justify-center"
-                            >
-                                <div
-                                    className="w-24 h-24 bg-white/60 backdrop-blur-md rounded-full shadow-lg border border-white flex items-center justify-center p-4 cursor-pointer hover:scale-110 transition-transform duration-300"
-                                    onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
+                {viewport === 'tablet' && (
+                    <div className="mt-20 max-w-5xl mx-auto">
+                        <div className="grid grid-cols-4 gap-8">
+                            {companyLogos.slice(0, 16).map((logo) => (
+                                <motion.div
+                                    key={logo.name}
+                                    whileInView={{ opacity: 1, scale: 1 }}
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="flex justify-center"
                                 >
-                                    <img
-                                        src={`/images-optimized/${logo.fileName}`}
-                                        alt={logo.name}
-                                        className="w-full h-full object-contain"
-                                        decoding="async"
-                                        loading="lazy"
-                                    />
-                                </div>
-                            </motion.div>
-                        ))}
+                                    <div
+                                        className="w-24 h-24 bg-white/60 backdrop-blur-md rounded-full shadow-lg border border-white flex items-center justify-center p-4 cursor-pointer hover:scale-110 transition-transform duration-300"
+                                        onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
+                                    >
+                                        <img
+                                            src={`/images-optimized/${logo.fileName}`}
+                                            alt={logo.name}
+                                            className="w-full h-full object-contain"
+                                            decoding="async"
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Mobile: Bubble Grid */}
-                <div className="block md:hidden mt-16 max-w-sm mx-auto px-4">
-                    <div className="grid grid-cols-3 gap-6">
-                        {companyLogos.slice(0, 12).map((logo) => (
-                            <div key={logo.name} className="flex flex-col items-center gap-2">
-                                <div
-                                    className="w-20 h-20 bg-white/60 backdrop-blur-md rounded-full shadow-md border border-white flex items-center justify-center p-3 cursor-pointer hover:scale-110 transition-transform duration-300"
-                                    onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
-                                >
-                                    <img
-                                        src={`/images-optimized/${logo.fileName}`}
-                                        alt={logo.name}
-                                        className="w-full h-full object-contain"
-                                        decoding="async"
-                                        loading="lazy"
-                                    />
+                {viewport === 'mobile' && (
+                    <div className="mt-16 max-w-sm mx-auto px-4">
+                        <div className="grid grid-cols-3 gap-6">
+                            {companyLogos.slice(0, 12).map((logo) => (
+                                <div key={logo.name} className="flex flex-col items-center gap-2">
+                                    <div
+                                        className="w-20 h-20 bg-white/60 backdrop-blur-md rounded-full shadow-md border border-white flex items-center justify-center p-3 cursor-pointer hover:scale-110 transition-transform duration-300"
+                                        onClick={() => document.getElementById('enquiry-form')?.scrollIntoView({ behavior: 'smooth' })}
+                                    >
+                                        <img
+                                            src={`/images-optimized/${logo.fileName}`}
+                                            alt={logo.name}
+                                            className="w-full h-full object-contain"
+                                            decoding="async"
+                                            loading="lazy"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <style dangerouslySetInnerHTML={{

@@ -20,7 +20,7 @@ const JudgeManagement: React.FC = () => {
     const fetchJudges = async () => {
         try {
             setLoading(true);
-            const res = await fetch(`${API_BASE_URL}/api/judges`, {
+            const res = await fetch(`${API_BASE_URL}/api/judges/`, {
                 headers: { ...authHeaders() }
             });
             if (res.ok) {
@@ -41,7 +41,7 @@ const JudgeManagement: React.FC = () => {
     const handleInviteJudge = async (judgeData: any) => {
         setIsInviting(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/api/judges`, {
+            const res = await fetch(`${API_BASE_URL}/api/judges/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...authHeaders() },
                 body: JSON.stringify({

@@ -16,6 +16,9 @@ from services.field_validation import (
     persist_submission_file_fields,
 )
 from services.submission_format import format_submission_timestamp, resolve_notification_action_url
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 async def _resolve_event_id(event_id: str) -> str:
@@ -103,7 +106,8 @@ async def validate_submission_data(
         elif field_type == "number":
             try:
                 float(value)
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 106: {e}")
                 errors[field_id] = "Must be a valid number"
         
         elif field_type == "textarea":
@@ -365,11 +369,11 @@ async def submit_stage_data(
         mirrored_app_id = None
         try:
             # Find a mirrored opportunity linked to this event (if any)
-            print(f"[DEBUG] Attempting to mirror submission for event {event_id} user {user_id}")
+            logger.info(f"[DEBUG] Attempting to mirror submission for event {event_id} user {user_id}")
             opp = await opportunities_col.find_one({"event_link_id": str(event_id)})
             if opp:
                 opp_id = str(opp.get("_id"))
-                print(f"[DEBUG] Found opportunity {opp_id} linked to event {event_id}")
+                logger.info(f"[DEBUG] Found opportunity {opp_id} linked to event {event_id}")
                 existing = await opportunity_applications_col.find_one({"opportunity_id": opp_id, "user_id": str(user_id)})
                 if not existing:
                     from datetime import datetime as _dt
@@ -387,25 +391,25 @@ async def submit_stage_data(
                     try:
                         mirrored_app_id = str(r.inserted_id)
                         mirrored = True
-                        print(f"[DEBUG] Inserted mirrored application {mirrored_app_id} for opportunity {opp_id}")
+                        logger.info(f"[DEBUG] Inserted mirrored application {mirrored_app_id} for opportunity {opp_id}")
                     except Exception as e:
-                        print(f"[WARNING] Inserted mirrored application but failed to read inserted_id: {e}")
+                        logger.error(f"[WARNING] Inserted mirrored application but failed to read inserted_id: {e}")
                     # Increment applicants count on opportunity
                     try:
                         await opportunities_col.update_one({"_id": opp.get("_id")}, {"$inc": {"applicantsCount": 1}})
                     except Exception as e:
-                        print(f"[WARNING] Could not increment applicantsCount on opportunity {opp_id}: {e}")
+                        logger.warning(f"[WARNING] Could not increment applicantsCount on opportunity {opp_id}: {e}")
                 else:
-                    print(f"[DEBUG] Application already exists for user {user_id} on opportunity {opp_id}")
+                    logger.info(f"[DEBUG] Application already exists for user {user_id} on opportunity {opp_id}")
                     mirrored = True
                     try:
                         mirrored_app_id = str(existing.get("_id"))
                     except Exception:
                         mirrored_app_id = None
             else:
-                print(f"[DEBUG] No opportunity linked to event {event_id} — skipping mirror")
+                logger.info(f"[DEBUG] No opportunity linked to event {event_id} — skipping mirror")
         except Exception as e:
-            print(f"[WARNING] Could not mirror submission to opportunity applications: {e}")
+            logger.warning(f"[WARNING] Could not mirror submission to opportunity applications: {e}")
         
         # Create/update opportunity application so it shows in "My Applications"
         try:
@@ -425,7 +429,7 @@ async def submit_stage_data(
                     upsert=True
                 )
         except Exception as e:
-            print(f"[WARN] Failed to sync opportunity application: {e}")
+            logger.error(f"[WARN] Failed to sync opportunity application: {e}")
 
         try:
             stage_label = target_stage.get("name") or "Submission"
@@ -497,7 +501,7 @@ async def submit_stage_data(
                     meta=meta,
                 )
         except Exception as e:
-            print(f"[WARN] Could not create submission notification: {e}")
+            logger.warning(f"[WARN] Could not create submission notification: {e}")
 
         async def _send_confirmation_email():
             try:
@@ -555,7 +559,7 @@ async def submit_stage_data(
                     )
                 await send_notification_email(participant_email, subject, body_html)
             except Exception as e:
-                print(f"[WARN] submission confirmation email failed: {e}")
+                logger.error(f"[WARN] submission confirmation email failed: {e}")
 
         asyncio.create_task(_send_confirmation_email())
 
@@ -576,7 +580,7 @@ async def submit_stage_data(
         }
     
     except Exception as e:
-        print(f"[ERROR] submit_stage_data: {e}")
+        logger.error(f"[ERROR] submit_stage_data: {e}")
         return {"error": str(e), "status": "error"}
 
 async def get_submission_data(
@@ -638,7 +642,7 @@ async def get_submission_data(
             "can_edit": can_edit,
         }
     except Exception as e:
-        print(f"[ERROR] get_submission_data: {e}")
+        logger.error(f"[ERROR] get_submission_data: {e}")
         return {"error": str(e)}
 
 async def update_profile_registration(
@@ -714,5 +718,5 @@ async def update_profile_registration(
             "participant_id": participant_id,
         }
     except Exception as e:
-        print(f"[ERROR] update_profile_registration: {e}")
+        logger.error(f"[ERROR] update_profile_registration: {e}")
         return {"error": str(e)}

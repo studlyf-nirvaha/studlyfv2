@@ -819,22 +819,34 @@ async def delete_institution_listing(event_id: str, user: dict = Depends(get_aut
             from db import participants_col, teams_col, submissions_col, submission_data_col, hackathon_submissions_col, scores_col
             try:
                 await participants_col.delete_many({"event_id": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 822: {e}")
+                pass
             try:
                 await teams_col.delete_many({"event_id": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 825: {e}")
+                pass
             try:
                 await submissions_col.delete_many({"event_id": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 828: {e}")
+                pass
             try:
                 await submission_data_col.delete_many({"event_id": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 831: {e}")
+                pass
             try:
                 await hackathon_submissions_col.delete_many({"hackathonId": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 834: {e}")
+                pass
             try:
                 await scores_col.delete_many({"event_id": event_id})
-            except: pass
+            except Exception as e:
+                logger.warning(f"Handled exception at line 837: {e}")
+                pass
             return {"status": "success", "message": "Event deleted successfully"}
     except Exception:
         pass
@@ -865,7 +877,8 @@ async def get_event_participants(event_id: str, user: dict = Depends(get_auth_us
     try:
         if len(str(event_id)) == 24:
             ev_id_variants.append(ObjectId(event_id))
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 868: {e}")
         pass
 
     linked_opp = await opportunities_col.find_one({"event_link_id": {"$in": ev_id_variants}})
@@ -1984,7 +1997,9 @@ async def list_event_submissions_enriched(event_id: str, user: dict = Depends(ge
         try:
             if len(str(event_id)) == 24:
                 ev_id_variants.append(ObjectId(event_id))
-        except: pass
+        except Exception as e:
+            logger.warning(f"Handled exception at line 1987: {e}")
+            pass
 
         linked_opp = await opportunities_col.find_one({"event_link_id": {"$in": ev_id_variants}})
         opp_id_ctx = str(linked_opp["_id"]) if linked_opp else None
@@ -2168,7 +2183,8 @@ async def update_team_institution_selection(
     try:
         if len(str(event_id)) == 24:
             ev_id_variants.append(ObjectId(event_id))
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 2171: {e}")
         pass
 
     # 1. Try Teams collection
@@ -3305,7 +3321,8 @@ async def get_all_deliverables(institution_id: str, user: dict = Depends(get_aut
     try:
         if len(str(institution_id)) == 24:
             inst_variants.append(ObjectId(institution_id))
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 3308: {e}")
         pass
 
     # 1. Get all events for this institution to scope the search
@@ -3353,7 +3370,8 @@ async def get_all_submissions(institution_id: str, user: dict = Depends(get_auth
     try:
         if len(str(institution_id)) == 24:
             inst_variants.append(ObjectId(institution_id))
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 3356: {e}")
         pass
 
     # 1. Get all events
@@ -4257,7 +4275,7 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
     team_id = email_data.get("team_id")
     emails = email_data.get("emails", [])
     
-    print(f"[EMAIL DEBUG] Team ID: {team_id}, Status: {status}, Provided emails: {emails}")
+    logger.info(f"[EMAIL DEBUG] Team ID: {team_id}, Status: {status}, Provided emails: {emails}")
 
     def _add_email(value: str | None, bucket: list[str]):
         if not value:
@@ -4311,10 +4329,10 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
                         user_doc = None
                 if user_doc and user_doc.get("email"):
                     _add_email(user_doc.get("email"), emails)
-        print(f"[EMAIL DEBUG] Fetched {len(emails)} emails from participants: {emails}")
+        logger.info(f"[EMAIL DEBUG] Fetched {len(emails)} emails from participants: {emails}")
     
     if not emails:
-        print(f"[EMAIL DEBUG] No email addresses found for team {team_id}")
+        logger.info(f"[EMAIL DEBUG] No email addresses found for team {team_id}")
         return {"status": "no_emails", "message": "No email addresses provided", "emails_found": emails}
     
     # Stage context from frontend
@@ -4380,14 +4398,14 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
     sent_count = 0
     for email in emails:
         try:
-            print(f"[EMAIL DEBUG] Attempting to send email to {email}")
+            logger.info(f"[EMAIL DEBUG] Attempting to send email to {email}")
             result = await send_notification_email(email, subject, body_html)
-            print(f"[EMAIL DEBUG] Email sent to {email}, result: {result}")
+            logger.info(f"[EMAIL DEBUG] Email sent to {email}, result: {result}")
             sent_count += 1
         except Exception as e:
-            print(f"[EMAIL DEBUG] Failed to send email to {email}: {e}")
+            logger.error(f"[EMAIL DEBUG] Failed to send email to {email}: {e}")
     
-    print(f"[EMAIL DEBUG] Email sending complete. Sent: {sent_count}/{len(emails)}")
+    logger.info(f"[EMAIL DEBUG] Email sending complete. Sent: {sent_count}/{len(emails)}")
 
     submission_id = email_data.get("submission_id")
     if sent_count > 0 and submission_id:
@@ -4711,7 +4729,7 @@ async def update_event_details(event_id: str, update_data: dict, user: dict = De
         if opp_update:
             await opportunities_col.update_many({"event_link_id": str(event_id)}, {"$set": opp_update})
     except Exception as e:
-        print(f"[ERROR] Failed to sync opportunity: {e}")
+        logger.error(f"[ERROR] Failed to sync opportunity: {e}")
 
     # ── Trigger notifications for changes ──
     if changed_deadlines:
@@ -5354,7 +5372,9 @@ async def _background_auto_classify(event_id: str, thresholds: dict, criteria_da
         for vid in list(event_id_variants):
             if ObjectId.is_valid(vid):
                 try: event_id_in.append(ObjectId(vid))
-                except: pass
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 5357: {e}")
+                    pass
 
         # Filter by stage_id if provided
         query: dict = {"event_id": {"$in": event_id_in}}
@@ -5408,7 +5428,7 @@ async def _background_auto_classify(event_id: str, thresholds: dict, criteria_da
             await _classify_and_update(submission_data_col, {"_id": sd["_id"]}, sd)
 
     except Exception as e:
-        print(f"[ERROR] Auto-classification background task failed for event {event_id}: {e}")
+        logger.error(f"[ERROR] Auto-classification background task failed for event {event_id}: {e}")
 
 @router.post("/events/{event_id}/criteria")
 async def update_judging_criteria(event_id: str, request: Request, background_tasks: BackgroundTasks, user: dict = Depends(get_auth_user)):
@@ -6363,7 +6383,8 @@ async def create_pro_event(request: Request, user: dict = Depends(get_auth_user)
                     event_data[key] = False
                 else:
                     event_data[key] = value
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 6366: {e}")
             event_data[key] = value
 
     # 2. Handle Image Uploads
@@ -6419,14 +6440,14 @@ async def create_pro_event(request: Request, user: dict = Depends(get_auth_user)
     fest_logo_file = form.get('festival_logo_file')
     fest_banner_file = form.get('festival_banner_file')
     
-    print("=== DEBUG CREATE PRO EVENT ===")
-    print("Form keys:", list(form.keys()))
-    print("logo_file:", logo_file, "type:", type(logo_file))
-    print("banner_file:", banner_file, "type:", type(banner_file))
+    logger.info("=== DEBUG CREATE PRO EVENT ===")
+    logger.info("Form keys:", list(form.keys()))
+    logger.info("logo_file:", logo_file, "type:", type(logo_file))
+    logger.info("banner_file:", banner_file, "type:", type(banner_file))
     
     if logo_file and hasattr(logo_file, "filename") and logo_file.filename:
         url = await save_image(logo_file, "logo")
-        print("Saved logo URL:", url)
+        logger.info("Saved logo URL:", url)
         if url: event_data["logo_url"] = url
         
     if banner_file and hasattr(banner_file, "filename") and banner_file.filename:
@@ -6495,10 +6516,10 @@ async def create_pro_event(request: Request, user: dict = Depends(get_auth_user)
         if participation_type in ("team", "both") and _strict_team_size_bounds(event_data) is None:
             raise HTTPException(status_code=400, detail="Team size must be configured before making this event live")
         
-    print("=== FINAL EVENT DATA ===")
-    print("logo_url in event_data:", event_data.get("logo_url", "MISSING"))
-    print("banner_url in event_data:", event_data.get("banner_url", "MISSING"))
-    print("festivalData keys:", list(event_data.get("festivalData", {}).keys()) if isinstance(event_data.get("festivalData"), dict) else "N/A")
+    logger.info("=== FINAL EVENT DATA ===")
+    logger.info("logo_url in event_data:", event_data.get("logo_url", "MISSING"))
+    logger.info("banner_url in event_data:", event_data.get("banner_url", "MISSING"))
+    logger.info("festivalData keys:", list(event_data.get("festivalData", {}).keys()) if isinstance(event_data.get("festivalData"), dict) else "N/A")
     
     result = await events_col.insert_one(event_data)
     
@@ -6566,7 +6587,8 @@ async def create_pro_event(request: Request, user: dict = Depends(get_auth_user)
                 try:
                     parsed = json.loads(v)
                     return parsed if isinstance(parsed, list) else [parsed]
-                except:
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 6569: {e}")
                     return [v]
             return [v]
 
@@ -6586,7 +6608,8 @@ async def create_pro_event(request: Request, user: dict = Depends(get_auth_user)
         if isinstance(opp_data["deadline"], str):
             try:
                 opp_data["deadline"] = datetime.fromisoformat(opp_data["deadline"].replace("Z", "+00:00"))
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 6589: {e}")
                 opp_data["deadline"] = datetime.now(timezone.utc)
 
         await opportunities_col.insert_one(opp_data)
@@ -6637,7 +6660,8 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
                     event_data[key] = False
                 else:
                     event_data[key] = value
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 6640: {e}")
             event_data[key] = value
 
     # 2. Handle Image Uploads
@@ -6693,14 +6717,14 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
     fest_logo_file = form.get('festival_logo_file')
     fest_banner_file = form.get('festival_banner_file')
     
-    print("=== DEBUG UPDATE PRO EVENT ===")
-    print("Form keys:", list(form.keys()))
-    print("logo_file:", logo_file, "type:", type(logo_file))
-    print("banner_file:", banner_file, "type:", type(banner_file))
+    logger.info("=== DEBUG UPDATE PRO EVENT ===")
+    logger.info("Form keys:", list(form.keys()))
+    logger.info("logo_file:", logo_file, "type:", type(logo_file))
+    logger.info("banner_file:", banner_file, "type:", type(banner_file))
     
     if logo_file and hasattr(logo_file, "filename") and logo_file.filename:
         url = await save_image(logo_file, "logo")
-        print("Saved logo URL:", url)
+        logger.info("Saved logo URL:", url)
         if url: event_data["logo_url"] = url
         
     if banner_file and hasattr(banner_file, "filename") and banner_file.filename:
@@ -6779,7 +6803,8 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
             if isinstance(reg_fields, str):
                 try:
                     reg_fields = json.loads(reg_fields)
-                except:
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 6782: {e}")
                     reg_fields = []
 
             _city = (updated_event.get("city") or updated_event.get("venueAddress") or "").strip()
@@ -6813,7 +6838,8 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
                     try:
                         parsed = json.loads(v)
                         return parsed if isinstance(parsed, list) else [parsed]
-                    except:
+                    except Exception as e:
+                        logger.warning(f"Handled exception at line 6816: {e}")
                         return [v]
                 return [v]
 
@@ -6835,7 +6861,8 @@ async def update_pro_event(event_id: str, request: Request, user: dict = Depends
             if isinstance(opp_data["deadline"], str):
                 try:
                     opp_data["deadline"] = datetime.fromisoformat(opp_data["deadline"].replace("Z", "+00:00"))
-                except:
+                except Exception as e:
+                    logger.warning(f"Handled exception at line 6838: {e}")
                     opp_data["deadline"] = datetime.now(timezone.utc)
 
             await opportunities_col.update_many({"event_link_id": str(event_id)}, {"$set": opp_data})
@@ -7158,7 +7185,7 @@ async def get_institution_stats(institution_id: str):
             "average_score": f"{avg_score}%" if avg_score > 0 else "0%"
         }
     except Exception as e:
-        print(f"Error fetching stats: {str(e)}")
+        logger.error(f"Error fetching stats: {str(e)}")
         return {
             "total_participants": 0,
             "active_events": 0,
@@ -7294,7 +7321,7 @@ async def submit_evaluation(payload: dict):
         return {"success": True, "message": "Evaluation submitted and leaderboard updated"}
         
     except Exception as e:
-        print(f"Error submitting evaluation: {str(e)}")
+        logger.error(f"Error submitting evaluation: {str(e)}")
         return {"error": str(e)}, 500
 
 @router.get("/institution/leaderboard/active_event")
@@ -7338,7 +7365,7 @@ async def get_leaderboard(event_id: Optional[str] = None):
         return formatted
         
     except Exception as e:
-        print(f"Error fetching leaderboard: {str(e)}")
+        logger.error(f"Error fetching leaderboard: {str(e)}")
         return {"error": str(e)}, 500
 
 @router.post("/institution/certificates/generate")
@@ -7377,7 +7404,7 @@ async def generate_certificates(payload: dict):
         return {"success": True, "issued_count": certificates_issued}
         
     except Exception as e:
-        print(f"Error generating certificates: {str(e)}")
+        logger.error(f"Error generating certificates: {str(e)}")
         return {"error": str(e)}, 500
 
 @router.get("/search")
@@ -7421,7 +7448,7 @@ async def global_search(q: str, institution_id: str, user: dict = Depends(get_au
         return results
         
     except Exception as e:
-        print(f"Search API Error: {str(e)}")
+        logger.error(f"Search API Error: {str(e)}")
         return {"error": str(e)}, 500
 
 @router.get("/stats/{institution_id}")
@@ -7457,7 +7484,7 @@ async def get_institution_stats(institution_id: str, user: dict = Depends(get_au
             "avg_score": f"{avg_score}%"
         }
     except Exception as e:
-        print(f"Stats API Error: {str(e)}")
+        logger.error(f"Stats API Error: {str(e)}")
         return {"error": str(e)}, 500
 
 # ─── Avatar Management ────────────────────────────────────────────────────────
@@ -7699,7 +7726,7 @@ async def get_institution_events_db_only(institution_id: str, user: dict = Depen
             events.append(e)
         return events
     except Exception as e:
-        print(f"Error fetching events for {institution_id}: {e}")
+        logger.error(f"Error fetching events for {institution_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

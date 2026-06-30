@@ -150,7 +150,8 @@ async def get_my_event_registrations(
         if event_ids:
             try:
                 event_ids_obj = [ObjectId(eid) if ObjectId.is_valid(eid) else eid for eid in event_ids]
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 153: {e}")
                 event_ids_obj = event_ids
             
             events_cursor = events_col.find({"_id": {"$in": event_ids_obj}})
@@ -217,7 +218,8 @@ async def get_my_event_registrations(
         if opp_ids:
             try:
                 opp_ids_obj = [ObjectId(oid) if ObjectId.is_valid(oid) else oid for oid in opp_ids]
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 220: {e}")
                 opp_ids_obj = opp_ids
             
             opps_cursor = opportunities_col.find({"_id": {"$in": opp_ids_obj}})
@@ -490,7 +492,7 @@ async def list_event_participants(
     Admin endpoint with PAGINATION support.
     """
     # Verify event ownership
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="Only event hosts can view participants")
     

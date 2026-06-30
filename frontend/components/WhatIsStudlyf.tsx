@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
@@ -41,15 +41,21 @@ const items = [
 
 const WhatIsStudlyf: React.FC = () => {
     const targetRef = useRef<HTMLDivElement | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     const { scrollYProgress } = useScroll({
         target: targetRef,
     });
 
-    // Transform scroll progress into horizontal translation
-    // We have 4 items, each taking 100vw. Total width is roughly 400vw.
-    // To show the last item (400vw), we need to translate by -300vw.
-    // However, it's safer to use percentages based on the container.
     const x = useTransform(scrollYProgress, [0, 1], ["0%", "-75%"]);
+    const translateX = isMobile ? "0%" : x;
 
     return (
         <section className="bg-white">
@@ -102,13 +108,13 @@ const WhatIsStudlyf: React.FC = () => {
             </div>
 
             {/* Horizontal Scroll Container - Reduced height for less white space transition */}
-            <div ref={targetRef} className="relative h-[250vh] bg-white">
-                <div className="sticky top-0 h-screen flex items-center overflow-hidden">
-                    <motion.div style={{ x }} className="flex px-[10vw]">
+            <div ref={targetRef} className={`relative ${isMobile ? 'h-auto py-12' : 'h-[250vh]'} bg-white`}>
+                <div className={`${isMobile ? 'relative h-auto' : 'sticky top-0 h-screen'} flex flex-col md:flex-row md:items-center overflow-visible md:overflow-hidden`}>
+                    <motion.div style={{ x: translateX }} className={`flex ${isMobile ? 'flex-col gap-10 px-6 w-full' : 'flex px-[10vw]'}`}>
                         {items.map((item) => (
-                            <div key={item.id} className="group relative h-screen w-[90vw] md:w-[85vw] lg:w-[80vw] flex-shrink-0 flex items-center justify-center p-4 md:p-8 lg:p-12">
+                            <div key={item.id} className={`group relative ${isMobile ? 'h-auto w-full p-0' : 'h-screen w-[90vw] md:w-[85vw] lg:w-[80vw] p-4 md:p-8 lg:p-12'} flex-shrink-0 flex items-center justify-center`}>
                                 {/* The Main Card as a Browser Window with Dynamic Colors */}
-                                <div className={`relative w-full max-w-4xl h-[400px] md:h-[500px] ${item.bgColor} rounded-[2rem] overflow-hidden border-2 ${item.borderColor} shadow-[0_0_50px_-12px_rgba(108,77,255,0.25)] transition-all duration-700 hover:shadow-[0_0_80px_-10px_rgba(108,77,255,0.4)] group/card flex flex-col`}>
+                                <div className={`relative w-full max-w-4xl ${isMobile ? 'h-auto min-h-[350px] pb-6' : 'h-[400px] md:h-[500px]'} ${item.bgColor} rounded-[2rem] overflow-hidden border-2 ${item.borderColor} shadow-[0_0_50px_-12px_rgba(108,77,255,0.25)] transition-all duration-700 hover:shadow-[0_0_80px_-10px_rgba(108,77,255,0.4)] group/card flex flex-col`}>
 
                                     {/* Browser Window Header - Covers the whole card */}
                                     <div className="h-10 bg-[#1A1A1A] border-b border-[#2A2A2A] flex items-center px-6 gap-3 shrink-0">
@@ -130,7 +136,7 @@ const WhatIsStudlyf: React.FC = () => {
                                     </div>
 
                                     {/* Content Grid Area - Normalized height */}
-                                    <div className="flex-1 p-6 md:p-10 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center overflow-hidden">
+                                    <div className="flex-1 p-6 md:p-10 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center overflow-visible md:overflow-hidden">
 
                                         {/* Text Content */}
                                         <div className="order-2 lg:order-1 flex flex-col items-start space-y-4 md:space-y-6">
@@ -177,4 +183,5 @@ const WhatIsStudlyf: React.FC = () => {
 };
 
 export default WhatIsStudlyf;
+
 

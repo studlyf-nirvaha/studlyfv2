@@ -30,7 +30,6 @@ async function processDirectory(dir) {
             const relDir = path.relative(inputDir, dir);
             const targetPath = path.join(outputDir, relDir, file.replace(/\.(png|jpg|jpeg)$/, '.webp'));
             
-            console.log(`Optimizing: ${fullPath} -> ${targetPath}`);
             await sharp(fullPath)
                 .webp({ quality: 80 })
                 .toFile(targetPath);
@@ -39,7 +38,6 @@ async function processDirectory(dir) {
             const targetPath = path.join(outputDir, relDir, file);
             
             if (!fs.existsSync(targetPath)) {
-                console.log(`Copying webp: ${fullPath} -> ${targetPath}`);
                 fs.copyFileSync(fullPath, targetPath);
             }
         }

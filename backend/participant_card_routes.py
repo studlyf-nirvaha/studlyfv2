@@ -20,7 +20,8 @@ async def get_participant_card(
         try:
             p_obj = ObjectId(participant_id)
             participant = await participants_col.find_one({"_id": p_obj, "event_id": event_id})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 23: {e}")
             pass
 
     if not participant:
@@ -35,7 +36,8 @@ async def get_participant_card(
     try:
         e_obj = ObjectId(event_id)
         event = await events_col.find_one({"_id": e_obj})
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 38: {e}")
         event = None
 
     team_name = None
@@ -43,7 +45,8 @@ async def get_participant_card(
     if team_id:
         try:
             team = await teams_col.find_one({"_id": ObjectId(team_id)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 46: {e}")
             team = await teams_col.find_one({"team_id": team_id})
         if team:
             team_name = team.get("name") or team.get("team_name") or None

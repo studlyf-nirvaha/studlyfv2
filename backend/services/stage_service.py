@@ -7,6 +7,9 @@ from db import db, events_col, participants_col, teams_col, submission_data_col,
 from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
+import logging
+logger = logging.getLogger(__name__)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STAGE TYPE DEFINITIONS (Admin defines these when creating event)
@@ -148,7 +151,7 @@ async def advance_participant_to_next_stage(event_id: str, user_id: str) -> dict
         
         return {"status": "success", "next_stage": next_stage_name, "new_status": update_data.get("status")}
     except Exception as e:
-        print(f"[ERROR] advance_participant_to_next_stage: {e}")
+        logger.error(f"[ERROR] advance_participant_to_next_stage: {e}")
         return {"error": str(e)}
 
 async def get_event_stages(event_id: str) -> List[dict]:
@@ -247,7 +250,7 @@ async def get_event_stages(event_id: str) -> List[dict]:
         
         return enriched
     except Exception as e:
-        print(f"[ERROR] get_event_stages: {e}")
+        logger.error(f"[ERROR] get_event_stages: {e}")
         return []
 
 async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dict]:
@@ -271,7 +274,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                 })
                 if participant:
                     return participant
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 274: {e}")
             pass
             
         # Fallback 2: check if event_id is human-readable and map to ObjectId string
@@ -284,7 +288,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                 })
                 if participant:
                     return participant
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 287: {e}")
             pass
 
         # Fallback 3 (Self-healing): Check if user has an application in opportunity_applications
@@ -292,7 +297,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
         # Find opportunity by ID or event_link_id
         try:
             opp = await opportunities_col.find_one({"_id": ObjectId(event_id)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 295: {e}")
             pass
         if not opp:
             opp = await opportunities_col.find_one({"event_link_id": event_id})
@@ -324,7 +330,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                                 target_event = await events_col.find_one({"event_id": opp["event_link_id"]})
                                 if not target_event:
                                     target_event = await events_col.find_one({"_id": ObjectId(opp["event_link_id"])})
-                        except:
+                        except Exception as e:
+                            logger.warning(f"Handled exception at line 327: {e}")
                             pass
                     
                     first_stage = None
@@ -383,7 +390,7 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                     return participant_doc
             
     except Exception as e:
-        print(f"[ERROR] _get_participant_fallback: {e}")
+        logger.error(f"[ERROR] _get_participant_fallback: {e}")
         
     return None
 
@@ -486,7 +493,7 @@ async def get_participant_stage_progress(event_id: str, user_id: str) -> dict:
             "participant_id": str(participant["_id"]),
         }
     except Exception as e:
-        print(f"[ERROR] get_participant_stage_progress: {e}")
+        logger.error(f"[ERROR] get_participant_stage_progress: {e}")
         return {"error": str(e)}
 
 async def get_stage_action_required(event_id: str, user_id: str, stage_id: str) -> dict:
@@ -537,7 +544,7 @@ async def get_stage_action_required(event_id: str, user_id: str, stage_id: str) 
             return {"error": f"Unknown stage type: {stage_type}"}
     
     except Exception as e:
-        print(f"[ERROR] get_stage_action_required: {e}")
+        logger.error(f"[ERROR] get_stage_action_required: {e}")
         return {"error": str(e)}
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -599,7 +606,7 @@ async def _handle_registration_stage(event_id: str, user_id: str, stage: dict) -
             "message": "Complete your registration using your profile data"
         }
     except Exception as e:
-        print(f"[ERROR] _handle_registration_stage: {e}")
+        logger.error(f"[ERROR] _handle_registration_stage: {e}")
         return {"error": str(e)}
 
 async def _handle_team_formation_stage(event_id: str, user_id: str, stage: dict) -> dict:
@@ -648,7 +655,7 @@ async def _handle_team_formation_stage(event_id: str, user_id: str, stage: dict)
             ]
         }
     except Exception as e:
-        print(f"[ERROR] _handle_team_formation_stage: {e}")
+        logger.error(f"[ERROR] _handle_team_formation_stage: {e}")
         return {"error": str(e)}
 
 async def _handle_submission_stage(event_id: str, user_id: str, stage: dict) -> dict:
@@ -697,7 +704,7 @@ async def _handle_submission_stage(event_id: str, user_id: str, stage: dict) -> 
             "message": f"Please fill out the {stage.get('name', 'submission')} form"
         }
     except Exception as e:
-        print(f"[ERROR] _handle_submission_stage: {e}")
+        logger.error(f"[ERROR] _handle_submission_stage: {e}")
         return {"error": str(e)}
 
 async def _handle_final_stage(event_id: str, user_id: str, stage: dict) -> dict:
@@ -732,5 +739,5 @@ async def _handle_final_stage(event_id: str, user_id: str, stage: dict) -> dict:
             "message": "Your submissions are complete. Results will be announced soon."
         }
     except Exception as e:
-        print(f"[ERROR] _handle_final_stage: {e}")
+        logger.error(f"[ERROR] _handle_final_stage: {e}")
         return {"error": str(e)}

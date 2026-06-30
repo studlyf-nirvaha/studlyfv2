@@ -136,7 +136,8 @@ class DatabaseManager:
             # ── Events (supports institution dashboard queries) ──
             try:
                 await self.db.events.drop_index("event_id_1")
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 139: {e}")
                 pass
             await self.db.events.create_index("event_id", unique=True, sparse=True)
             await self.db.events.create_index([("institution_id", 1), ("status", 1)])
@@ -241,7 +242,8 @@ class DatabaseManager:
                 logger.warning(f"Event certificate duplicate cleanup: {clean_err}")
             try:
                 await self.db.event_certificates.drop_index("event_id_1_user_id_1_achievement_key_1")
-            except:
+            except Exception as e:
+                logger.warning(f"Handled exception at line 244: {e}")
                 pass
             await self.db.event_certificates.create_index(
                 [("event_id", 1), ("user_id", 1), ("achievement_key", 1)],

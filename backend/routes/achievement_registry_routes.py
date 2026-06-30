@@ -9,6 +9,9 @@ import uuid
 from services.institutional_certificate_service import certificate_service, ACHIEVEMENT_TYPES, VALID_ACHIEVEMENTS
 from services.email_service import send_notification_email, get_certificate_issued_template
 from services.email_template_service import get_active_template, render_template
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/v1/institution/certificates", tags=["Achievement Registry"])
 
@@ -281,7 +284,7 @@ async def issue_certificates(
     if role not in ("institution", "admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Institution access required")
 
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
@@ -402,7 +405,7 @@ async def issue_certificates(
                     )
                     await send_notification_email(recipient_email, subj, body)
             except Exception as e:
-                print(f"[CERT EMAIL FAIL] {user_id}: {e}")
+                logger.info(f"[CERT EMAIL FAIL] {user_id}: {e}")
 
     return {
         "status": "success",
@@ -446,7 +449,7 @@ async def get_certificate_registry(
         team_id = c.get("team_id")
         if team_id and not c.get("team_name"):
             try:
-                team_doc = await teams_col.find_one({"_id": ObjectId(team_id)})
+                team_doc = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
                 if team_doc:
                     c["team_name"] = team_doc.get("team_name") or team_doc.get("name") or ""
             except Exception:

@@ -459,7 +459,7 @@ async def configure_stages(
     from db import events_col
     
     # Verify user is event owner
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="You don't have permission to configure this event")
     
@@ -467,7 +467,7 @@ async def configure_stages(
     
     # Update event with new stages
     result = await events_col.update_one(
-        {"_id": ObjectId(event_id)},
+        {"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)},
         {"$set": {"stages": stages, "updated_at": datetime.now(timezone.utc)}}
     )
     
@@ -493,7 +493,7 @@ async def list_event_submissions(
     from db import submission_data_col, events_col
     
     # Verify user is event owner
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="You don't have permission to view this event's submissions")
     
@@ -524,7 +524,7 @@ async def get_stage_analytics(
     from datetime import datetime, timezone
     
     # Verify user is event owner
-    event = await events_col.find_one({"_id": ObjectId(event_id)})
+    event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not event or str(event.get("institution_id")) != str(user.get("institution_id")):
         raise HTTPException(status_code=403, detail="You don't have permission to view this event")
     

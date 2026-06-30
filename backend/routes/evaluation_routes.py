@@ -3,6 +3,9 @@ from typing import Optional, Tuple, Any, Dict
 from bson import ObjectId
 from datetime import datetime, timezone
 from auth_institution import get_auth_user_optional
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/evaluation", tags=["Evaluation"])
 
@@ -232,7 +235,7 @@ async def get_evaluation_submission(token_or_id: str, user: Optional[dict] = Dep
     except HTTPException:
         raise
     except Exception as e:
-        print(f"ERROR in get_evaluation_submission: {str(e)}")
+        logger.error(f"ERROR in get_evaluation_submission: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to load evaluation data")
 
@@ -369,7 +372,7 @@ async def submit_evaluation(
     try:
         from db import hackathon_submissions_col
         await hackathon_submissions_col.update_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {"$set": {
                 "totalScore": float(score),
                 "rubricScores": criteria_scores,
@@ -384,7 +387,7 @@ async def submit_evaluation(
     try:
         from db import submissions_col
         await submissions_col.update_one(
-            {"_id": ObjectId(submission_id)},
+            {"_id": (ObjectId(submission_id) if ObjectId.is_valid(submission_id) else submission_id)},
             {"$set": {
                 "total_score": float(score),
                 "evaluation_score": float(score),

@@ -14,6 +14,9 @@ from bson.son import SON
 from datetime import timezone
 from services.email_service import send_notification_email, get_team_invite_template, get_team_join_template
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/teams", tags=["Teams"])
 
@@ -84,12 +87,12 @@ async def send_team_invite(
             raise HTTPException(status_code=400, detail="team_id and invite_email are required")
         
         # Get team details
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
         
         # Get event details
-        event = await events_col.find_one({"_id": ObjectId(event_id)})
+        event = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
@@ -103,7 +106,7 @@ async def send_team_invite(
         
         # Store invite
         await teams_col.update_one(
-            {"_id": ObjectId(team_id)},
+            {"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)},
             {"$push": {"invites": {
                 "code": invite_code,
                 "email": invite_email,
@@ -133,7 +136,7 @@ async def send_team_invite(
                 max_team_size=max_s,
             )
         except Exception as e:
-            print(f"Error sending team invite email: {e}")
+            logger.error(f"Error sending team invite email: {e}")
         
         return {
             "success": True,
@@ -149,45 +152,45 @@ async def create_team_secure(
     payload: dict = Body(...),
     user: dict = Depends(get_auth_user),
 ):
-    print(f"DEBUG: Team creation request - User: {user}, Payload: {payload}")
+    logger.info(f"DEBUG: Team creation request - User: {user}, Payload: {payload}")
     
     uid = str(user.get("user_id") or "")
     if not uid:
-        print("DEBUG: No user_id found")
+        logger.info("DEBUG: No user_id found")
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     event_id = str(payload.get("event_id") or "").strip()
     team_name = str(payload.get("team_name") or "").strip()
     
-    print(f"DEBUG: Extracted - event_id: {event_id}, team_name: {team_name}")
+    logger.info(f"DEBUG: Extracted - event_id: {event_id}, team_name: {team_name}")
     
     if not event_id or not team_name:
-        print("DEBUG: Missing event_id or team_name")
+        logger.info("DEBUG: Missing event_id or team_name")
         raise HTTPException(status_code=400, detail="event_id and team_name are required")
 
     try:
-        ev = await events_col.find_one({"_id": ObjectId(event_id)})
+        ev = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     except Exception as e:
-        print(f"DEBUG: Invalid ObjectId format for event_id: {event_id}")
+        logger.info(f"DEBUG: Invalid ObjectId format for event_id: {event_id}")
         raise HTTPException(status_code=400, detail="Invalid event_id format")
     
     if not ev:
-        print(f"DEBUG: Event not found for event_id: {event_id}")
+        logger.info(f"DEBUG: Event not found for event_id: {event_id}")
         raise HTTPException(status_code=404, detail="Event not found")
 
-    print(f"DEBUG: Event found: {ev.get('name', 'Unknown')}")
+    logger.info(f"DEBUG: Event found: {ev.get('name', 'Unknown')}")
 
     # Check if user is already registered or has applied
     p = await participants_col.find_one({"event_id": event_id, "user_id": uid})
-    print(f"DEBUG: Participant record: {p}")
+    logger.info(f"DEBUG: Participant record: {p}")
     
     if p and p.get("team_id"):
-        print(f"DEBUG: User already in team: {p.get('team_id')}")
+        logger.info(f"DEBUG: User already in team: {p.get('team_id')}")
         raise HTTPException(status_code=400, detail="You are already in a team")
     
     # If not registered, create a basic participant record
     if not p:
-        print("DEBUG: Creating new participant record")
+        logger.info("DEBUG: Creating new participant record")
         first_stage = None
         st = ev.get("stages")
         if isinstance(st, list) and st:
@@ -201,9 +204,9 @@ async def create_team_secure(
         }
         result = await participants_col.insert_one(p)
         p["_id"] = str(result.inserted_id)
-        print(f"DEBUG: Created participant record: {p['_id']}")
+        logger.info(f"DEBUG: Created participant record: {p['_id']}")
     else:
-        print("DEBUG: Using existing participant record")
+        logger.info("DEBUG: Using existing participant record")
 
     limits = _team_size_limits(ev)
     if not limits:
@@ -262,7 +265,7 @@ async def create_team_invite(
     if not uid:
         raise HTTPException(status_code=401, detail="Unauthorized")
     try:
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
     except Exception:
         team = None
     if not team:
@@ -311,7 +314,7 @@ async def create_team_invite(
         "revoked": False,
     }
     await teams_col.update_one(
-        {"_id": ObjectId(team_id)},
+        {"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)},
         {"$set": {"invite_code": code, "invites": [invite], "updated_at": now}},
     )
     return {"status": "success", "code": code, "team_id": team_id, "reused": False, "permanent": True}
@@ -322,7 +325,7 @@ async def revoke_team_invite(team_id: str, code: str, user: dict = Depends(get_a
     """Revoke a previously generated invite code (mark revoked=True). Only team leader can revoke."""
     uid = str(user.get("user_id") or "")
     try:
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
     except Exception:
         team = None
     if not team:
@@ -345,7 +348,7 @@ async def revoke_team_invite(team_id: str, code: str, user: dict = Depends(get_a
     # If this is the permanent invite_code, clear it
     if team.get("invite_code") == code:
         update["invite_code"] = None
-    await teams_col.update_one({"_id": ObjectId(team_id)}, {"$set": update})
+    await teams_col.update_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)}, {"$set": update})
     return {"status": "success", "message": "Invite revoked"}
 
 
@@ -354,7 +357,7 @@ async def list_team_invites(team_id: str, user: dict = Depends(get_auth_user)):
     """List invites for a team (leader only). Returns invite code, email, uses, max_uses, expires_at, revoked."""
     uid = str(user.get("user_id") or "")
     try:
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
     except Exception:
         team = None
     if not team:
@@ -384,7 +387,7 @@ async def list_invite_acceptances(team_id: str, user: dict = Depends(get_auth_us
     """List invite acceptance audit records for a team (leader only)."""
     uid = str(user.get("user_id") or "")
     try:
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
     except Exception:
         team = None
     if not team:
@@ -414,7 +417,7 @@ async def export_invite_acceptances_csv(team_id: str, user: dict = Depends(get_a
     """Export invite acceptance audit as CSV (leader-only)."""
     uid = str(user.get("user_id") or "")
     try:
-        team = await teams_col.find_one({"_id": ObjectId(team_id)})
+        team = await teams_col.find_one({"_id": (ObjectId(team_id) if ObjectId.is_valid(team_id) else team_id)})
     except Exception:
         team = None
     if not team:
@@ -595,7 +598,7 @@ async def join_by_invite(
         raise HTTPException(status_code=404, detail="Invite code not found")
 
     event_id = str(team.get("event_id") or "")
-    ev = await events_col.find_one({"_id": ObjectId(event_id)})
+    ev = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     if not ev:
         raise HTTPException(status_code=404, detail="Event not found")
     limits = _team_size_limits(ev)
@@ -724,7 +727,7 @@ async def join_by_invite(
                         "created_at": datetime.utcnow()
                     }))
     except Exception as e:
-        print(f"Error sending team join notification: {e}")
+        logger.error(f"Error sending team join notification: {e}")
 
     # Notify Institution
     inst_id = ev.get("institution_id")
@@ -753,7 +756,7 @@ async def join_by_invite(
         }
         await team_invite_acceptances_col.insert_one(acceptance)
     except Exception as e:
-        print(f"Warning: failed to write invite acceptance audit: {e}")
+        logger.error(f"Warning: failed to write invite acceptance audit: {e}")
 
     return {"status": "success", "team_id": str(team["_id"]), "event_id": event_id}
 
@@ -774,7 +777,7 @@ async def preview_invite(code: str):
     ev = None
     try:
         if event_id:
-            ev = await events_col.find_one({"_id": ObjectId(event_id)})
+            ev = await events_col.find_one({"_id": (ObjectId(event_id) if ObjectId.is_valid(event_id) else event_id)})
     except Exception:
         ev = None
 

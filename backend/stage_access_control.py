@@ -70,7 +70,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                 })
                 if participant:
                     return participant
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 73: {e}")
             pass
             
         # Fallback 2: check if event_id is human-readable and map to ObjectId string
@@ -83,7 +84,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                 })
                 if participant:
                     return participant
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 86: {e}")
             pass
 
         # Fallback 3 (Self-healing): Check if user has an application in opportunity_applications
@@ -91,7 +93,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
         # Find opportunity by ID or event_link_id
         try:
             opp = await opportunities_col.find_one({"_id": ObjectId(event_id)})
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 94: {e}")
             pass
         if not opp:
             opp = await opportunities_col.find_one({"event_link_id": event_id})
@@ -127,7 +130,8 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                                 target_event = await events_col.find_one({"event_id": opp["event_link_id"]})
                                 if not target_event:
                                     target_event = await events_col.find_one({"_id": ObjectId(opp["event_link_id"])})
-                        except:
+                        except Exception as e:
+                            logger.warning(f"Handled exception at line 130: {e}")
                             pass
                     
                     first_stage = None
@@ -186,7 +190,7 @@ async def _get_participant_fallback(event_id: str, user_id: str) -> Optional[dic
                     return participant_doc
             
     except Exception as e:
-        print(f"[ERROR] _get_participant_fallback: {e}")
+        logger.error(f"[ERROR] _get_participant_fallback: {e}")
         
     return None
 
@@ -606,7 +610,8 @@ async def get_all_stages_access(event_id: str, user_id: str) -> Dict[str, Any]:
                 res = await events_col.find_one({"event_id": resolved_id}) or await events_col.find_one({"event_link_id": str(resolved_id)})
             logger.info(f"PERF: Event fetch took {time.time() - start_ev:.4f}s")
             return res
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 609: {e}")
             return None
             
     event_task = get_event()
@@ -814,7 +819,8 @@ async def check_stage_submission_access(
         try:
             if event and event.get("allow_individual_progress_with_no_team"):
                 allow_individual = True
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 817: {e}")
             allow_individual = False
 
         # Dynamically determine required status from stage visibility
@@ -912,7 +918,8 @@ async def check_stage_deadline(event_id: str, stage_index: int = None, stage_nam
     """
     try:
         opp_id = ObjectId(event_id) if len(str(event_id)) == 24 else event_id
-    except:
+    except Exception as e:
+        logger.warning(f"Handled exception at line 915: {e}")
         opp_id = event_id
     
     # Prefer the canonical `events` collection where stages are persisted by admins.
@@ -921,7 +928,8 @@ async def check_stage_deadline(event_id: str, stage_index: int = None, stage_nam
         # Try by ObjectId first if possible
         try:
             obj_id = ObjectId(event_id) if len(str(event_id)) == 24 else None
-        except:
+        except Exception as e:
+            logger.warning(f"Handled exception at line 924: {e}")
             obj_id = None
 
         if obj_id:
@@ -982,7 +990,7 @@ async def check_stage_deadline(event_id: str, stage_index: int = None, stage_nam
         return target_stage
     
     # Check if now is within [start_date, end_date]
-    print(f"DEBUG: now={now}, start_date={start_date}, end_date={end_date}")
+    logger.info(f"DEBUG: now={now}, start_date={start_date}, end_date={end_date}")
     if now < start_date:
         raise HTTPException(
             status_code=403,

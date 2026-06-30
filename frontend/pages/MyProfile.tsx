@@ -1193,7 +1193,6 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
         await navigator.clipboard.writeText(publicProfileUrl);
         setSaveStatus({ type: 'success', message: 'Profile URL copied — paste it into LinkedIn.' });
       } catch (e) {
-        console.warn('Failed to copy profile URL for LinkedIn:', e);
       }
       const linkedinParams = new URLSearchParams({
         startTask: 'CERTIFICATION_NAME',
@@ -1225,7 +1224,6 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
         link.download = profileTemplateFileName;
         link.click();
       } catch (e) {
-        console.warn('WhatsApp profile image download failed', e);
       }
 
       // Use the platform share sheet with the generated image file whenever the browser supports it.
@@ -1237,7 +1235,6 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
           return;
         }
       } catch (e) {
-        console.warn('Native share for WhatsApp failed', e);
       }
 
       // Try to copy image to clipboard so user can paste into WhatsApp Web
@@ -1294,12 +1291,10 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
             htmlLink.download = `profile-preview.html`;
             htmlLink.click();
           } catch (e) {
-            console.warn('Failed to auto-download preview URL file', e);
           }
         }
       }
     } catch (e) {
-      console.warn('Image upload for social share failed:', e);
     }
 
     // Try to copy the image itself to the clipboard (some desktop browsers support this in secure contexts)
@@ -1346,7 +1341,6 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
     try { platformWindow?.focus(); } catch {}
     return;
   } catch (err) {
-    console.warn('Share flow error:', err);
     const errorMessage = err instanceof Error ? err.message : 'Share failed.';
     setSaveStatus({ type: 'error', message: errorMessage });
     setTimeout(() => setSaveStatus(null), 3000);
@@ -1489,7 +1483,6 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
           setShareQrDataUrl(qrDataUrl);
         }
       } catch (error) {
-        console.warn('Failed to generate share QR', error);
         if (active) {
           setShareQrDataUrl(null);
         }

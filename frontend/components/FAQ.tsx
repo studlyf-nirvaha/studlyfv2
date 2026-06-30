@@ -69,7 +69,7 @@ const FAQItem: React.FC<FAQItemProps> = ({ question, answer, isOpen, toggle }) =
 };
 
 const FAQ: React.FC = () => {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const left = faqData.slice(0, Math.ceil(faqData.length / 2));
   const right = faqData.slice(Math.ceil(faqData.length / 2));

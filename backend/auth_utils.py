@@ -51,6 +51,15 @@ def verify_password(plain_password, hashed_password):
         logger.error(f"Password verification error: {e}")
         return False
 
+_DUMMY_PWD_HASH = bcrypt.hashpw(b"timing-attack-mitigation", bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("utf-8")
+
+def dummy_verify_password():
+    """Run a throwaway bcrypt check to equalize timing on the user-not-found path."""
+    try:
+        bcrypt.checkpw(b"invalid", _DUMMY_PWD_HASH.encode("utf-8"))
+    except Exception:
+        pass
+
 def get_password_hash(password):
     """Generate a hashed version of a password using bcrypt with enhanced error handling."""
     try:

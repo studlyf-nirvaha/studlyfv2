@@ -168,11 +168,9 @@ const Courses: React.FC = () => {
   // Fetch courses and user state
   useEffect(() => {
     const fetchData = async () => {
-      console.log('🔵 Starting course fetch from:', `${API_BASE_URL}/api/courses`);
       try {
         setLoading(true);
         // Get all courses - REQUIRED
-        console.log('📡 Fetching courses...');
         const coursesRes = await fetch(`${API_BASE_URL}/api/courses`, {
           method: 'GET',
           headers: {
@@ -180,7 +178,6 @@ const Courses: React.FC = () => {
           },
         });
         
-        console.log('📥 Response status:', coursesRes.status);
         
         if (!coursesRes.ok) {
           console.error('❌ Courses API error:', coursesRes.status, coursesRes.statusText);
@@ -191,17 +188,13 @@ const Courses: React.FC = () => {
         }
         
         const coursesData = await coursesRes.json();
-        console.log('✅ Courses data received:', coursesData);
-        console.log('📊 Total courses:', coursesData?.length || 0);
         
         const allCourses = coursesData && Array.isArray(coursesData) ? coursesData : [];
 
 
         if (allCourses.length > 0) {
           setCourses(allCourses);
-          console.log('✓ Courses set in state');
         } else {
-          console.warn('⚠️ No courses in response or invalid format');
           setCourses([]);
         }
       } catch (err) {
@@ -209,7 +202,6 @@ const Courses: React.FC = () => {
         setCourses([]);
       } finally {
         setLoading(false);
-        console.log('🏁 Loading finished');
       }
 
       // Get user course states - OPTIONAL (doesn't block course display)

@@ -13,6 +13,9 @@ from bson import ObjectId
 import json
 import csv
 import io
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ReportFormat(str, Enum):
     PDF = "pdf"
@@ -95,7 +98,7 @@ class ReportingService:
                 "generated_at": datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
-            print(f"Report Generation Error: {e}")
+            logger.error(f"Report Generation Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -122,7 +125,7 @@ class ReportingService:
                 ]
             }
         except Exception as e:
-            print(f"Leaderboard Report Error: {e}")
+            logger.error(f"Leaderboard Report Error: {e}")
             return {}
 
     @staticmethod
@@ -158,7 +161,7 @@ class ReportingService:
                 "by_college": by_college
             }
         except Exception as e:
-            print(f"Participant Report Error: {e}")
+            logger.error(f"Participant Report Error: {e}")
             return {}
 
     @staticmethod
@@ -189,7 +192,7 @@ class ReportingService:
                 "completion_percentage": round((evaluated / total * 100), 2) if total > 0 else 0
             }
         except Exception as e:
-            print(f"Submission Report Error: {e}")
+            logger.error(f"Submission Report Error: {e}")
             return {}
 
     @staticmethod
@@ -217,7 +220,7 @@ class ReportingService:
                 "judges": judge_stats
             }
         except Exception as e:
-            print(f"Judge Report Error: {e}")
+            logger.error(f"Judge Report Error: {e}")
             return {}
 
     @staticmethod
@@ -241,7 +244,7 @@ class ReportingService:
                 "updated_at": event.get("updated_at").isoformat()
             }
         except Exception as e:
-            print(f"Event Summary Error: {e}")
+            logger.error(f"Event Summary Error: {e}")
             return {}
 
     @staticmethod
@@ -270,7 +273,7 @@ class ReportingService:
             else:
                 return json.dumps(report_data, default=str)
         except Exception as e:
-            print(f"Format Error: {e}")
+            logger.error(f"Format Error: {e}")
             return "{}"
 
     @staticmethod
@@ -305,7 +308,7 @@ class ReportingService:
                 "next_run": schedule_config["next_run"].isoformat()
             }
         except Exception as e:
-            print(f"Schedule Error: {e}")
+            logger.error(f"Schedule Error: {e}")
             return {"success": False, "error": str(e)}
 
     @staticmethod
@@ -343,7 +346,7 @@ class ReportingService:
                 } for r in reports
             ]
         except Exception as e:
-            print(f"History Error: {e}")
+            logger.error(f"History Error: {e}")
             return []
 
 # Initialize singleton

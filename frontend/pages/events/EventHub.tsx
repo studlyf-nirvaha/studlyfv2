@@ -567,6 +567,16 @@ const EventHub: React.FC = () => {
                                 return <div className="text-center p-10 font-bold text-slate-500">No active submission stage found.</div>;
                              }
 
+                             const minTeam = submissionStage?.config?.team_min_size || event?.min_team_size || 1;
+                             const maxTeam = submissionStage?.config?.team_max_size || event?.max_team_size || 1;
+                             const needsTeam = minTeam > 1;
+                             const teamSizeConfigured = minTeam !== undefined;
+                             const memberCount = team?.members?.length || 0;
+                             const teamMeetsSize = !needsTeam || (memberCount >= minTeam && memberCount <= maxTeam);
+
+                             const dynamicFields = submissionStage?.config?.fields || [];
+                             const hasDynamicFields = Array.isArray(dynamicFields) && dynamicFields.length > 0;
+
                              if (!isSubmissionType) {
                                 return (
                                     <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm text-center">

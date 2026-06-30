@@ -156,7 +156,6 @@ const OpportunitiesManagement: React.FC<OpportunitiesManagementProps> = ({ insti
             if (!institutionId) return;
             try {
                 setLoading('institutionOpportunities', true);
-                console.log(`DEBUG: Fetching events for institution: ${institutionId}`);
                 const response = await fetch(`${API_BASE_URL}/api/v1/institution/events/${institutionId}`, { headers: { ...authHeaders() } });
                 
                 if (!response.ok) {

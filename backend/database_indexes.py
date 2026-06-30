@@ -19,32 +19,24 @@ class DatabaseIndexManager:
         """Create all required indexes on startup"""
         logger.info("Creating database indexes...")
         
-        try:
-            # Users collection
-            await self._create_users_indexes()
-            
-            # Institutions collection
-            await self._create_institutions_indexes()
-            
-            # Certificates collection
-            await self._create_certificates_indexes()
-            
-            # Events collection
-            await self._create_events_indexes()
-            
-            # Leaderboards collection
-            await self._create_leaderboards_indexes()
-            
-            # Email deliveries collection
-            await self._create_email_indexes()
-            
-            # Submission collections
-            await self._create_submission_indexes()
-            
-            # Audit logs collection
-            await self._create_audit_logs_indexes()
-            
-            logger.info("All indexes created successfully")
+        index_methods = [
+            ("Users", self._create_users_indexes),
+            ("Institutions", self._create_institutions_indexes),
+            ("Certificates", self._create_certificates_indexes),
+            ("Events", self._create_events_indexes),
+            ("Leaderboards", self._create_leaderboards_indexes),
+            ("Email", self._create_email_indexes),
+            ("Submissions", self._create_submission_indexes),
+            ("Audit Logs", self._create_audit_logs_indexes),
+        ]
+        
+        for name, method in index_methods:
+            try:
+                await method()
+            except Exception as e:
+                logger.error(f"Error creating {name} indexes: {e}")
+                
+        logger.info("All indexes process completed")
 
     async def _create_submission_indexes(self):
         """Indexes for submission collections"""
@@ -62,10 +54,6 @@ class DatabaseIndexManager:
             await col.create_index([("event_id", ASCENDING), ("stage_id", ASCENDING)])
             
         logger.info("✓ Submission indexes created")
-        
-        except Exception as e:
-            logger.error(f"Error creating indexes: {e}")
-            raise
     
     async def _create_users_indexes(self):
         """Indexes for users collection"""
@@ -78,23 +66,38 @@ class DatabaseIndexManager:
                 unique=True,
                 sparse=True
             )
-        except pymongo.errors.DuplicateKeyError:
-            logger.warning("Email index already exists")
+        except pymongo.errors.OperationFailure as e:
+            if e.code == 86:  # IndexKeySpecsConflict
+                logger.warning("email index exists with different options, skipping (see fix note)")
+            else:
+                raise
         
         # Institution lookup
-        await users.create_index([("institution_id", ASCENDING)])
+        try:
+            await users.create_index([("institution_id", ASCENDING)])
+        except Exception as e:
+            logger.error(f"Failed to create users institution_id index: {e}")
         
         # Compound index for searches
-        await users.create_index([
-            ("institution_id", ASCENDING),
-            ("email", ASCENDING)
-        ])
+        try:
+            await users.create_index([
+                ("institution_id", ASCENDING),
+                ("email", ASCENDING)
+            ])
+        except Exception as e:
+            logger.error(f"Failed to create users compound index: {e}")
         
         # Sort by creation date
-        await users.create_index([("created_at", DESCENDING)])
+        try:
+            await users.create_index([("created_at", DESCENDING)])
+        except Exception as e:
+            logger.error(f"Failed to create users created_at index: {e}")
         
         # Status index
-        await users.create_index([("status", ASCENDING)])
+        try:
+            await users.create_index([("status", ASCENDING)])
+        except Exception as e:
+            logger.error(f"Failed to create users status index: {e}")
         
         logger.info("✓ Users indexes created")
     
@@ -109,8 +112,11 @@ class DatabaseIndexManager:
                 unique=True,
                 sparse=True
             )
-        except pymongo.errors.DuplicateKeyError:
-            logger.warning("Institution name index already exists")
+        except pymongo.errors.OperationFailure as e:
+            if e.code == 86:  # IndexKeySpecsConflict
+                logger.warning("name index exists with different options, skipping (see fix note)")
+            else:
+                raise
         
         # Domain lookup
         try:
@@ -119,14 +125,23 @@ class DatabaseIndexManager:
                 unique=True,
                 sparse=True
             )
-        except pymongo.errors.DuplicateKeyError:
-            logger.warning("Domain index already exists")
+        except pymongo.errors.OperationFailure as e:
+            if e.code == 86:  # IndexKeySpecsConflict
+                logger.warning("domain index exists with different options, skipping (see fix note)")
+            else:
+                raise
         
         # Created by
-        await institutions.create_index([("created_by", ASCENDING)])
+        try:
+            await institutions.create_index([("created_by", ASCENDING)])
+        except Exception as e:
+            logger.error(f"Failed to create institutions created_by index: {e}")
         
         # Creation date
-        await institutions.create_index([("created_at", DESCENDING)])
+        try:
+            await institutions.create_index([("created_at", DESCENDING)])
+        except Exception as e:
+            logger.error(f"Failed to create institutions created_at index: {e}")
         
         logger.info("✓ Institutions indexes created")
     

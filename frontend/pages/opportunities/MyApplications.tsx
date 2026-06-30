@@ -33,7 +33,6 @@ const MyApplications: React.FC = () => {
         (async () => {
             setLoading(true);
             try {
-                console.log('DEBUG: Fetching applications from:', `${API_BASE_URL}/api/opportunities/me/applications`);
             const [appRes, notifRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/api/opportunities/me/applications`, { headers: { ...authHeaders() } }),
                     fetch(`${API_BASE_URL}/api/opportunities/me/notifications?limit=30`, { headers: { ...authHeaders() } }),
@@ -41,10 +40,8 @@ const MyApplications: React.FC = () => {
                 if (cancelled) return;
                 if (appRes.ok) {
                     const data = await appRes.json();
-                    console.log('DEBUG: Applications data received:', data);
                     setApplications(Array.isArray(data) ? data : []);
                 } else {
-                    console.log('DEBUG: Failed to fetch applications, status:', appRes.status);
                     setApplications([]);
                 }
                 if (notifRes.ok) {

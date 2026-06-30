@@ -8,6 +8,9 @@ from bson import ObjectId
 from db import notifications_col, users_col, institutions_col
 from services.email_service import send_notification_email
 import os
+import logging
+logger = logging.getLogger(__name__)
+
 
 class NotificationService:
     """Service for managing all types of notifications"""
@@ -57,7 +60,7 @@ class NotificationService:
         try:
             await self._send_email_notification_if_enabled(user_id, notification_doc)
         except Exception as e:
-            print(f"[EMAIL] Failed to send email notification: {e}")
+            logger.error(f"[EMAIL] Failed to send email notification: {e}")
         
         return {"notification_id": notification_id, "status": "created"}
     
@@ -338,7 +341,7 @@ class NotificationService:
             await send_notification_email(user_email, subject, body_html)
         except Exception as e:
             # Log error but don't fail the notification creation
-            print(f"Failed to send email notification: {e}")
+            logger.error(f"Failed to send email notification: {e}")
 
 # Global instance
 notification_service = NotificationService()

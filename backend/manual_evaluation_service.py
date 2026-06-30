@@ -12,6 +12,9 @@ from bson import ObjectId
 from db import submissions_col, scores_col, judges_col, events_col, users_col, notifications_col
 from services.email_service import send_notification_email
 from notification_helpers import notify_institution
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ManualEvaluationService:
     """Service for manual evaluation of coding submissions"""
@@ -440,7 +443,7 @@ class ManualEvaluationService:
         try:
             await send_notification_email(judge.get("email", ""), subject, body_html)
         except Exception as e:
-            print(f"Failed to send evaluation notification email: {e}")
+            logger.error(f"Failed to send evaluation notification email: {e}")
     
     async def _notify_participant_of_evaluation(self, submission: dict, evaluation_record: dict):
         """Send notification to participant about evaluation completion"""
@@ -484,7 +487,7 @@ class ManualEvaluationService:
         try:
             await send_notification_email(participant_email, subject, body_html)
         except Exception as e:
-            print(f"Failed to send evaluation completion email: {e}")
+            logger.error(f"Failed to send evaluation completion email: {e}")
     
     async def _get_participant_info(self, submission: dict) -> dict:
         """Get participant information for a submission"""

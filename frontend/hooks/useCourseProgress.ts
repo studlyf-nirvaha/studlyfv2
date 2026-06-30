@@ -39,6 +39,7 @@ interface ProgressHook {
     passed: boolean,
     quizAnswers: number[][]
   ) => Promise<void>;
+  updateModules: (mods: any[]) => void;
 }
 
 /**
@@ -56,7 +57,6 @@ export default function useCourseProgress({ userId, courseId }: UseCourseProgres
       const saved = localStorage.getItem(progressKey);
       return saved ? JSON.parse(saved) : {};
     } catch (e) {
-      console.warn('Corrupted progress data, clearing.', e);
       localStorage.removeItem(progressKey);
       return {};
     }
@@ -162,7 +162,6 @@ export default function useCourseProgress({ userId, courseId }: UseCourseProgres
           }),
         });
       } catch (e) {
-        console.warn('Backend sync failed – progress saved locally.', e);
       }
     },
     [completedSteps, uid, courseId, modules]
