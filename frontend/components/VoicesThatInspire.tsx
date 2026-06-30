@@ -6,31 +6,31 @@ const personalities = [
         name: "Steve Jobs",
         role: "Co-founder, Apple Inc.",
         quote: "The only way to do great work is to love what you do. Don't settle. Keep looking.",
-        image: "https://www.usmagazine.com/wp-content/uploads/backup/steve-jobs-92a047e4-7791-45f6-a8b9-d4d24a376dd2.jpg?w=1000&quality=86&strip=all"
+        image: "/images-optimized/steve-jobs.webp"
     },
     {
         name: "Elon Musk",
         role: "CEO, Tesla & SpaceX",
         quote: "Persistence is very important. You should not give up unless you are forced to give up.",
-        image: "/images/elon-musk.jpg"
+        image: "/images-optimized/elon-musk.webp"
     },
     {
         name: "Bill Gates",
         role: "Co-founder, Microsoft",
         quote: "Your most unhappy customers are your greatest source of learning. Success is a lousy teacher.",
-        image: "/images/bill-gates.jpg"
+        image: "/images-optimized/bill-gates.webp"
     },
     {
         name: "Warren Buffett",
         role: "CEO, Berkshire Hathaway",
         quote: "The most important investment you can make is in yourself. Knowledge builds up like interest.",
-        image: "/images/warren-buffett.jpg"
+        image: "/images-optimized/warren-buffett.webp"
     },
     {
         name: "Sundar Pichai",
         role: "CEO, Google & Alphabet",
         quote: "Wear your failure as a badge of honor. It's the only way to truly innovate and grow.",
-        image: "https://www.vikasjoshi.in/wp-content/uploads/2023/11/Sundarpichai.jpg"
+        image: "/images-optimized/sundar-pichai.webp"
     },
     {
         name: "Satya Nadella",
@@ -42,19 +42,19 @@ const personalities = [
         name: "Mark Zuckerberg",
         role: "Founder & CEO, Meta",
         quote: "The biggest risk is not taking any risk. Move fast and break things to find what works.",
-        image: "https://www.newtraderu.com/wp-content/uploads/Current-Mark-Zuckerberg-Net-Worth-2024.jpg"
+        image: "/images-optimized/mark-zuckerberg.webp"
     },
     {
         name: "Jeff Bezos",
         role: "Founder, Amazon",
         quote: "I knew that if I failed I wouldn't regret that, but I knew I might regret not trying.",
-        image: "https://people.com/thmb/E5SM0jiDVLG-Dj_Lpw2hRMgN_tI=/4000x0/filters:no_upscale():max_bytes(150000):strip_icc():focal(999x0:1001x2)/jeff-bezos-1-921922c6cdc6442397a7f0dcd8bd0370.jpg"
+        image: "/images-optimized/jeff-bezos.webp"
     },
     {
         name: "Jensen Huang",
         role: "Founder & CEO, NVIDIA",
         quote: "Software is eating the world, but AI is going to eat software. Never stop being a student.",
-        image: "/images/jensen-huang.jpg"
+        image: "/images-optimized/jensen-huang.webp"
     },
     {
         name: "Tim Cook",
@@ -77,7 +77,7 @@ const personalities = [
 ];
 
 const QuoteCard = ({ person }: { person: typeof personalities[0] }) => (
-    <div className="flex-shrink-0 w-[240px] sm:w-[260px] md:w-[280px] lg:w-[320px] aspect-[3/4.5] relative rounded-[1rem] overflow-hidden group transition-all duration-700 hover:-translate-y-2 cursor-pointer shadow-2xl">
+    <div className="flex-shrink-0 w-[240px] sm:w-[260px] md:w-[280px] lg:w-[320px] aspect-[3/4.5] relative rounded-[1rem] overflow-hidden group transition-all duration-700 hover:-translate-y-2 cursor-pointer shadow-2xl snap-center">
         {/* Background Image - Color by default */}
         <img
             src={person.image}
@@ -142,6 +142,21 @@ const VoicesThatInspire: React.FC = () => {
                         animation-duration: 40s;
                     }
                 }
+                @media (max-width: 768px) {
+                    .scroll-container {
+                        animation: none !important;
+                        overflow-x: auto !important;
+                        scroll-snap-type: x mandatory !important;
+                        -webkit-overflow-scrolling: touch;
+                        padding-left: 2rem !important;
+                        padding-right: 2rem !important;
+                        width: auto !important;
+                        scrollbar-width: none;
+                    }
+                    .scroll-container::-webkit-scrollbar {
+                        display: none;
+                    }
+                }
             ` }} />
 
             <div className="relative">
@@ -160,3 +175,4 @@ const VoicesThatInspire: React.FC = () => {
 };
 
 export default VoicesThatInspire;
+

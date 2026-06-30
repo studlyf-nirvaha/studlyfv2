@@ -119,7 +119,7 @@ const LandingHero: React.FC = () => {
                             </motion.div>
                         </div>
 
-                        <h1 className="text-[60px] sm:text-[100px] md:text-[140px] font-['Poppins'] font-bold text-black leading-none tracking-tight relative z-20">
+                        <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-[110px] xl:text-[140px] font-['Poppins'] font-bold text-black leading-none tracking-tight relative z-20">
                             Learn
                         </h1>
 
@@ -153,9 +153,9 @@ const LandingHero: React.FC = () => {
                             </div>
                         </div>
 
-                        <h1 className="text-[60px] sm:text-[100px] md:text-[140px] font-['Poppins'] font-bold text-black leading-[1.1] tracking-tight flex items-center relative z-20 pb-4">
+                        <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-[110px] xl:text-[140px] font-['Poppins'] font-bold text-black leading-[1.1] tracking-tight flex items-center relative z-20 pb-4">
                             <span>by&nbsp;</span>
-                            <span className="relative inline-block min-w-[200px] sm:min-w-[320px] md:min-w-[580px]">
+                            <span className="relative inline-block min-w-[140px] sm:min-w-[220px] md:min-w-[300px] lg:min-w-[350px] xl:min-w-[580px]">
                                 <AnimatePresence mode="wait">
                                     <motion.span
                                         key={words[index]}

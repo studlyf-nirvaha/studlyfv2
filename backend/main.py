@@ -272,10 +272,10 @@ async def startup_event():
         from services.reminder_service import reminder_service
 
         scheduler = AsyncIOScheduler()
-        scheduler.add_job(reminder_service.send_judge_reminders, 'interval', hours=12)
-        scheduler.add_job(reminder_service.send_participant_reminders, 'interval', hours=6)
-        scheduler.add_job(reminder_service.send_24h_participant_reminders, 'interval', hours=2)
-        scheduler.add_job(reminder_service.send_1h_participant_reminders, 'interval', minutes=30)
+        scheduler.add_job(reminder_service.send_judge_reminders, 'interval', hours=12, misfire_grace_time=600)
+        scheduler.add_job(reminder_service.send_participant_reminders, 'interval', hours=6, misfire_grace_time=600)
+        scheduler.add_job(reminder_service.send_24h_participant_reminders, 'interval', hours=2, misfire_grace_time=600)
+        scheduler.add_job(reminder_service.send_1h_participant_reminders, 'interval', minutes=30, misfire_grace_time=300)
         scheduler.start()
         logger.info("Background reminder scheduler started")
     except ImportError as e:

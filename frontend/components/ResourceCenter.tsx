@@ -62,7 +62,7 @@ const resources: ResourceItem[] = [
         type: 'CASE STUDY',
         title: "Studlyf's Data Empowerment Initiative at Siemens",
         desc: 'Transforming how engineering teams make data-driven decisions through contextual collaboration.',
-        image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200',
+        image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=1200',
         icon: <BookOpen size={14} />,
         height: 'h-[360px]',
         cardBg: 'bg-[#4C1D95]',
