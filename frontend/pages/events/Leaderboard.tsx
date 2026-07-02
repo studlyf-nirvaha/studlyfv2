@@ -66,9 +66,39 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ eventId }) => {
 
     useEffect(() => {
         fetchLeaderboard();
-        // Auto-refresh every 5 minutes
-        const interval = setInterval(fetchLeaderboard, 300000);
-        return () => clearInterval(interval);
+        
+        // Connect to WebSocket for real-time updates instead of polling
+        const wsUrl = API_BASE_URL.replace(/^http/, 'ws') + `/ws/events/${eventId}`;
+        let ws: WebSocket;
+        
+        const connectWs = () => {
+            ws = new WebSocket(wsUrl);
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "LEADERBOARD_UPDATE" || data.type === "JUDGE_EVALUATION") {
+                        fetchLeaderboard(); // Refetch or apply granular update
+                    }
+                } catch (e) {
+                    console.error("WebSocket message error:", e);
+                }
+            };
+            
+            ws.onclose = () => {
+                // Try to reconnect after 5 seconds if connection drops
+                setTimeout(connectWs, 5000);
+            };
+        };
+        
+        connectWs();
+        
+        return () => {
+            if (ws) {
+                ws.onclose = null; // Prevent reconnect loop on unmount
+                ws.close();
+            }
+        };
     }, [eventId]);
 
     const getRankStyle = (rank: number) => {

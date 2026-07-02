@@ -285,6 +285,24 @@ async def evaluate_submission(data: dict = Body(...)):
             submission_id,
             float(total_score),
         )
+        
+    # Broadcast to WebSocket connected clients (Leaderboard)
+    try:
+        from routes.websocket_routes import manager
+        event_id_to_broadcast = str(sub_doc_ev.get("event_id", "")) if sub_doc_ev else ""
+        if not event_id_to_broadcast:
+            # Try to get opportunity_id
+            sub_doc = await submissions_col.find_one({"_id": ObjectId(submission_id)})
+            if sub_doc and "opportunity_id" in sub_doc:
+                event_id_to_broadcast = str(sub_doc["opportunity_id"])
+                
+        if event_id_to_broadcast:
+            await manager.broadcast_global(
+                event_id_to_broadcast, 
+                {"type": "LEADERBOARD_UPDATE", "submission_id": str(submission_id)}
+            )
+    except Exception as e:
+        print(f"WS Broadcast failed: {e}")
 
     return {"status": "success", "total_score": total_score}
 

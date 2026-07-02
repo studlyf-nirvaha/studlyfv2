@@ -832,6 +832,13 @@ from rate_limiter import rate_limit, check_rate_limit
 async def startup_db_client():
     from db import db
     await db.connect()
+    
+    try:
+        from services.redis_pubsub import start_listener
+        from routes.websocket_routes import handle_redis_message
+        await start_listener(handle_redis_message)
+    except Exception as e:
+        print(f"Failed to start Redis WS listener: {e}")
     # Ensure career assessment templates exist (seed defaults if empty)
     try:
         from db import career_assessment_templates_col
@@ -909,8 +916,11 @@ app.include_router(stage_endpoints.router)
 from routes import company_simulator
 app.include_router(company_simulator.router, prefix="/api/company-simulator")
 
-
-
+try:
+    from routes import websocket_routes
+    app.include_router(websocket_routes.router)
+except ImportError as e:
+    print(f"Skipping websocket_routes: {e}")
 @app.get("/api/user/{user_id}/badges")
 async def get_user_badges(user_id: str):
     user_profile = await users_col.find_one({"user_id": user_id})
