@@ -73,7 +73,7 @@ const typeIcon = (type?: string) => {
 };
 
 const CertificatesPage: React.FC<{ institutionId: string; onNavigate?: (tab: string) => void }> = ({ institutionId, onNavigate }) => {
-  const [activeTab, setActiveTab] = useState<'registry' | 'templates' | 'issue' | 'rules' | 'settings'>('registry');
+
   
   const handleDownloadPdf = async (cert: any) => {
     try {
