@@ -15,7 +15,7 @@ async def get_institution_stats(institution_id: str):
             {"$or": [{"institution_id": institution_id}, {"createdBy": institution_id}]},
             {"_id": 1, "type": 1, "event_link_id": 1}
         )
-        all_opps = await opp_cursor.to_list(length=None)
+        all_opps = await opp_cursor.to_list(length=1000)
         
         hack_opp_ids = [str(o["_id"]) for o in all_opps if o.get("event_link_id")]
         ji_opp_ids = [str(o["_id"]) for o in all_opps if not o.get("event_link_id") and str(o.get("type", "")).strip().lower() in ("job", "internship")]

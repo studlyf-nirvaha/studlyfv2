@@ -285,6 +285,24 @@ async def evaluate_submission(data: dict = Body(...)):
             submission_id,
             float(total_score),
         )
+        
+    # Broadcast to WebSocket connected clients (Leaderboard)
+    try:
+        from routes.websocket_routes import manager
+        event_id_to_broadcast = str(sub_doc_ev.get("event_id", "")) if sub_doc_ev else ""
+        if not event_id_to_broadcast:
+            # Try to get opportunity_id
+            sub_doc = await submissions_col.find_one({"_id": ObjectId(submission_id)})
+            if sub_doc and "opportunity_id" in sub_doc:
+                event_id_to_broadcast = str(sub_doc["opportunity_id"])
+                
+        if event_id_to_broadcast:
+            await manager.broadcast_global(
+                event_id_to_broadcast, 
+                {"type": "LEADERBOARD_UPDATE", "submission_id": str(submission_id)}
+            )
+    except Exception as e:
+        print(f"WS Broadcast failed: {e}")
 
     return {"status": "success", "total_score": total_score}
 
@@ -321,7 +339,7 @@ async def get_leaderboard(opportunity_id: str):
         
         # Attach rubric breakdown for the matrix
         # Pre-fetch scores for this submission
-        all_sub_scores = await submission_scores_col.find({"submission_id": str(doc["_id"])}).to_list(length=None)
+        all_sub_scores = await submission_scores_col.find({"submission_id": str(doc["_id"])}).to_list(length=1000)
         
         # Batch fetch all required rubrics for this submission
         rubric_ids = [ObjectId(s["rubric_id"]) for s in all_sub_scores if s.get("rubric_id")]

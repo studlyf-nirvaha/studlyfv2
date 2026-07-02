@@ -38,8 +38,6 @@ async def send_new_opportunity_email(opportunity: dict, event: dict = None) -> d
         if len(short_desc) > 250:
             short_desc = short_desc[:250] + "..."
 
-        all_users = await users_col.find({}).to_list(length=None)
-
         opp_id = str(opportunity.get("_id", ""))
         opp_title = opportunity.get("title") or event_data.get("title") or ""
         opp_deadline = opportunity.get("deadline") or event_data.get("registrationDeadline")
@@ -73,7 +71,7 @@ async def send_new_opportunity_email(opportunity: dict, event: dict = None) -> d
             "frontend_url": frontend_url,
         }
 
-        for user in all_users:
+        async for user in users_col.find({}):
             try:
                 email = user.get("email", "").strip()
                 if not email:
@@ -139,7 +137,7 @@ async def send_deadline_reminder_emails(days_until: int = 3) -> dict:
         opportunities = await opportunities_col.find({
             "deadline": {"$gte": start_of_day, "$lte": end_of_day},
             "status": "active"
-        }).to_list(length=None)
+        }).to_list(length=1000)
         
         for opp in opportunities:
             try:
@@ -148,10 +146,8 @@ async def send_deadline_reminder_emails(days_until: int = 3) -> dict:
                 opp_org = opp.get("organization") or ""
                 
                 # Check if we already sent reminder for this opportunity and user combo
-                # Get all registered users
-                all_users = await users_col.find({"role": {"$in": ["student", "learner"]}}).to_list(length=None)
-                
-                for user in all_users:
+                # Iterate through all registered users
+                async for user in users_col.find({"role": {"$in": ["student", "learner"]}}):
                     try:
                         # Check if reminder already sent
                         already_sent = await opportunity_emails_log_col.find_one({
@@ -224,15 +220,13 @@ async def send_daily_digest_email() -> dict:
         upcoming_opps = await opportunities_col.find({
             "deadline": {"$gte": now, "$lte": seven_days_later},
             "status": "active"
-        }).sort("deadline", 1).to_list(length=None)
+        }).sort("deadline", 1).to_list(length=1000)
         
         if not upcoming_opps:
             return {"sent_count": 0, "failed_count": 0, "message": "No upcoming opportunities"}
         
-        # Get all students
-        all_users = await users_col.find({"role": {"$in": ["student", "learner"]}}).to_list(length=None)
-        
-        for user in all_users:
+        # Iterate over all students
+        async for user in users_col.find({"role": {"$in": ["student", "learner"]}}):
             try:
                 email = user.get("email", "").strip()
                 if not email:

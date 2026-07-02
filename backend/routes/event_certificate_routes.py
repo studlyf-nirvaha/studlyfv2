@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from bson import ObjectId
 from datetime import datetime
@@ -16,7 +17,7 @@ async def generate_event_certificates(
     event_id: str,
     achievement_type: str = "participation",
     user_id: str = None,
-    template_id: str | None = None,
+    template_id: Optional[str] = None,
     user: dict = Depends(get_auth_user),
 ):
     role = str(user.get("role") or "").lower()
@@ -66,7 +67,7 @@ async def list_event_certificates(
     elif role not in ("institution", "admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    certs = await event_certificates_col.find(query).sort("issued_at", -1).to_list(length=None)
+    certs = await event_certificates_col.find(query).sort("issued_at", -1).to_list(length=1000)
     for c in certs:
         c["_id"] = str(c["_id"])
     return certs

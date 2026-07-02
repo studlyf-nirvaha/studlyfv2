@@ -726,7 +726,7 @@ async def apply_for_opportunity(application_data: dict) -> dict:
 async def get_user_applications(user_id: str) -> List[dict]:
     """All portal applications for a learner, with opportunity, host labels, and real-time status."""
     cursor = opportunity_applications_col.find({"user_id": user_id})
-    applications = await cursor.to_list(length=None)
+    applications = await cursor.to_list(length=1000)
     
     if not applications:
         return []
@@ -748,7 +748,7 @@ async def get_user_applications(user_id: str) -> List[dict]:
             
     opp_map = {}
     if opp_ids:
-        opp_list = await opportunities_col.find({"_id": {"$in": opp_ids}}).to_list(length=None)
+        opp_list = await opportunities_col.find({"_id": {"$in": opp_ids}}).to_list(length=1000)
         opp_map = {str(opp["_id"]): opp for opp in opp_list}
         
     # Batch-fetch all participants for this user & these events
@@ -760,7 +760,7 @@ async def get_user_applications(user_id: str) -> List[dict]:
             
     part_map = {}
     if event_ids:
-        part_list = await participants_col.find({"user_id": user_id, "event_id": {"$in": event_ids}}).to_list(length=None)
+        part_list = await participants_col.find({"user_id": user_id, "event_id": {"$in": event_ids}}).to_list(length=1000)
         part_map = {str(part["event_id"]): part for part in part_list}
         
     # Batch-fetch all institutions
@@ -772,7 +772,7 @@ async def get_user_applications(user_id: str) -> List[dict]:
             
     inst_map = {}
     if inst_keys:
-        inst_list = await institutions_col.find({"institution_id": {"$in": list(inst_keys)}}).to_list(length=None)
+        inst_list = await institutions_col.find({"institution_id": {"$in": list(inst_keys)}}).to_list(length=1000)
         inst_map = {str(inst["institution_id"]): inst for inst in inst_list}
         
     for doc in applications:
@@ -844,7 +844,7 @@ async def get_learner_opportunity_overview(user_id: str, limit: int = 8) -> dict
 
     opp_map = {}
     if opp_ids:
-        opp_list = await opportunities_col.find({"_id": {"$in": opp_ids}}).to_list(length=None)
+        opp_list = await opportunities_col.find({"_id": {"$in": opp_ids}}).to_list(length=1000)
         opp_map = {str(opp["_id"]): opp for opp in opp_list}
 
     event_ids = []
@@ -855,7 +855,7 @@ async def get_learner_opportunity_overview(user_id: str, limit: int = 8) -> dict
 
     event_map = {}
     if event_ids:
-        event_list = await events_col.find({"_id": {"$in": event_ids}}).to_list(length=None)
+        event_list = await events_col.find({"_id": {"$in": event_ids}}).to_list(length=1000)
         event_map = {str(ev["_id"]): ev for ev in event_list}
 
     upcoming = []

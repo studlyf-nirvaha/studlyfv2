@@ -46,7 +46,7 @@ class LeaderboardService:
         score_query = {"event_id": {"$in": event_id_in}}
         if stage_id:
             score_query["stage_id"] = stage_id
-        scores_list = await scores_col.find(score_query).to_list(length=100000)
+        scores_list = await scores_col.find(score_query).to_list(length=1000)
         
         # Build maps for O(1) in-memory lookups
         scores_by_sub = {}

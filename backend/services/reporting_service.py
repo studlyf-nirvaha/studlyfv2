@@ -107,7 +107,7 @@ class ReportingService:
         try:
             entries = await leaderboard_col.find({
                 "event_id": event_id
-            }).sort("rank", 1).to_list(None)
+            }).sort("rank", 1).to_list(length=1000)
             
             return {
                 "title": "Event Leaderboard",
@@ -134,7 +134,7 @@ class ReportingService:
         try:
             participants = await participants_col.find({
                 "event_id": event_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             # Analyze demographics
             by_department = {}
@@ -170,7 +170,7 @@ class ReportingService:
         try:
             submissions = await submissions_col.find({
                 "event_id": event_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             total = len(submissions)
             evaluated = len([s for s in submissions if s.get("status") == "Evaluated"])

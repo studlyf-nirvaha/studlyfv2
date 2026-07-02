@@ -149,7 +149,7 @@ class EventLifecycleService:
             event_title = event.get("title", "Event")
             participants = await participants_col.find({
                 "event_id": event_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             notification_map = {
                 EventStatus.LIVE: {
@@ -200,7 +200,7 @@ class EventLifecycleService:
             live_events = await events_col.find({
                 "status": EventStatus.LIVE.value,
                 "submission_deadline": {"$lte": now}
-            }).to_list(None)
+            }).to_list(length=1000)
             
             for event in live_events:
                 await EventLifecycleService.transition_event_status(
@@ -214,7 +214,7 @@ class EventLifecycleService:
             eval_events = await events_col.find({
                 "status": EventStatus.EVALUATION.value,
                 "evaluation_end_date": {"$lte": now}
-            }).to_list(None)
+            }).to_list(length=1000)
             
             for event in eval_events:
                 await EventLifecycleService.transition_event_status(

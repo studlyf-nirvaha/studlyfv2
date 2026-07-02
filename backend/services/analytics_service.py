@@ -22,7 +22,7 @@ class AnalyticsService:
         """
         try:
             # Get all events for this institution
-            events = await events_col.find({"institution_id": institution_id}).to_list(None)
+            events = await events_col.find({"institution_id": institution_id}).to_list(length=1000)
             event_ids = [str(e["_id"]) for e in events]
             
             # KPI 1: Total Registrations
@@ -98,7 +98,7 @@ class AnalyticsService:
         Stages: Registered → Submitted → Evaluated → Ranked
         """
         try:
-            events = await events_col.find({"institution_id": institution_id}).to_list(None)
+            events = await events_col.find({"institution_id": institution_id}).to_list(length=1000)
             event_ids = [str(e["_id"]) for e in events]
             
             stage1_registered = await participants_col.count_documents({
@@ -136,7 +136,7 @@ class AnalyticsService:
         Return detailed engagement metrics and timelines.
         """
         try:
-            events = await events_col.find({"institution_id": institution_id}).to_list(None)
+            events = await events_col.find({"institution_id": institution_id}).to_list(length=1000)
             event_ids = [str(e["_id"]) for e in events]
             
             # Registration Timeline (by day)
@@ -184,7 +184,7 @@ class AnalyticsService:
         Analyze participant demographics by department, year, and location.
         """
         try:
-            events = await events_col.find({"institution_id": institution_id}).to_list(None)
+            events = await events_col.find({"institution_id": institution_id}).to_list(length=1000)
             event_ids = [str(e["_id"]) for e in events]
             
             # By Department
@@ -224,7 +224,7 @@ class AnalyticsService:
         Calculate judge participation, scoring fairness, and performance metrics.
         """
         try:
-            events = await events_col.find({"institution_id": institution_id}).to_list(None)
+            events = await events_col.find({"institution_id": institution_id}).to_list(length=1000)
             event_ids = [str(e["_id"]) for e in events]
             
             # Judge participation and submission counts

@@ -262,13 +262,15 @@ def get_certificate_issued_template(
         accent="#6C3BFF",
     )
 
+from typing import Optional
+
 def get_team_invite_template(
     leader_name: str,
     team_name: str,
     event_name: str,
     invite_code: str,
-    current_team_size: int | None = None,
-    max_team_size: int | None = None,
+    current_team_size: Optional[int] = None,
+    max_team_size: Optional[int] = None,
     organization_name: str = "Studlyf",
 ):
     frontend_url = os.getenv("FRONTEND_URL", "https://studlyf.in")

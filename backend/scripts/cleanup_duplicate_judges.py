@@ -31,7 +31,7 @@ async def main():
         }},
         {"$match": {"count": {"$gt": 1}}},
     ]
-    duplicates = await scores_col.aggregate(pipeline).to_list(None)
+    duplicates = await scores_col.aggregate(pipeline).to_list(length=1000)
     print(f"Found {len(duplicates)} submissions with multiple score entries")
 
     total_removed = 0

@@ -90,10 +90,10 @@ async def student_view_submissions(user: dict = Depends(get_current_user)):
         submissions = []
         
         # Check team submissions
-        teams = await teams_col.find({"members.user_id": user_id}).to_list(length=None)
+        teams = await teams_col.find({"members.user_id": user_id}).to_list(length=1000)
         for team in teams:
             team_id = str(team.get("_id"))
-            team_subs = await submissions_col.find({"team_id": team_id}).to_list(length=None)
+            team_subs = await submissions_col.find({"team_id": team_id}).to_list(length=1000)
             
             # Check if user is team leader or member
             is_leader = str(user_id) == (team.get("team_leader_id") or team.get("leader_id"))
@@ -106,7 +106,7 @@ async def student_view_submissions(user: dict = Depends(get_current_user)):
                 submissions.append(sub_data)
         
         # Check solo submissions
-        solo_subs = await submissions_col.find({"user_id": user_id, "team_id": {"$exists": False}}).to_list(length=None)
+        solo_subs = await submissions_col.find({"user_id": user_id, "team_id": {"$exists": False}}).to_list(length=1000)
         for sub in solo_subs:
             sub_data = dict(sub)
             sub_data["_id"] = str(sub_data["_id"])

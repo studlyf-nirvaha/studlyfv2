@@ -1,95 +1,97 @@
 # FastAPI & Web Framework
-fastapi==0.136.1
-uvicorn[standard]==0.46.0
-starlette==1.0.0
-pydantic==2.13.3
-pydantic-core==2.46.3
+fastapi
+uvicorn[standard]
+starlette
+pydantic
+pydantic-core
 
 # Database & ORM
-motor==3.7.1
-pymongo==4.17.0
-python-dotenv==1.2.2
+motor
+pymongo
+python-dotenv
 
 # Security & Authentication
-PyJWT==2.12.1
-bcrypt==5.0.0
-passlib==1.7.4
-cryptography==47.0.0
+PyJWT
+bcrypt
+passlib
+cryptography
 
 # Firebase
-firebase-admin==7.4.0
-google-auth==2.49.2
-google-auth-oauthlib==1.2.1
-google-auth-httplib2==0.2.0
-google-cloud-core==2.5.1
-google-cloud-firestore==2.27.0
-google-cloud-storage==3.10.1
-google-api-core==2.30.3
+firebase-admin
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-cloud-core
+google-cloud-firestore
+google-cloud-storage
+google-api-core
 
 # File Processing
-python-multipart==0.0.27
-pdfminer.six==20231228
-PyPDF2==3.0.1
-python-docx==1.2.0
-Pillow==12.2.0
-pdfplumber==0.11.4
-reportlab==4.5.0
-weasyprint==68.1
-python-magic==0.4.27
-groq==1.4.0
+python-multipart
+pdfminer.six
+PyPDF2
+python-docx
+Pillow
+pdfplumber
+reportlab
+weasyprint
+python-magic
+groq
 
 # Email
-aiosmtplib==3.0.1
+aiosmtplib
 
 # Data Processing
-beautifulsoup4==4.14.3
-lxml==6.1.0
-cssselect2==0.9.0
+beautifulsoup4
+lxml
+cssselect2
 
 # Async & Concurrency
-anyio==4.13.0
-asyncio-contextmanager==1.0.1
+anyio
+asyncio-contextmanager
 
 # HTTP & Networking
-httpx==0.28.1
-requests==2.33.1
-h2==4.3.0
-hpack==4.1.0
-hyperframe==6.1.0
+httpx
+requests
+h2
+hpack
+hyperframe
 
 # Utilities
-click==8.3.3
-colorama==0.4.6
-limits==5.8.0
-APScheduler==3.11.2
-qrcode==8.2
-slowapi==0.1.9
-certifi==2026.1.4
-Markdown==3.10.2
-markdown2==2.5.5
-mistune==3.2.0
-redis==5.0.1
+click
+colorama
+limits
+APScheduler
+qrcode
+slowapi
+certifi
+Markdown
+markdown2
+mistune
+redis
 
 # Logging & Monitoring
-sentry-sdk==2.28.0
-python-json-logger==2.0.7
+sentry-sdk
+python-json-logger
 
 # Testing
-pytest==9.0.3
-pytest-asyncio==0.23.2
-pytest-cov==4.1.0
-httpx==0.28.1
+pytest
+pytest-asyncio
+pytest-cov
+httpx
 
 # Production Server
-gunicorn==22.0.0
+gunicorn
 
 # Code Quality (optional, for development)
-black==26.3.1
-flake8==6.1.0
-mypy==1.8.0
-isort==5.13.2
+black
+flake8
+mypy
+isort
 
 # Development
-ipython==8.20.0
-razorpay==2.0.1
+ipython
+razorpay
 jinja2
+scikit-learn
+numpy

@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import logging
 from datetime import datetime
@@ -10,7 +11,7 @@ from services.registration_service import validate_event_restrictions
 logger = logging.getLogger("announcement_service")
 
 
-async def create_announcement_job(event: dict, subject: str, body: str, created_by: dict, limit: int | None = None):
+async def create_announcement_job(event: dict, subject: str, body: str, created_by: dict, limit: Optional[int] = None):
     """Create announcement job and enqueue recipients in background."""
     now = datetime.utcnow()
     job = {
@@ -32,7 +33,7 @@ async def create_announcement_job(event: dict, subject: str, body: str, created_
     return announcement_id
 
 
-async def _process_announcement_job(announcement_id: str, event: dict, subject: str, body: str, created_by: dict, limit: int | None = None):
+async def _process_announcement_job(announcement_id: str, event: dict, subject: str, body: str, created_by: dict, limit: Optional[int] = None):
     """Scan eligible users, enqueue emails via email_queue_service, and record audit entries."""
     try:
         logger.info(f"Starting announcement job {announcement_id} for event {event.get('title')}")

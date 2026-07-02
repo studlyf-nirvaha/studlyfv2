@@ -511,13 +511,37 @@ const SubmissionList: React.FC<SubmissionListProps> = ({ institutionId }) => {
                             {selectedSubmissions.length > 0 && (
                                 <button
                                     onClick={async () => {
-                                        // TODO: Implement bulk notification logic
-                                        alert(`Sending evaluation notification to judges for ${selectedSubmissions.length} submissions.`);
-                                        // Trigger backend API call to notify judges
+                                        try {
+                                            const originalText = document.getElementById('bulk-btn-text');
+                                            if (originalText) originalText.innerText = 'Sending...';
+                                            
+                                            const res = await fetch(`${API_BASE_URL}/api/hackathons/submissions/bulk-notify-judges`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    ...authHeaders()
+                                                },
+                                                body: JSON.stringify({ submission_ids: selectedSubmissions })
+                                            });
+                                            
+                                            const data = await res.json();
+                                            if (res.ok) {
+                                                alert(data.message || 'Notifications sent successfully!');
+                                                setSelectedSubmissions([]); // clear selection
+                                            } else {
+                                                alert(data.detail || 'Failed to send notifications');
+                                            }
+                                        } catch (error) {
+                                            console.error(error);
+                                            alert('An error occurred while sending notifications.');
+                                        } finally {
+                                            const originalText = document.getElementById('bulk-btn-text');
+                                            if (originalText) originalText.innerText = 'Send Bulk Notification';
+                                        }
                                     }}
                                     className="px-6 py-3.5 bg-[#6C3BFF] text-white border border-[#6C3BFF] rounded-2xl text-sm font-bold hover:bg-[#5a2ed9] transition-all shadow-lg shadow-[#6C3BFF]/20 flex items-center gap-2"
                                 >
-                                    <Bell size={18} /> Send Bulk Notification
+                                    <Bell size={18} /> <span id="bulk-btn-text">Send Bulk Notification</span>
                                 </button>
                             )}
                             <div className="relative w-full lg:w-80 group">

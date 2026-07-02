@@ -141,7 +141,7 @@ async def get_my_event_registrations(
     
     try:
         # --- BATCH 1: Fetch all participant records for this user ---
-        participant_docs = await participants_col.find({"user_id": uid}).sort("registered_at", -1).to_list(length=None)
+        participant_docs = await participants_col.find({"user_id": uid}).sort("registered_at", -1).to_list(length=1000)
         
         # --- BATCH 2: Collect all event IDs and fetch events in one query ---
         event_ids = [p.get("event_id") for p in participant_docs if p.get("event_id")]
@@ -208,7 +208,7 @@ async def get_my_event_registrations(
             })
         
         # --- BATCH 3: Fetch opportunity applications ---
-        opp_apps = await opportunity_applications_col.find({"user_id": uid}).sort("applied_at", -1).to_list(length=None)
+        opp_apps = await opportunity_applications_col.find({"user_id": uid}).sort("applied_at", -1).to_list(length=1000)
         
         # Collect opportunity IDs
         opp_ids = [app.get("opportunity_id") for app in opp_apps if app.get("opportunity_id")]
@@ -505,7 +505,7 @@ async def list_event_participants(
     # Batch fetch participants and users
     skip = (page - 1) * limit
     participant_cursor = participants_col.find(query).skip(skip).limit(limit)
-    participants = await participant_cursor.to_list(length=None)
+    participants = await participant_cursor.to_list(length=1000)
     
     user_ids = [str(p.get("user_id")) for p in participants if p.get("user_id")]
     users_dict = {}

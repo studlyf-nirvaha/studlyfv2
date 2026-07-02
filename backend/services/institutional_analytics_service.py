@@ -64,7 +64,7 @@ class InstitutionalAnalyticsService:
             }},
             {"$sort": {"_id": 1}}
         ]
-        results = await participants_col.aggregate(pipeline).to_list(None)
+        results = await participants_col.aggregate(pipeline).to_list(length=1000)
         return [{"date": r["_id"], "count": r["count"]} for r in results]
 
     async def get_departmental_breakdown(self, institution_id: str):
@@ -73,7 +73,7 @@ class InstitutionalAnalyticsService:
             {"$group": {"_id": "$department", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}}
         ]
-        results = await participants_col.aggregate(pipeline).to_list(None)
+        results = await participants_col.aggregate(pipeline).to_list(length=1000)
         return [{"label": r["_id"] or "", "value": r["count"]} for r in results]
 
 analytics_service = InstitutionalAnalyticsService()

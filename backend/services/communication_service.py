@@ -61,11 +61,11 @@ class CommunicationService:
             high_performers = await submissions_col.find({
                 "event_id": event_id,
                 "average_score": {"$gte": min_score}
-            }).to_list(None)
+            }).to_list(length=1000)
             high_performer_ids = [s.get("participant_id") for s in high_performers]
             query["_id"] = {"$in": [ObjectId(pid) for pid in high_performer_ids if pid]}
         
-        participants = await participants_col.find(query).to_list(None)
+        participants = await participants_col.find(query).to_list(length=1000)
         return [str(p["_id"]) for p in participants]
 
     @staticmethod
@@ -85,7 +85,7 @@ class CommunicationService:
             # Get participant details
             participants = await participants_col.find({
                 "_id": {"$in": [ObjectId(pid) for pid in segment_ids]}
-            }).to_list(None)
+            }).to_list(length=1000)
             
             email_count = 0
             in_app_count = 0

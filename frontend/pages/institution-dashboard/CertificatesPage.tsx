@@ -7,6 +7,8 @@ import {
 import { API_BASE_URL, authHeaders } from '../../apiConfig';
 import CertificateTemplateBuilder from './components/CertificateTemplateBuilder';
 import ParticipantCardCustomizer from './components/ParticipantCardCustomizer';
+import { pdf } from '@react-pdf/renderer';
+import { CertificatePDF } from '../../components/pdf/CertificatePDF';
 
 interface EventStage { id: string; name: string }
 interface EventItem { _id: string; title: string; stages?: EventStage[] }
@@ -71,6 +73,32 @@ const typeIcon = (type?: string) => {
 };
 
 const CertificatesPage: React.FC<{ institutionId: string; onNavigate?: (tab: string) => void }> = ({ institutionId, onNavigate }) => {
+
+  
+  const handleDownloadPdf = async (cert: any) => {
+    try {
+      const doc = <CertificatePDF data={{
+          studentName: cert.student_name || cert.recipient_name || 'Participant',
+          eventName: cert.event_title || 'Hackathon',
+          category: cert.category || cert.type || 'Participation',
+          issueDate: cert.issue_date || cert.issued_on || new Date().toISOString(),
+          certificateId: cert.certificate_id || cert._id
+      }} />;
+      const asPdf = pdf([]);
+      asPdf.updateContainer(doc);
+      const blob = await asPdf.toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Certificate_${cert.certificate_id || 'SL'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [selectedStage, setSelectedStage] = useState<EventStage | null>(null);
@@ -800,7 +828,7 @@ const CertificatesPage: React.FC<{ institutionId: string; onNavigate?: (tab: str
                             <td className="py-3 px-4">
                               <div className="flex items-center justify-center space-x-2 text-indigo-600">
                                 <Eye className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => setSelectedCertificate(c)} aria-label="Preview Certificate" />
-                                {!isPending && <><Download className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Download certificate: ' + (c.certificate_id || c._id))} aria-label="Download PDF" />
+                                {!isPending && <><Download className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => handleDownloadPdf(c)} aria-label="Download PDF" />
                                 <Mail className="w-4 h-4 cursor-pointer hover:text-indigo-800" onClick={() => alert('Send email to: ' + c.email)} aria-label="Email Certificate" /></>}
                                 <MoreVertical className="w-4 h-4 cursor-pointer text-slate-400" />
                               </div>
