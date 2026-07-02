@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import datetime, timezone, timedelta
 import asyncio
 import os
@@ -97,7 +98,7 @@ def _event_id_query(event_id: str) -> dict:
     return {"$or": or_clauses}
 
 
-async def collect_event_id_variants(event_id: str, event: dict | None = None) -> list:
+async def collect_event_id_variants(event_id: str, event: Optional[dict] = None) -> list:
     """All event_id strings that may appear on submissions, scores, and teams."""
     from routes.registration_flow_routes import resolve_event_id
 
@@ -149,7 +150,7 @@ def _strip_data_uri(value):
     return value
 
 
-def _resolve_institution_logo_url(institution_id: str, profile: dict) -> str | None:
+def _resolve_institution_logo_url(institution_id: str, profile: dict) -> Optional[str]:
     """Return a logo URL usable by the navbar (file path, https, or compact data URI)."""
     raw = profile.get("logo_url") or profile.get("logo") or profile.get("image_url")
     if not raw or not isinstance(raw, str):
@@ -1308,10 +1309,10 @@ async def get_all_institution_participants(institution_id: str, user: dict = Dep
 @router.get("/events/{event_id}/qualified-bundle")
 async def get_qualified_bundle(
     event_id: str,
-    threshold: float | None = None,
-    waitlist_min: float | None = None,
-    reject_below: float | None = None,
-    stage_id: str | None = None,
+    threshold: Optional[float] = None,
+    waitlist_min: Optional[float] = None,
+    reject_below: Optional[float] = None,
+    stage_id: Optional[str] = None,
     user: dict = Depends(get_auth_user),
 ):
     logger.info(f"[QUALIFIED-BUNDLE] Called event_id={event_id}")
@@ -1386,10 +1387,10 @@ async def get_qualified_bundle(
             if ud:
                 user_lookup[uid] = ud
 
-    def _collect_member_emails(team_id_value: str | None, user_id_value: str | None = None) -> list[str]:
+    def _collect_member_emails(team_id_value: Optional[str], user_id_value: Optional[str] = None) -> list[str]:
         emails: list[str] = []
 
-        def _push(email_value: str | None):
+        def _push(email_value: Optional[str]):
             if not email_value:
                 return
             email_str = str(email_value).strip().lower()
@@ -1415,10 +1416,10 @@ async def get_qualified_bundle(
 
         return emails
 
-    def _collect_member_user_ids(team_id_value: str | None, user_id_value: str | None = None) -> list[str]:
+    def _collect_member_user_ids(team_id_value: Optional[str], user_id_value: Optional[str] = None) -> list[str]:
         user_ids: list[str] = []
 
-        def _push(value: str | None):
+        def _push(value: Optional[str]):
             if not value:
                 return
             uid = str(value).strip()
@@ -2266,7 +2267,7 @@ async def fetch_leaderboard(event_id: str):
         if not event: event = await events_col.find_one({}, sort=[("created_at", -1)])
         if event: event_id = str(event["_id"])
 
-    rankings = await leaderboard_col.find({"event_id": event_id}).sort("rank", 1).to_list(None)
+    rankings = await leaderboard_col.find({"event_id": event_id}).sort("rank", 1).to_list(length=1000)
     for r in rankings: r["_id"] = str(r["_id"])
     return rankings
 
@@ -2676,7 +2677,7 @@ async def fetch_event_results(event_id: str):
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    rankings = await leaderboard_col.find({"event_id": event_id}).sort("rank", 1).to_list(None)
+    rankings = await leaderboard_col.find({"event_id": event_id}).sort("rank", 1).to_list(length=1000)
     for r in rankings:
         r["_id"] = str(r["_id"])
 
@@ -2765,7 +2766,7 @@ async def export_leaderboard_pdf(event_id: str, stage_id: str = None):
     if stage_id:
         query["stage_id"] = stage_id
         
-    rankings = await leaderboard_col.find(query).sort("rank", 1).to_list(None)
+    rankings = await leaderboard_col.find(query).sort("rank", 1).to_list(length=1000)
     
     # 2. Create PDF Buffer
     buffer = BytesIO()
@@ -2839,7 +2840,7 @@ async def export_leaderboard_pdf(event_id: str, stage_id: str = None):
     )
 
 @router.post("/finalize-event/{event_id}")
-async def finalize_event(event_id: str, template_id: str | None = None):
+async def finalize_event(event_id: str, template_id: Optional[str] = None):
     """
     Triggers final results processing and bulk leaderboard generation.
     Transitions event status from LIVE to ENDED.
@@ -2858,7 +2859,7 @@ async def finalize_event(event_id: str, template_id: str | None = None):
         {"$sort": {"total_score": -1}}
     ]
     
-    rankings = await scores_col.aggregate(pipeline).to_list(None)
+    rankings = await scores_col.aggregate(pipeline).to_list(length=1000)
     
     # 2. Save rankings to Leaderboard
     for idx, rank in enumerate(rankings):
@@ -3066,7 +3067,7 @@ async def list_institution_certificates(institution_id: str, user: dict = Depend
 
     results = []
 
-    legacy_certs = await certificates_col.find({"institution_id": str(institution_id)}).sort("issue_date", -1).to_list(length=None)
+    legacy_certs = await certificates_col.find({"institution_id": str(institution_id)}).sort("issue_date", -1).to_list(length=1000)
     for cert in legacy_certs:
         issue_value = cert.get("issue_date") or cert.get("issued_date")
         if isinstance(issue_value, datetime):
@@ -3087,7 +3088,7 @@ async def list_institution_certificates(institution_id: str, user: dict = Depend
         event_ids.append(str(event["_id"]))
 
     if event_ids:
-        certs = await event_certificates_col.find({"event_id": {"$in": event_ids}}).sort("issued_at", -1).to_list(length=None)
+        certs = await event_certificates_col.find({"event_id": {"$in": event_ids}}).sort("issued_at", -1).to_list(length=1000)
         for cert in certs:
             issued_value = cert.get("issued_date") or cert.get("issued_at")
             if isinstance(issued_value, datetime):
@@ -3309,15 +3310,15 @@ async def get_all_deliverables(institution_id: str, user: dict = Depends(get_aut
         pass
 
     # 1. Get all events for this institution to scope the search
-    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=None)
+    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=1000)
     event_ids = [str(e["_id"]) for e in events]
     event_titles = {str(e["_id"]): (e.get("title") or e.get("name") or "Event") for e in events}
     
     # 2. Fetch all teams/submissions to get global status
-    teams = await teams_col.find({"event_id": {"$in": event_ids}}).to_list(length=None)
+    teams = await teams_col.find({"event_id": {"$in": event_ids}}).to_list(length=1000)
     team_status_map = {str(t["_id"]): t.get("institution_selection") or t.get("status") for t in teams}
     
-    submissions = await submissions_col.find({"event_id": {"$in": event_ids}}).to_list(length=None)
+    submissions = await submissions_col.find({"event_id": {"$in": event_ids}}).to_list(length=1000)
     sub_status_map = {str(s["user_id"]): s.get("status") for s in submissions if s.get("user_id")}
 
     # 3. Fetch all submission_data (deliverables) for these events
@@ -3357,17 +3358,17 @@ async def get_all_submissions(institution_id: str, user: dict = Depends(get_auth
         pass
 
     # 1. Get all events
-    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=None)
+    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=1000)
     event_ids = [str(e["_id"]) for e in events]
     event_titles = {str(e["_id"]): (e.get("title") or e.get("name") or "Event") for e in events}
     event_judges = {str(e["_id"]): len(e.get("judges") or []) for e in events}
 
     team_member_emails: dict[str, list[str]] = {}
 
-    async def _collect_team_member_emails(team_doc: dict | None, fallback_user_id: str | None = None) -> list[str]:
+    async def _collect_team_member_emails(team_doc: Optional[dict], fallback_user_id: Optional[str] = None) -> list[str]:
         emails: list[str] = []
 
-        def _push(value: str | None):
+        def _push(value: Optional[str]):
             if not value:
                 return
             email = str(value).strip().lower()
@@ -3977,7 +3978,7 @@ async def get_score_distribution(institution_id: str, user: dict = Depends(get_a
         {"$project": {"range": "$_id", "count": 1, "_id": 0}}
     ]
     
-    results = await scores_col.aggregate(pipeline).to_list(None)
+    results = await scores_col.aggregate(pipeline).to_list(length=1000)
     
     # Ensure all ranges are present even if count is 0
     ranges = ["0-20", "21-40", "41-60", "61-80", "81-100"]
@@ -4009,7 +4010,7 @@ async def get_submission_distribution(institution_id: str, user: dict = Depends(
         {"$limit": 5}
     ]
     
-    return await submissions_col.aggregate(pipeline).to_list(None)
+    return await submissions_col.aggregate(pipeline).to_list(length=1000)
 
 @router.get("/export-summary/{institution_id}")
 async def export_institution_summary(institution_id: str, user: dict = Depends(get_auth_user)):
@@ -4259,7 +4260,7 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
     
     print(f"[EMAIL DEBUG] Team ID: {team_id}, Status: {status}, Provided emails: {emails}")
 
-    def _add_email(value: str | None, bucket: list[str]):
+    def _add_email(value: Optional[str], bucket: list[str]):
         if not value:
             return
         email_value = str(value).strip().lower()
@@ -4299,7 +4300,7 @@ async def send_status_email(event_id: str, email_data: dict, user: dict = Depend
         participants = await participants_col.find({
             "event_id": event_id,
             "team_id": team_id
-        }).to_list(None)
+        }).to_list(length=1000)
         for participant in participants:
             _add_email(participant.get("email"), emails)
             if participant.get("user_id"):
@@ -4545,7 +4546,7 @@ async def _notify_new_opportunity(event_id: str):
                 admins = await users_col.find({
                     "institution_id": str(iid),
                     "role": {"$in": ["admin", "institution", "super_admin"]}
-                }).to_list(length=None)
+                }).to_list(length=1000)
                 title = event.get("title", "New Event")
                 for admin in admins:
                     email = admin.get("email", "").strip()
@@ -7121,7 +7122,7 @@ async def get_institution_stats(institution_id: str):
 
         # 2. Total Teams
         # We find all events for this institution first
-        inst_events = await db.events.find({"institution_id": institution_id}).to_list(length=None)
+        inst_events = await db.events.find({"institution_id": institution_id}).to_list(length=1000)
         event_ids = [str(e["_id"]) for e in inst_events]
         
         total_teams_count = 0
@@ -7146,7 +7147,7 @@ async def get_institution_stats(institution_id: str):
         # 4. Average Score (Calculated from evaluations)
         avg_score = 0
         if event_ids:
-            evals = await db.evaluations.find({"event_id": {"$in": event_ids}}).to_list(length=None)
+            evals = await db.evaluations.find({"event_id": {"$in": event_ids}}).to_list(length=1000)
             if evals:
                 total_points = sum(e.get("total_score", 0) for e in evals)
                 avg_score = round(total_points / len(evals), 1)

@@ -20,19 +20,54 @@ class EligibilityEngine:
 
     async def evaluate_rule(self, rule: EligibilityRule) -> EligibilityResult:
         """Evaluate a single rule against snapshot data."""
-        # TODO: Load snapshot based on rule.snapshot_id
+        snapshot_id = getattr(rule, 'snapshot_id', None)
+        snapshot_data = []
+        team_ids = []
+        reason = "Matched requirement"
         
-        # 2. Logic based on rule_type (RANK, TOP_N, etc.)
-        team_ids = [] # From snapshot
-        reason = "Matches rank requirement"
+        if snapshot_id:
+            try:
+                from bson import ObjectId
+                snapshot = await db.snapshots.find_one({"_id": ObjectId(snapshot_id)})
+                if snapshot:
+                    snapshot_data = snapshot.get("rankings", [])
+            except Exception as e:
+                logger.error(f"Failed to load snapshot {snapshot_id}: {e}")
+                
+        rule_type = getattr(rule, 'rule_type', None)
+        config = getattr(rule, 'config', {})
         
-        # 3. Team Expansion
+        if rule_type == RuleType.RANK:
+            min_rank = config.get("min_rank", 1)
+            max_rank = config.get("max_rank", 100)
+            reason = f"Matches rank requirement ({min_rank}-{max_rank})"
+            
+            for item in snapshot_data:
+                item_rank = item.get("rank", 9999)
+                if min_rank <= item_rank <= max_rank:
+                    t_id = item.get("team_id")
+                    if t_id:
+                        team_ids.append(str(t_id))
+                        
+        elif rule_type == RuleType.TOP_PERCENTILE:
+            percentile = config.get("percentile", 10)
+            reason = f"Top {percentile}% teams in snapshot"
+            total = len(snapshot_data)
+            cutoff = max(1, int(total * (percentile / 100.0)))
+            sorted_data = sorted(snapshot_data, key=lambda x: x.get("score", 0), reverse=True)
+            for item in sorted_data[:cutoff]:
+                t_id = item.get("team_id")
+                if t_id:
+                    team_ids.append(str(t_id))
+        else:
+            reason = "Default participation rule evaluation"
+        
         recipient_ids = await self.expand_team_members(team_ids)
         
         return EligibilityResult(
-            eligible=True,
-            rule_id=rule.rule_id,
-            certificate_type=rule.certificate_type,
+            eligible=len(team_ids) > 0 or rule_type not in [RuleType.RANK, RuleType.TOP_PERCENTILE],
+            rule_id=getattr(rule, 'rule_id', "default"),
+            certificate_type=getattr(rule, 'certificate_type', "participation"),
             team_ids=team_ids,
             evaluation_reason=reason
         )

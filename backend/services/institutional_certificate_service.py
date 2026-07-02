@@ -1,3 +1,4 @@
+from typing import Optional
 import os
 import io
 import base64
@@ -36,7 +37,7 @@ def generate_certificate_id(event_code: str = "HACK") -> str:
     return f"STUD-{event_code}-{year}-{seq:05d}"
 
 
-def resolve_rank_achievement(rank: int | None) -> str:
+def resolve_rank_achievement(rank: Optional[int]) -> str:
     if rank == 1:
         return "winner"
     if rank == 2:
@@ -73,11 +74,11 @@ def _build_certificate_record(
     verification_code: str,
     verification_url: str,
     issued_date: str,
-    institution_id: str | None = None,
-    template_id: str | None = None,
-    rank: int | None = None,
-    team_id: str | None = None,
-    pdf_path: str | None = None,
+    institution_id: Optional[str] = None,
+    template_id: Optional[str] = None,
+    rank: Optional[int] = None,
+    team_id: Optional[str] = None,
+    pdf_path: Optional[str] = None,
 ) -> dict:
     return {
         "certificate_id": cert_id,
@@ -219,10 +220,10 @@ class InstitutionalCertificateService:
         event_date: str,
         achievement_type: str = "participation",
         event_code: str = "HACK",
-        institution_id: str | None = None,
-        rank: int | None = None,
-        team_id: str | None = None,
-        template_id: str | None = None,
+        institution_id: Optional[str] = None,
+        rank: Optional[int] = None,
+        team_id: Optional[str] = None,
+        template_id: Optional[str] = None,
     ) -> dict:
         cert_id = generate_certificate_id(event_code)
         v_code = hashlib.sha256(f"{cert_id}:{event_id}:{user_id}".encode()).hexdigest()[:12].upper()
@@ -308,7 +309,7 @@ class InstitutionalCertificateService:
 
         return record
 
-    async def issue_ranked_event_certificates(self, event_id: str, rankings: list, send_email: bool = True, template_id: str | None = None) -> list:
+    async def issue_ranked_event_certificates(self, event_id: str, rankings: list, send_email: bool = True, template_id: Optional[str] = None) -> list:
         from db import events_col, participants_col, teams_col, users_col
         from services.email_template_service import get_active_template, render_template
         from services.email_service import (
@@ -463,20 +464,20 @@ class InstitutionalCertificateService:
 
     async def get_user_certificates(self, event_id: str, user_id: str) -> list:
         cursor = event_certificates_col.find({"event_id": event_id, "user_id": user_id}).sort("issued_at", -1)
-        certs = await cursor.to_list(length=None)
+        certs = await cursor.to_list(length=1000)
         for c in certs:
             c["_id"] = str(c["_id"])
         return certs
 
     async def get_event_certificates(self, event_id: str) -> list:
         cursor = event_certificates_col.find({"event_id": event_id}).sort("issued_at", -1)
-        certs = await cursor.to_list(length=None)
+        certs = await cursor.to_list(length=1000)
         for c in certs:
             c["_id"] = str(c["_id"])
         return certs
 
 
-async def enqueue_certificate_job(event_id: str, achievement_type: str = "participation", event_code: str = "HACK", template_id: str | None = None) -> str:
+async def enqueue_certificate_job(event_id: str, achievement_type: str = "participation", event_code: str = "HACK", template_id: Optional[str] = None) -> str:
     """Create a certificate generation job in the queue. Returns job_id."""
     result = await certificate_jobs_col.insert_one({
         "event_id": event_id,

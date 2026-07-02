@@ -60,18 +60,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToSignup, transparent = f
                 if (next && next.startsWith('/')) {
                     // Ignore opportunity deep-links for post-login landing and prefer dashboard
                     if (next.startsWith('/opportunities')) {
-                        navigate('/dashboard');
+                        navigate('/dashboard/learner', { replace: true });
                     } else {
-                        navigate(next);
+                        navigate(next, { replace: true });
                     }
                     return;
                 }
 
                 // Default redirect based on role
-            if (data.user.role === 'super_admin' || data.user.role === 'admin') navigate('/admin');
-            else if (data.user.role === 'institution') navigate('/institution-dashboard?post=true');
-            else if (data.user.role === 'judge') navigate('/judge-portal');
-            else navigate('/dashboard');
+                if (data.user.role === 'super_admin' || data.user.role === 'admin') navigate('/admin', { replace: true });
+                else if (data.user.role === 'institution') navigate('/institution-dashboard?post=true', { replace: true });
+                else if (data.user.role === 'judge') navigate('/judge-portal', { replace: true });
+                else navigate('/dashboard/learner', { replace: true });
             } else {
                 const detail = data.detail || 'Login failed. Please check your credentials.';
                 setError(detail);

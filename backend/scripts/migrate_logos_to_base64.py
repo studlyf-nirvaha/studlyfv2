@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Migration: Convert legacy file-path logos/banners to base64 in MongoDB.
 Reads files from the local uploads directory and stores them as base64 data URIs.
@@ -16,7 +17,7 @@ import asyncio
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(__file__))
 
-def extract_local_path(val: str) -> str | None:
+def extract_local_path(val: str) -> Optional[str]:
     """Convert a stored URL to a local file path if possible."""
     # Stored as absolute Render URL: https://studlyf-tlkk.onrender.com/uploads/events/x.png
     # Stored as relative path: /uploads/events/x.png or uploads/events/x.png
@@ -26,7 +27,7 @@ def extract_local_path(val: str) -> str | None:
     rel = val[idx:]  # e.g. "uploads/events/x.png"
     return os.path.join(BACKEND_DIR, rel)
 
-async def convert_file_to_b64(local_path: str) -> str | None:
+async def convert_file_to_b64(local_path: str) -> Optional[str]:
     if not os.path.exists(local_path):
         print(f"  [SKIP] File not found: {local_path}")
         return None

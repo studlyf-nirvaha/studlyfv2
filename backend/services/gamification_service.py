@@ -100,11 +100,11 @@ class GamificationService:
             # Get user participation data
             participations = await participants_col.find({
                 "user_id": user_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             submissions = await submissions_col.find({
                 "user_id": user_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             # Check each badge
             
@@ -213,7 +213,7 @@ class GamificationService:
             # Get all ranked participants
             rankings = await leaderboard_col.find({
                 "event_id": event_id
-            }).sort("rank", 1).to_list(None)
+            }).sort("rank", 1).to_list(length=1000)
             
             leaderboard_data = {
                 "event_id": event_id,
@@ -254,11 +254,11 @@ class GamificationService:
         try:
             badges = await badges_col.find({
                 "user_id": user_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             achievements = await achievements_col.find({
                 "user_id": user_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             # Calculate stats
             total_points = sum(a.get("points", 0) for a in achievements)

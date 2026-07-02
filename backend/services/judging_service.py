@@ -53,7 +53,7 @@ class JudgingService:
             other_submissions = await submissions_col.find({
                 "event_id": event_id,
                 "_id": {"$ne": ObjectId(submission_id)}
-            }).to_list(None)
+            }).to_list(length=1000)
             
             # Calculate similarity scores
             similarities = []
@@ -199,7 +199,7 @@ class JudgingService:
             assigned_judges = submission.get("assigned_judge_ids", [])
             submitted_judges = await scores_col.find({
                 "submission_id": submission_id
-            }).to_list(None)
+            }).to_list(length=1000)
             
             all_submitted = len(submitted_judges) == len(assigned_judges)
             
@@ -284,7 +284,7 @@ class JudgingService:
             if event_id:
                 query["event_id"] = event_id
             
-            judge_assignments = await judges_col.find(query).to_list(None)
+            judge_assignments = await judges_col.find(query).to_list(length=1000)
             
             submissions_data = []
             for assignment in judge_assignments:

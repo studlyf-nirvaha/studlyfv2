@@ -73,7 +73,7 @@ async def get_my_event_registrations(user: dict = Depends(get_auth_user)):
     results = []
     
     # --- Part 1: Event participants ---
-    participants = await participants_col.find({"user_id": uid}).sort("registered_at", -1).to_list(None)
+    participants = await participants_col.find({"user_id": uid}).sort("registered_at", -1).to_list(length=1000)
     event_ids = [ObjectId(p.get("event_id")) for p in participants if p.get("event_id")]
     
     events_dict = {}
@@ -690,7 +690,7 @@ async def list_event_participants(
     
     # Get participants
     cursor = participants_col.find(query)
-    participants = await cursor.to_list(length=None)
+    participants = await cursor.to_list(length=1000)
     
     # Enrich with user info
     user_ids = [str(p.get("user_id")) for p in participants]

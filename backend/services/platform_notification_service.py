@@ -20,8 +20,8 @@ async def notify_team_invitation(
     event_title: str,
     organization_name: str,
     invite_link: str,
-    current_team_size: int | None = None,
-    max_team_size: int | None = None,
+    current_team_size: Optional[int] = None,
+    max_team_size: Optional[int] = None,
 ):
     await send_template_email(
         template_type="team_invitation",

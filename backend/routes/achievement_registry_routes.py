@@ -18,14 +18,14 @@ router = APIRouter(prefix="/api/v1/institution/certificates", tags=["Achievement
 # This IS correct.
 
 
-async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None):
+async def _get_leaderboard_for_event(event_id: str, stage_id: Optional[str] = None):
     """Fetch submissions with scores to build a leaderboard (queries both collections)."""
     match = {"event_id": event_id}
     if stage_id:
         match["stage_id"] = stage_id
 
-    subs_data = await submission_data_col.find(match).to_list(length=None)
-    subs_main = await submissions_col.find(match).to_list(length=None)
+    subs_data = await submission_data_col.find(match).to_list(length=1000)
+    subs_main = await submissions_col.find(match).to_list(length=1000)
 
     seen = set()
     submissions = []
@@ -87,7 +87,7 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
 
     # Resolve team names
     if team_ids_to_resolve:
-        team_docs = await teams_col.find({"_id": {"$in": [ObjectId(tid) if ObjectId.is_valid(tid) else tid for tid in team_ids_to_resolve]}}).to_list(length=None)
+        team_docs = await teams_col.find({"_id": {"$in": [ObjectId(tid) if ObjectId.is_valid(tid) else tid for tid in team_ids_to_resolve]}}).to_list(length=1000)
         team_map = {}
         for td in team_docs:
             tid = str(td["_id"])
@@ -99,7 +99,7 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
 
     # Resolve user names from users_col for missing names
     if name_lookup_ids:
-        user_docs = await users_col.find({"user_id": {"$in": list(name_lookup_ids)}}, {"user_id": 1, "full_name": 1, "name": 1}).to_list(length=None)
+        user_docs = await users_col.find({"user_id": {"$in": list(name_lookup_ids)}}, {"user_id": 1, "full_name": 1, "name": 1}).to_list(length=1000)
         user_name_map = {}
         for ud in user_docs:
             uid = ud.get("user_id", "")
@@ -115,7 +115,7 @@ async def _get_leaderboard_for_event(event_id: str, stage_id: str | None = None)
         if tid:
             team_member_ids.add(tid)
     if team_member_ids:
-        team_docs = await teams_col.find({"_id": {"$in": [ObjectId(tid) if ObjectId.is_valid(tid) else tid for tid in team_member_ids]}}).to_list(length=None)
+        team_docs = await teams_col.find({"_id": {"$in": [ObjectId(tid) if ObjectId.is_valid(tid) else tid for tid in team_member_ids]}}).to_list(length=1000)
         team_member_map = {}
         for td in team_docs:
             tid = str(td["_id"])
@@ -245,7 +245,7 @@ async def get_eligible_recipients(
                 qualified_ids.add(r["user_id"])
             if r.get("team_id"):
                 qualified_ids.add(r["team_id"])
-    all_participants = await participants_col.find({"event_id": event_id}).to_list(length=None)
+    all_participants = await participants_col.find({"event_id": event_id}).to_list(length=1000)
     non_qualifiers = []
     for p in all_participants:
         pid = str(p.get("user_id") or "")

@@ -8,6 +8,8 @@ import { API_BASE_URL, authHeaders } from '../../apiConfig';
 import { useAuth } from '../../AuthContext';
 import CertificateTemplateBuilder from './components/CertificateTemplateBuilder';
 import { Template1, Template2, Template3, Template4, Template5, Template6, Template7, Template8, Template9, CertData } from './components/CertTemplates';
+import { pdf } from '@react-pdf/renderer';
+import { CertificatePDF } from '../../components/pdf/CertificatePDF';
 
 interface EventStage {
   id: string;
@@ -99,6 +101,33 @@ const typeIcon = (type?: string) => {
 
 export default function AchievementRegistry() {
   const { user } = useAuth();
+  
+
+  const handleDownloadPdf = async (cert: any) => {
+    try {
+      const doc = <CertificatePDF data={{
+          studentName: cert.student_name || cert.recipient_name || 'Participant',
+          eventName: cert.event_title || 'Hackathon',
+          category: cert.category || cert.type || 'Participation',
+          issueDate: cert.issue_date || cert.issued_on || new Date().toISOString(),
+          certificateId: cert.certificate_id || cert._id
+      }} />;
+      const asPdf = pdf([]);
+      asPdf.updateContainer(doc);
+      const blob = await asPdf.toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Certificate_${cert.certificate_id || 'SL'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [selectedStage, setSelectedStage] = useState<EventStage | null>(null);

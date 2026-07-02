@@ -163,6 +163,35 @@ async def create_hackathon_submission(submission: HackathonSubmission, current_u
                     {"$set": {"team_id": str(team_doc["_id"])}}
                 )
 
+        # ML Plagiarism Detection
+        try:
+            from services.ml_service import ml_service
+            
+            # Fetch existing submissions for this event to compare
+            existing_cursor = hackathon_submissions_col.find(
+                {"$or": [{"eventId": target_event_id}, {"hackathonId": target_event_id}]},
+                {"solution": 1, "problemStatement": 1, "_id": 1}
+            )
+            existing_subs = await existing_cursor.to_list(length=1000)
+            
+            # Prepare data format for ML service
+            previous_submissions = [
+                {"_id": str(sub["_id"]), "code": f"{sub.get('problemStatement', '')} {sub.get('solution', '')}"}
+                for sub in existing_subs
+            ]
+            
+            new_code = f"{submission.problemStatement} {submission.solution}"
+            
+            is_plagiarized, sim_score, matched_id = await ml_service.detect_plagiarism(new_code, previous_submissions)
+            
+            submission_dict["plagiarism_flag"] = is_plagiarized
+            submission_dict["plagiarism_score"] = float(sim_score)
+            if is_plagiarized:
+                submission_dict["matched_submission_id"] = matched_id
+                
+        except Exception as ml_err:
+            print(f"ML Plagiarism Check Failed: {ml_err}")
+
         # 3. Insert the actual submission
         result = await hackathon_submissions_col.insert_one(submission_dict)
         submission_dict["_id"] = str(result.inserted_id)
@@ -233,7 +262,7 @@ async def get_event_submissions(
     else:
         cursor = cursor.sort("createdAt", -1)
         
-    submissions = await cursor.to_list(length=None)
+    submissions = await cursor.to_list(length=1000)
     return [fix_id(s) for s in submissions]
 
 @router.get("/institution/{institution_id}/submissions")
@@ -249,13 +278,13 @@ async def get_institution_hackathon_submissions(institution_id: str):
     except:
         pass
 
-    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=None)
+    events = await events_col.find({"institution_id": {"$in": inst_variants}}).to_list(length=1000)
     opps = await opportunities_col.find({
         "$or": [
             {"institution_id": {"$in": inst_variants}},
             {"createdBy": {"$in": inst_variants}}
         ]
-    }).to_list(length=None)
+    }).to_list(length=1000)
 
     event_ids = [str(e["_id"]) for e in events]
     event_ids.extend([str(o["_id"]) for o in opps])
@@ -274,7 +303,7 @@ async def get_institution_hackathon_submissions(institution_id: str):
     }
 
     cursor = hackathon_submissions_col.find(query).sort("createdAt", -1)
-    submissions = await cursor.to_list(length=None)
+    submissions = await cursor.to_list(length=1000)
     return [fix_id(s) for s in submissions]
 
 @router.get("/submissions/{submission_id}")
@@ -442,7 +471,7 @@ async def get_hackathon_leaderboard(event_id: str, include_all: bool = Query(Fal
         [("totalScore", -1), ("updatedAt", -1), ("createdAt", -1)]
     )
 
-    submissions = await cursor.to_list(length=None)
+    submissions = await cursor.to_list(length=1000)
     leaderboard = []
     for i, s in enumerate(submissions):
         entry = fix_id(s)
@@ -475,7 +504,7 @@ async def get_hackathon_stats(event_id: str):
         except:
             pass
     
-    submissions = await hackathon_submissions_col.find({"hackathonId": {"$in": hack_ids}}).to_list(length=None)
+    submissions = await hackathon_submissions_col.find({"hackathonId": {"$in": hack_ids}}).to_list(length=1000)
     
     unique_users = set()
     for s in submissions:
@@ -544,3 +573,53 @@ async def get_my_hackathon_submission(event_id: str, current_user: dict = Depend
         return {"hasSubmitted": False}
     
     return {"hasSubmitted": True, "submission": fix_id(submission)}
+
+@router.post("/submissions/bulk-notify-judges")
+async def bulk_notify_judges(
+    submission_ids: List[str] = Body(..., embed=True),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Send bulk notifications to judges assigned to the provided submissions.
+    """
+    if current_user.get("role") not in ["super_admin", "institution"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    try:
+        from services.email_queue_service import enqueue_email
+    except ImportError:
+        enqueue_email = None
+
+    if not enqueue_email:
+        raise HTTPException(status_code=500, detail="Email service unavailable")
+
+    try:
+        from bson import ObjectId
+        obj_ids = [ObjectId(sid) for sid in submission_ids if ObjectId.is_valid(sid)]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid submission IDs")
+
+    cursor = hackathon_submissions_col.find({"_id": {"$in": obj_ids}})
+    
+    judge_emails = set()
+    async for sub in cursor:
+        assigned = sub.get("assigned_judge_emails", [])
+        if isinstance(assigned, list):
+            for e in assigned:
+                if e:
+                    judge_emails.add(str(e).strip().lower())
+                    
+    if not judge_emails:
+        return {"status": "success", "message": "No judges assigned to the selected submissions."}
+        
+    for email in judge_emails:
+        subject = "New Submissions to Evaluate"
+        body = "Hello,\n\nYou have new submissions waiting for your evaluation. Please log in to your dashboard to review them.\n\nBest,\nStudLyf Team"
+        await enqueue_email(
+            recipient=email,
+            subject=subject,
+            body=body,
+            priority=10
+        )
+        
+    return {"status": "success", "message": f"Successfully queued notifications to {len(judge_emails)} judges."}

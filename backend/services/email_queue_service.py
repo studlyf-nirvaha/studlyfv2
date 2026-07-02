@@ -1,3 +1,4 @@
+from typing import Optional
 import asyncio
 import logging
 from datetime import datetime
@@ -15,7 +16,7 @@ POLL_INTERVAL_SECONDS = 5
 _email_cb = get_circuit_breaker("email_smtp", failure_threshold=3, recovery_timeout=60.0)
 
 
-async def enqueue_email(recipient: str, subject: str, body: str, metadata: dict | None = None, idempotency_key: str | None = None, priority: int = 0):
+async def enqueue_email(recipient: str, subject: str, body: str, metadata: Optional[dict] = None, idempotency_key: Optional[str] = None, priority: int = 0):
     """Add an email to the persistent queue for background delivery."""
     if not recipient or "@" not in recipient:
         raise ValueError("Invalid recipient email")
@@ -40,7 +41,7 @@ async def enqueue_email(recipient: str, subject: str, body: str, metadata: dict 
     return str(result.inserted_id)
 
 
-async def _fetch_next_email() -> dict | None:
+async def _fetch_next_email() -> Optional[dict]:
     """Fetch the next queued email and mark it as processing."""
     now = datetime.utcnow()
     query = {
@@ -61,7 +62,7 @@ async def _fetch_next_email() -> dict | None:
     return email_job
 
 
-async def _finalize_email_job(job: dict, success: bool, failure_reason: str | None = None):
+async def _finalize_email_job(job: dict, success: bool, failure_reason: Optional[str] = None):
     """Update the queue record and write delivery logs."""
     status = "sent" if success else ("failed" if job.get("attempts", 0) >= MAX_RETRY_ATTEMPTS else "pending")
     now = datetime.utcnow()

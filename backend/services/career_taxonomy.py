@@ -1,3 +1,4 @@
+from typing import Optional
 """
 Career Dreamer — Taxonomy Data Layer
 =====================================
@@ -853,7 +854,7 @@ def get_all_role_names() -> list[str]:
     """Return a sorted list of all career role names in the taxonomy."""
     return sorted(ROLE_DATABASE.keys())
 
-def get_role_data(role_name: str) -> dict | None:
+def get_role_data(role_name: str) -> Optional[dict]:
     """Get the full data dict for a specific role, or None if not found."""
     return ROLE_DATABASE.get(role_name)
 

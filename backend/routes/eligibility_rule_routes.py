@@ -40,10 +40,10 @@ async def list_rules(
         event_ids = await db.events.find(
             {"institution_id": institution_id},
             {"_id": 1}
-        ).to_list(length=None)
+        ).to_list(length=1000)
         query["event_id"] = {"$in": [str(e["_id"]) for e in event_ids]}
     
-    rules = await db.eligibility_rules.find(query).sort("created_at", -1).to_list(length=None)
+    rules = await db.eligibility_rules.find(query).sort("created_at", -1).to_list(length=1000)
     for r in rules:
         r["_id"] = str(r["_id"])
     return rules

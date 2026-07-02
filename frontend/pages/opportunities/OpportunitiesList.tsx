@@ -433,12 +433,14 @@ const OpportunitiesList: React.FC = () => {
                             </motion.div>
                         </button>
                         
-                        <button
-                            onClick={() => navigate('/dashboard/institution?post=true')}
-                            className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition-all"
-                        >
-                            <Plus size={14} /> Post Opportunity
-                        </button>
+                        {user?.role === 'institution' && (
+                            <button
+                                onClick={() => navigate('/institution-dashboard?post=true', { replace: true })}
+                                className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 transition-all"
+                            >
+                                <Plus size={14} /> Post Opportunity
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
