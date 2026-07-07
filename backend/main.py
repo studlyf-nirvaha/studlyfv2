@@ -28,7 +28,7 @@ import secrets
 
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
-import time
+import time as time_module
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -36,9 +36,9 @@ logger = logging.getLogger("perf_logger")
 
 class PerformanceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        start_time = time.time()
+        start_time = time_module.time()
         response = await call_next(request)
-        process_time = (time.time() - start_time) * 1000
+        process_time = (time_module.time() - start_time) * 1000
         logger.info(f"[PERF] {process_time:.2f}ms - {request.method} {request.url.path}")
         return response
 
