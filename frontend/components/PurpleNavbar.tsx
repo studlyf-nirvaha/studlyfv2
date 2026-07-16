@@ -31,7 +31,7 @@ const BentoCard = ({ title, desc, children, className = "", to = "#", onClick }:
 );
 
 const LearnDropdown = ({ onItemClick }: { onItemClick: () => void }) => (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 min-w-[300px] md:min-w-[900px]">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 min-w-[300px] md:min-w-[1000px]">
         <BentoCard onClick={onItemClick} to="/learn/courses-overview" title="Courses" desc="Role-focused tracks for elite engineering readiness." className="md:col-span-2 md:row-span-2 min-h-[180px] md:min-h-[260px] bg-white shadow-sm overflow-hidden">
             <div className="absolute top-0 right-0 w-1/2 h-full overflow-hidden">
                 <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Courses" />
@@ -42,6 +42,11 @@ const LearnDropdown = ({ onItemClick }: { onItemClick: () => void }) => (
             <div className="absolute top-0 right-0 w-1/3 h-full overflow-hidden">
                 <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=400" className="w-full h-full object-cover group-hover:scale-110 transition-transform" alt="Corporate" />
                 <div className="absolute inset-0 bg-gradient-to-r from-white via-white/40 to-transparent"></div>
+            </div>
+        </BentoCard>
+        <BentoCard onClick={onItemClick} to="/learn/career-onboarding" title="Career Dreamer" desc="AI career recommendation engine based on user interests." className="md:col-span-1 md:row-span-2 min-h-[180px] md:min-h-[260px] bg-[#7C3AED]/5 border border-[#7C3AED]/10 hover:border-[#7C3AED]/30 shadow-sm overflow-hidden group">
+            <div className="absolute bottom-0 right-0 w-full h-1/2 bg-gradient-to-t from-[#7C3AED]/10 to-transparent flex items-end p-6 justify-end rounded-b-[1.5rem] group-hover:from-[#7C3AED]/20 transition-colors">
+                <span className="text-4xl">🚀</span>
             </div>
         </BentoCard>
     </div>

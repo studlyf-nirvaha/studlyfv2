@@ -931,15 +931,40 @@ const getRoleTasksAndSkills = (role: string) => {
             ]
         };
     }
+    
+    if (r.includes("parent") || r.includes("mother") || r.includes("father") || r.includes("caregiver")) {
+        return {
+            tasks: [
+                "Manage household schedules, routines, and daily logistical operations.",
+                "Provide emotional support, guidance, and developmental mentorship.",
+                "Budget and oversee family finances, including education and healthcare planning.",
+                "Coordinate with schools, doctors, and community organizations.",
+                "Resolve conflicts and mediate disagreements with empathy and patience.",
+                "Adapt quickly to unexpected emergencies and changing daily priorities."
+            ],
+            skills: [
+                { name: "Time Management", desc: "Balancing multiple schedules and daily priorities seamlessly." },
+                { name: "Empathy", desc: "Understanding and nurturing emotional well-being." },
+                { name: "Crisis Management", desc: "Handling unexpected situations calmly and effectively." },
+                { name: "Financial Planning", desc: "Managing household budgets and long-term expenses." },
+                { name: "Conflict Resolution", desc: "Mediating disputes and teaching problem-solving skills." },
+                { name: "Communication", desc: "Fostering open, honest dialogue within the family." },
+                { name: "Organization", desc: "Maintaining order in logistics, documents, and environment." },
+                { name: "Adaptability", desc: "Adjusting to rapidly changing circumstances and needs." }
+            ]
+        };
+    }
+    
     // Fallback/Default
+    const roleName = role ? role.trim() : "Professional";
     return {
         tasks: [
-            "Analyze complex requirements and devise effective, scalable solutions.",
-            "Collaborate with cross-functional teams to deliver key projects on time.",
-            "Communicate progress and results clearly to stakeholders and managers.",
-            "Identify process improvements and optimize day-to-day workflow efficiency.",
-            "Manage project timelines, resources, and deliverable quality.",
-            "Continuous learning to stay updated with industry best practices and tools."
+            `Analyze requirements and devise effective solutions for ${roleName} workflows.`,
+            `Collaborate with others to deliver key ${roleName} objectives on time.`,
+            `Communicate progress and results clearly to peers and stakeholders.`,
+            `Identify process improvements and optimize day-to-day ${roleName} efficiency.`,
+            `Manage timelines, resources, and overall deliverable quality.`,
+            `Engage in continuous learning to stay updated with ${roleName} best practices.`
         ],
         skills: [
             { name: "Communication", desc: "Expressing ideas clearly in writing and verbal discussions." },
@@ -1485,7 +1510,7 @@ const CareerOnboarding: React.FC = () => {
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && isValid) {
                                         const isStudent = formData.role.toLowerCase().includes('student');
-                                        setStep(isStudent ? 2 : 21);
+                                        setStep(isStudent ? 2 : 22);
                                     }
                                 }}
                                 placeholder="Type your role here…"
@@ -1513,7 +1538,7 @@ const CareerOnboarding: React.FC = () => {
                     <button
                         onClick={() => {
                             const isStudent = formData.role.toLowerCase().includes('student');
-                            setStep(isStudent ? 2 : 21);
+                            setStep(isStudent ? 2 : 22);
                         }}
                         disabled={!isValid}
                         className={`w-full sm:w-fit px-12 py-4 rounded-2xl font-semibold text-base transition-all select-none ${isValid
@@ -1528,6 +1553,15 @@ const CareerOnboarding: React.FC = () => {
         }
 
         if (step === 21) {
+            const predefinedOrgs = [
+                "Healthcare", "Technology", "Finance", "Education", "Manufacturing", 
+                "Retail", "Government", "Non-Profit", "Media", "Telecommunications", 
+                "Google", "Microsoft", "Amazon", "Apple", "Meta", "Netflix",
+                "Hospital", "Clinic", "Private Practice", "Pharmaceuticals"
+            ];
+            
+            const isOrganizationValid = organization.trim() === '' || predefinedOrgs.some(org => org.toLowerCase() === organization.trim().toLowerCase());
+
             return (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -1547,13 +1581,36 @@ const CareerOnboarding: React.FC = () => {
                         <input
                             autoFocus
                             type="text"
+                            list="organizations"
                             placeholder="Organization or industry (optional)"
                             value={organization}
                             onChange={(e) => setOrganization(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && setStep(22)}
-                            className="w-full text-3xl sm:text-4xl font-light text-slate-900 border-b-2 border-gray-200 focus:border-[#7C3AED] outline-none pb-3 pt-1 bg-transparent transition-all placeholder:text-slate-300"
-                            style={{ caretColor: '#7C3AED' }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && isOrganizationValid) {
+                                    setStep(22);
+                                }
+                            }}
+                            className={`w-full text-3xl sm:text-4xl font-light border-b-2 outline-none pb-3 pt-1 bg-transparent transition-all placeholder:text-slate-300 ${isOrganizationValid ? 'text-slate-900 border-gray-200 focus:border-[#7C3AED]' : 'text-red-500 border-red-400 focus:border-red-500'}`}
+                            style={{ caretColor: isOrganizationValid ? '#7C3AED' : '#ef4444' }}
                         />
+                        <datalist id="organizations">
+                            {predefinedOrgs.map(org => (
+                                <option key={org} value={org} />
+                            ))}
+                        </datalist>
+                        
+                        <AnimatePresence>
+                            {!isOrganizationValid && (
+                                <motion.p 
+                                    initial={{ opacity: 0, y: -5 }} 
+                                    animate={{ opacity: 1, y: 0 }} 
+                                    exit={{ opacity: 0, y: -5 }} 
+                                    className="text-red-500 text-sm mt-3 font-medium"
+                                >
+                                    Please select a recognized organization/industry from the dropdown or leave it blank.
+                                </motion.p>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Navigation Buttons */}
@@ -1566,7 +1623,8 @@ const CareerOnboarding: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setStep(22)}
-                            className="px-8 py-3 rounded-2xl font-semibold text-base transition-all select-none bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-lg shadow-purple-100 active:scale-95 cursor-pointer"
+                            disabled={!isOrganizationValid}
+                            className={`px-8 py-3 rounded-2xl font-semibold text-base transition-all select-none ${isOrganizationValid ? 'bg-[#7C3AED] text-white hover:bg-[#6D28D9] shadow-lg shadow-purple-100 active:scale-95 cursor-pointer' : 'bg-purple-100 text-purple-300 cursor-not-allowed'}`}
                         >
                             Next
                         </button>
@@ -1672,7 +1730,7 @@ const CareerOnboarding: React.FC = () => {
                         </span>
                         <div className="flex gap-4">
                             <button
-                                onClick={() => setStep(21)}
+                                onClick={() => setStep(1)}
                                 className="px-8 py-3 rounded-2xl font-semibold text-base transition-all select-none border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-[#7C3AED] active:scale-95 cursor-pointer bg-white"
                             >
                                 Back
@@ -2286,7 +2344,7 @@ const CareerOnboarding: React.FC = () => {
 
         if (activeTab === 'Identity') {
             return (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-6xl mx-auto pt-28 pb-12 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 px-6">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-7xl mx-auto pt-28 pb-12 grid lg:grid-cols-[350px_1fr] xl:grid-cols-[400px_1fr] gap-12 px-6">
                     <div className="space-y-10">
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-slate-800 font-bold uppercase text-[11px] tracking-widest"> Experiences</div>
@@ -2361,31 +2419,24 @@ const CareerOnboarding: React.FC = () => {
                                 </motion.p>
                             </AnimatePresence>
                         </div>
-                        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mt-12 pb-2">
-                            <div className="flex gap-3">
-                                <button onClick={async () => {
-                                    await handleAnalyze(formData);
-                                }} className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-all border border-gray-100 shadow-sm active:scale-95 hover:text-purple-600" title="Re-generate Identity and Paths"><span className="font-semibold hover:rotate-180 transition-transform duration-500">↻</span></button>
-                                <button onClick={() => { navigator.clipboard.writeText(identityStatement); alert('Copied!'); }} className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-all border border-gray-100"><span className="text-xs font-semibold">Copy</span></button>
-                            </div>
-
+                        <div className="flex flex-col gap-10 w-full mt-12 border-t border-slate-100 pt-10">
                             {/* Inferred Skill Vector Profile */}
                             {Object.keys(skillVector).length > 0 && (
-                                <div className="w-full text-left space-y-4 border-t pt-8 mt-8">
-                                    <div className="flex items-center gap-2 text-slate-800 font-bold uppercase text-[11px] tracking-widest">
+                                <div className="w-full text-left space-y-6">
+                                    <div className="flex items-center gap-2 text-slate-800 font-bold uppercase text-xs tracking-widest">
                                         Skill Vector Profile
                                     </div>
-                                    <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100/50 space-y-4">
+                                    <div className="bg-slate-50/80 rounded-[2rem] p-8 border border-slate-100 space-y-5 shadow-sm">
                                         {Object.entries(skillVector)
                                             .sort((a, b) => b[1] - a[1])
                                             .slice(0, 5)
                                             .map(([skill, val], i) => (
-                                                <div key={i} className="space-y-1.5">
-                                                    <div className="flex justify-between items-end text-xs font-semibold text-slate-700">
-                                                        <span className="capitalize">{skill.replace(/_/g, ' ')}</span>
-                                                        <span className="font-mono text-purple-600">{val}/10</span>
+                                                <div key={i} className="space-y-2">
+                                                    <div className="flex justify-between items-end text-sm font-bold text-slate-700">
+                                                        <span className="capitalize tracking-tight">{skill.replace(/_/g, ' ')}</span>
+                                                        <span className="font-mono text-purple-600 text-xs">{val}/10</span>
                                                     </div>
-                                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-2.5 bg-slate-200/60 rounded-full overflow-hidden">
                                                         <motion.div
                                                             initial={{ width: 0 }}
                                                             animate={{ width: `${val * 10}%` }}
@@ -2401,20 +2452,20 @@ const CareerOnboarding: React.FC = () => {
 
                             {/* Transferable Skills Discovered */}
                             {transferableSkills.length > 0 && (
-                                <div className="w-full text-left space-y-4 border-t pt-8 mt-8">
-                                    <div className="flex items-center gap-2 text-slate-800 font-bold uppercase text-[11px] tracking-widest">
+                                <div className="w-full text-left space-y-6">
+                                    <div className="flex items-center gap-2 text-slate-800 font-bold uppercase text-xs tracking-widest">
                                         Transferable Skill Inferences
                                     </div>
-                                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                         {transferableSkills.map((inf, i) => (
-                                            <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-left space-y-2">
-                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                    <span> {inf.source_field}</span>
+                                            <div key={i} className="p-6 bg-slate-50/80 border border-slate-100 rounded-[1.5rem] text-left space-y-3 hover:shadow-md transition-all hover:-translate-y-1">
+                                                <div className="flex items-center gap-2 text-[10px] font-black text-[#7C3AED] uppercase tracking-widest">
+                                                    <span>{inf.source_field}</span>
                                                 </div>
-                                                <p className="text-xs text-slate-600 italic">"{inf.context}"</p>
-                                                <div className="flex flex-wrap gap-1.5 mt-1">
+                                                <p className="text-sm text-slate-700 font-medium italic leading-relaxed">"{inf.context}"</p>
+                                                <div className="flex flex-wrap gap-2 mt-3">
                                                     {inf.inferred_skills.map((s: string) => (
-                                                        <span key={s} className="px-2 py-0.5 bg-purple-50 border border-purple-100 text-purple-600 rounded-full text-[9px] font-bold">
+                                                        <span key={s} className="px-3 py-1 bg-white border border-purple-100 text-purple-700 rounded-lg text-[10px] font-bold tracking-wide shadow-sm">
                                                             {s}
                                                         </span>
                                                     ))}
@@ -2424,12 +2475,26 @@ const CareerOnboarding: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mt-12 pt-8 border-t border-slate-100">
+                            <div className="flex gap-4">
+                                <button onClick={async () => {
+                                    await handleAnalyze(formData);
+                                }} className="px-6 py-3.5 bg-white rounded-xl flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50 transition-all border border-slate-200 shadow-sm active:scale-95 hover:text-[#7C3AED] font-bold text-xs tracking-wide uppercase group" title="Re-generate Identity and Paths">
+                                    <span className="text-lg group-hover:rotate-180 transition-transform duration-500">↻</span> Re-generate
+                                </button>
+                                <button onClick={() => { navigator.clipboard.writeText(identityStatement); alert('Copied!'); }} className="px-6 py-3.5 bg-white rounded-xl flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50 transition-all border border-slate-200 shadow-sm active:scale-95 font-bold text-xs tracking-wide uppercase">
+                                    Copy
+                                </button>
+                            </div>
 
                             <button
                                 onClick={() => { setActiveTab('Paths'); setStep(4); }}
-                                className="w-full sm:w-auto px-10 py-4 bg-[#111] text-white rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-[#7C3AED] transition-all shadow-lg active:scale-95 flex items-center gap-3 mt-6"
+                                className="w-full sm:w-auto px-10 py-4 bg-slate-900 text-white rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-[#7C3AED] transition-all shadow-xl active:scale-95 flex items-center gap-3 hover:shadow-purple-500/20"
                             >
-                                Explore Paths <span className="font-bold">→</span>
+                                Explore Paths <span className="font-bold text-lg">→</span>
                             </button>
                         </div>
                     </div>

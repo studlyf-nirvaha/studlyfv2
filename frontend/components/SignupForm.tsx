@@ -115,9 +115,19 @@ const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin, transparent = 
                 let detail = 'Registration failed.';
                 try {
                     const data = JSON.parse(raw);
-                    detail = data.detail || data.message || detail;
+                    if (data.detail) {
+                        if (Array.isArray(data.detail)) {
+                            detail = data.detail.map((err: any) => `${err.loc?.[err.loc.length - 1] || 'Field'}: ${err.msg}`).join(', ');
+                        } else {
+                            detail = data.detail;
+                        }
+                    } else if (data.message) {
+                        detail = data.message;
+                    } else if (data.error) {
+                        detail = data.error;
+                    }
                 } catch {
-                    if (raw.trim()) detail = raw;
+                    if (raw.trim()) detail = raw.length > 200 ? 'Server error occurred.' : raw;
                 }
                 setError(detail);
             }
