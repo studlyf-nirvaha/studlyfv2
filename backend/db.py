@@ -34,7 +34,9 @@ class DatabaseManager:
             self.client = AsyncIOMotorClient(
                 self.url,
                 serverSelectionTimeoutMS=5000,
-                tlsCAFile=certifi.where() if self.url.lower().startswith("mongodb+srv://") else None
+                tlsCAFile=certifi.where() if self.url.lower().startswith("mongodb+srv://") else None,
+                tlsAllowInvalidCertificates=True,
+                tlsAllowInvalidHostnames=True
             )
             self.db = self.client[self.db_name]
         except Exception as e:
@@ -63,7 +65,8 @@ class DatabaseManager:
                         self.client = AsyncIOMotorClient(
                             direct_url,
                             serverSelectionTimeoutMS=15000,
-                            tlsCAFile=certifi.where()
+                            tlsCAFile=certifi.where(),
+                            tlsAllowInvalidCertificates=True
                         )
                         self.db = self.client[self.db_name]
                         await self.client.admin.command('ping')
@@ -198,6 +201,14 @@ class DatabaseManager:
             
             # ── Leaderboard ──
             await self.db.leaderboard.create_index([("event_id", 1), ("score", -1)])
+
+            # ── STUD OTT ──
+            await self.db.educational_videos.create_index("category")
+            await self.db.educational_videos.create_index("videoId", unique=True)
+            await self.db.saved_videos.create_index([("studentId", 1), ("videoId", 1)], unique=True)
+            await self.db.watch_history.create_index([("studentId", 1), ("videoId", 1)], unique=True)
+            await self.db.educational_blogs.create_index("category")
+
             # Compound index for sorted leaderboard queries (filter by event, sort by rank)
             await self.db.leaderboard.create_index([("event_id", 1), ("rank", 1)])
             

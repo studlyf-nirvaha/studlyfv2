@@ -2,12 +2,30 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, X, Clock, Plus, Home, Headphones, Sparkles, BookOpen, BrainCircuit, TrendingUp, ChevronRight, User, Search, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Fuse from 'fuse.js';
 import { useAuth } from '../AuthContext';
 
 const getYouTubeId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
   return (match && match[2].length === 11) ? match[2] : null;
+};
+
+const HighlightText = ({ text, highlight }: { text: string, highlight: string }) => {
+  if (!highlight.trim()) return <>{text}</>;
+  const regex = new RegExp(`(${highlight})`, 'gi');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) => 
+        regex.test(part) ? (
+          <span key={i} className="bg-[#6C2BFF]/40 text-[#A88CFF] rounded px-0.5">{part}</span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
 };
 
 const getYouTubeThumbnail = (url: string) => {
@@ -27,19 +45,10 @@ const SIDEBAR_ITEMS = [
 
 const FEATURED_VIDEOS: VideoItem[] = [
   {
-    id: 'feat-1',
-    title: 'The Reality of Building an AI Startup',
-    subtitle: 'Dive into the untold truths of building and scaling a generative AI startup in today\'s hyper-competitive landscape. Unfiltered insights from founders who are in the trenches.',
-    url: 'https://www.youtube.com/watch?v=1bRwQVOSynE',
-    category: 'Startup Secrets',
-    duration: '45 mins',
-    tags: ['AI', 'Startup', 'Exclusive']
-  },
-  {
     id: 'feat-2',
     title: 'Mastering System Design in 2026',
     subtitle: 'An architectural deep dive into how top tier tech companies are structuring their microservices, streaming pipelines, and data layers for massive global scale.',
-    url: 'https://www.youtube.com/watch?v=b4b8ktEV4Bg',
+    url: 'https://www.youtube.com/watch?v=RsAKKF2-_Kg',
     category: 'Engineering Mastery',
     duration: '32 mins',
     tags: ['System Design', 'Architecture', 'Advanced']
@@ -48,7 +57,7 @@ const FEATURED_VIDEOS: VideoItem[] = [
     id: 'feat-3',
     title: 'The Psychology of Extreme Productivity',
     subtitle: 'Unlocking deep work and flow states. Learn the exact protocols top performers use to manage their time and attention in an era of endless digital distractions.',
-    url: 'https://www.youtube.com/watch?v=5rJ8P1VnZIM',
+    url: 'https://www.youtube.com/watch?v=RINKUFWzwfk',
     category: 'Deep Work',
     duration: '18 mins',
     tags: ['Productivity', 'Focus', 'Mindset']
@@ -57,7 +66,7 @@ const FEATURED_VIDEOS: VideoItem[] = [
     id: 'feat-4',
     title: 'Vibe with AI: The LLM Revolution',
     subtitle: 'Understanding the core mechanisms behind large language models and how to leverage prompt engineering as a powerful cognitive extension for your daily workflows.',
-    url: 'https://www.youtube.com/watch?v=zjkBMFhNj_g',
+    url: 'https://www.youtube.com/watch?v=JABjvOCl4Mg',
     category: 'AI Decoded',
     duration: '52 mins',
     tags: ['LLMs', 'Research', 'Deep Learning']
@@ -66,11 +75,20 @@ const FEATURED_VIDEOS: VideoItem[] = [
     id: 'feat-5',
     title: 'Designing Next-Gen User Experiences',
     subtitle: 'Exploring spatial computing, gesture-based interfaces, and how the physical and digital worlds are seamlessly blending together in modern product design.',
-    url: 'https://www.youtube.com/watch?v=1bRwQVOSynE',
+    url: 'https://www.youtube.com/watch?v=P98ib95eCng',
     category: 'Design Systems',
     duration: '24 mins',
     tags: ['UI/UX', 'Product', 'Future']
   }
+];
+
+const SHORTS_VIDEOS: VideoItem[] = [
+  { id: 'short-1', title: 'Why ChatGPT is so smart', url: 'https://www.youtube.com/watch?v=0-FUhQKe-eU', category: 'Shorts', duration: '58s' },
+  { id: 'short-2', title: 'Python in 60 Seconds', url: 'https://www.youtube.com/watch?v=RDS4Crfk_wQ', category: 'Shorts', duration: '60s' },
+  { id: 'short-3', title: 'React Hooks Explained Fast', url: 'https://www.youtube.com/watch?v=0_Yv7zDawl8', category: 'Shorts', duration: '45s' },
+  { id: 'short-4', title: 'System Design Basics', url: 'https://www.youtube.com/watch?v=zZ-VeqYPxoA', category: 'Shorts', duration: '55s' },
+  { id: 'short-5', title: 'How to Learn Anything', url: 'https://www.youtube.com/watch?v=7ARBJQn6QkM', category: 'Shorts', duration: '50s' },
+  { id: 'short-6', title: 'Best AI Tools for 2026', url: 'https://www.youtube.com/watch?v=3V9DawfbaQk', category: 'Shorts', duration: '59s' },
 ];
 
 interface VideoItem {
@@ -118,21 +136,21 @@ const DEFAULT_CATEGORIES: Record<string, CategoryData> = {
   }
 };
 
-const VideoCard = ({ vid, onPlay, isHistory = false }: { vid: VideoItem, onPlay: (vid: VideoItem, title: string, author: string) => void, isHistory?: boolean }) => {
+const VideoCard = ({ vid, onPlay, isHistory, onVideoError, highlight = '' }: { vid: VideoItem, onPlay: (vid: VideoItem, title: string, author: string) => void, isHistory?: boolean, onVideoError?: (id: string|number) => void, highlight?: string }) => {
   const [title, setTitle] = useState(vid.title || '');
   const [author, setAuthor] = useState(vid.subtitle || '');
-  const [isLoading, setIsLoading] = useState(!vid.title && !!vid.url);
+  const [isLoading, setIsLoading] = useState(!vid.title || vid.title.startsWith('Sample Video'));
 
   useEffect(() => {
-    if (vid.url && !vid.title) {
+    if (vid.url && (!vid.title || vid.title.startsWith('Sample Video'))) {
       // Stagger fetches slightly to avoid sudden burst of requests
       const numericId = typeof vid.id === 'number' ? vid.id : 0;
       const delay = (numericId % 10) * 150;
       const timer = setTimeout(() => {
-        fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(vid.url!)}&format=json`)
+        fetch(`https://noembed.com/embed?url=${encodeURIComponent(vid.url!)}&format=json`)
           .then(res => res.ok ? res.json() : null)
           .then(data => {
-            if (data) {
+            if (data && !data.error) {
               setTitle(data.title || 'StudOTT Video');
               setAuthor(data.author_name || 'Content');
             } else {
@@ -142,12 +160,15 @@ const VideoCard = ({ vid, onPlay, isHistory = false }: { vid: VideoItem, onPlay:
             setIsLoading(false);
           })
           .catch(() => {
+            if (onVideoError) onVideoError(vid.id);
             setTitle('StudOTT Video');
             setAuthor('Content');
             setIsLoading(false);
           });
       }, delay);
       return () => clearTimeout(timer);
+    } else {
+      setIsLoading(false);
     }
   }, [vid.url, vid.title, vid.id]);
 
@@ -159,6 +180,10 @@ const VideoCard = ({ vid, onPlay, isHistory = false }: { vid: VideoItem, onPlay:
       {vid.url ? (
         <img 
           src={getYouTubeThumbnail(vid.url)} 
+          onError={(e) => {
+            const hqUrl = `https://img.youtube.com/vi/${getYouTubeId(vid.url!)}/hqdefault.jpg`;
+            if (e.currentTarget.src !== hqUrl) e.currentTarget.src = hqUrl;
+          }}
           className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105" 
           alt={title || 'Video Thumbnail'} 
         />
@@ -197,7 +222,9 @@ const VideoCard = ({ vid, onPlay, isHistory = false }: { vid: VideoItem, onPlay:
         {isLoading ? (
           <div className="h-3 w-3/4 bg-white/10 rounded mb-1 animate-pulse" />
         ) : (
-          <h3 className="text-white font-semibold text-xs sm:text-sm leading-tight mb-0.5 group-hover:text-[#A88CFF] transition-colors line-clamp-1">{title || 'Coming Soon'}</h3>
+          <h3 className="text-white font-semibold text-xs sm:text-sm leading-tight mb-0.5 group-hover:text-[#A88CFF] transition-colors line-clamp-1">
+            <HighlightText text={title || 'Coming Soon'} highlight={highlight} />
+          </h3>
         )}
         
         <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
@@ -210,6 +237,95 @@ const VideoCard = ({ vid, onPlay, isHistory = false }: { vid: VideoItem, onPlay:
             <span className="flex items-center gap-1 text-[8px] text-white font-bold bg-white/10 px-1.5 py-0.5 rounded border border-white/10 backdrop-blur-md shrink-0">
               <Clock className="w-2.5 h-2.5" /> {vid.duration}
             </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ShortCard = ({ vid, onPlay, onVideoError, highlight = '' }: { vid: VideoItem, onPlay: (vid: VideoItem, title: string, author: string) => void, onVideoError?: (id: string|number) => void, highlight?: string }) => {
+  const [title, setTitle] = useState(vid.title || '');
+  const [author, setAuthor] = useState(vid.subtitle || '');
+  const [isLoading, setIsLoading] = useState(!vid.title || vid.title.startsWith('Sample Video'));
+
+  useEffect(() => {
+    if (vid.url && (!vid.title || vid.title.startsWith('Sample Video'))) {
+      const numericId = typeof vid.id === 'number' ? vid.id : 0;
+      const delay = (numericId % 10) * 150;
+      const timer = setTimeout(() => {
+        fetch(`https://noembed.com/embed?url=${encodeURIComponent(vid.url!)}&format=json`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data && !data.error) {
+              setTitle(data.title || 'StudOTT Short');
+              setAuthor(data.author_name || 'Content');
+            } else {
+              setTitle('StudOTT Short');
+              setAuthor('Content');
+            }
+            setIsLoading(false);
+          })
+          .catch(() => {
+            if (onVideoError) onVideoError(vid.id);
+            setTitle('StudOTT Short');
+            setAuthor('Content');
+            setIsLoading(false);
+          });
+      }, delay);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoading(false);
+    }
+  }, [vid.url, vid.title, vid.id]);
+
+  return (
+    <div 
+      onClick={() => vid.url && onPlay(vid, title, author)}
+      className="w-full aspect-[9/16] relative rounded-2xl overflow-hidden cursor-pointer group shadow-sm hover:shadow-[0_8px_30px_rgba(236,72,153,0.4)] border border-white/5 hover:border-[#EC4899]/50 transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] bg-[#141414]"
+    >
+      {vid.url ? (
+        <img 
+          src={getYouTubeThumbnail(vid.url)} 
+          onError={(e) => {
+            const hqUrl = `https://img.youtube.com/vi/${getYouTubeId(vid.url!)}/hqdefault.jpg`;
+            if (e.currentTarget.src !== hqUrl) e.currentTarget.src = hqUrl;
+          }}
+          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-700 group-hover:scale-110" 
+          alt={title || 'Short Thumbnail'} 
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-[#2e1a2e] to-[#0A0A0F] flex items-center justify-center opacity-80 group-hover:opacity-100 transition-all duration-500 group-hover:scale-105">
+           <Play className="w-8 h-8 text-white/10" />
+        </div>
+      )}
+      
+      {/* Shadow Gradients */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#030305] via-[#030305]/40 to-transparent opacity-100 group-hover:opacity-90 transition-opacity" />
+      <div className="absolute inset-0 bg-[#EC4899]/20 mix-blend-screen opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      
+      {/* Top Tag Shorts Icon */}
+      <div className="absolute top-3 right-3 flex gap-2 z-10">
+        <span className="p-1.5 bg-[#EC4899]/90 backdrop-blur-md text-white rounded-full border border-white/20 shadow-[0_4px_15px_rgba(236,72,153,0.5)]">
+          <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M10 14.65v-5.3L15 12l-5 2.65zm7.77-4.27c-.42-.18-.68-.32-.68-.32l1.61-.74c2.25-1.04 3.23-3.7 2.2-5.94-1.04-2.25-3.7-3.23-5.94-2.2l-9.84 4.54c-1.84.85-2.73 2.92-2.12 4.86.37 1.15 1.19 2.05 2.25 2.54.42.18.68.32.68.32l-1.61.74c-2.25 1.04-3.23 3.7-2.2 5.94 1.04 2.25 3.7 3.23 5.94 2.2l9.84-4.54c1.84-.85 2.73-2.92 2.12-4.86-.37-1.15-1.19-2.05-2.25-2.54z"/></svg>
+        </span>
+      </div>
+
+      {/* Content Bottom */}
+      <div className="absolute bottom-0 left-0 p-4 w-full transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300 ease-out z-10">
+        {isLoading ? (
+          <div className="h-4 w-3/4 bg-white/10 rounded mb-2 animate-pulse" />
+        ) : (
+          <h3 className="text-white font-bold text-sm sm:text-base leading-tight mb-1 group-hover:text-[#F472B6] transition-colors line-clamp-2 drop-shadow-md">
+            <HighlightText text={title || 'Coming Soon'} highlight={highlight} />
+          </h3>
+        )}
+        
+        <div className="flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
+          {isLoading ? (
+            <div className="h-2 w-1/2 bg-white/10 rounded animate-pulse" />
+          ) : (
+            <p className="text-gray-300 text-[11px] font-semibold line-clamp-1 pr-2 drop-shadow-md">{author || 'Educational Short'}</p>
           )}
         </div>
       </div>
@@ -230,19 +346,23 @@ const StudOTT: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [continueWatchingVideos, setContinueWatchingVideos] = useState<VideoItem[]>([]);
-  
+  const [brokenVideoIds, setBrokenVideoIds] = useState<Set<string | number>>(new Set());
   const introVideoRef = useRef<HTMLVideoElement>(null);
   const navigate = useNavigate();
 
   const userId = user?.user_id || user?.uid || user?.email || 'guest';
   const historyKey = `studott_history_${userId}`;
 
-  // Load History
   useEffect(() => {
     try {
       const saved = localStorage.getItem(historyKey);
       if (saved) {
-        setContinueWatchingVideos(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        const filtered = parsed.filter((v: any) => v.id !== 'feat-1' && !v.title?.includes('Reality of Building an AI'));
+        setContinueWatchingVideos(filtered);
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem(historyKey, JSON.stringify(filtered));
+        }
       } else {
         setContinueWatchingVideos([]);
       }
@@ -270,7 +390,6 @@ const StudOTT: React.FC = () => {
     });
   };
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -278,74 +397,43 @@ const StudOTT: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Flatten videos for search
   const allVideos = useMemo(() => {
-    const list: VideoItem[] = [...FEATURED_VIDEOS];
+    const list: VideoItem[] = [...FEATURED_VIDEOS, ...SHORTS_VIDEOS];
     Object.values(categories).forEach(cat => {
       list.push(...cat.videos);
     });
-    // Remove duplicates by URL
     const unique = new Map();
-    list.forEach(v => { if (v.url && !unique.has(v.url)) unique.set(v.url, v); });
+    list.forEach(v => { 
+      if (v.url && !unique.has(v.url) && !brokenVideoIds.has(v.id)) {
+        unique.set(v.url, v); 
+      }
+    });
     return Array.from(unique.values()) as VideoItem[];
-  }, [categories]);
+  }, [categories, brokenVideoIds]);
 
-  // Search Scoring Logic
-  const getSearchScore = (v: VideoItem, q: string) => {
-    const title = v.title?.toLowerCase() || '';
-    const category = v.category?.toLowerCase() || '';
-    const subtitle = v.subtitle?.toLowerCase() || '';
-    const tags = v.tags || [];
-    
-    let score = 0;
-    
-    // 1. Title matching (Highest Priority)
-    if (title === q) score += 100;
-    else if (title.startsWith(q)) score += 80;
-    else if (title.includes(q)) score += 50;
-    
-    // 2. Tags/Keywords
-    if (tags.some(t => t.toLowerCase() === q)) score += 30;
-    else if (tags.some(t => t.toLowerCase().includes(q))) score += 20;
-    
-    // 3. Category
-    if (category === q) score += 15;
-    else if (category.includes(q)) score += 10;
-    
-    // 4. Mentor/Subtitle
-    if (subtitle === q) score += 5;
-    else if (subtitle.includes(q)) score += 2;
-    
-    return score;
-  };
+  const fuse = useMemo(() => new Fuse(allVideos, {
+    keys: [
+      { name: 'title', weight: 0.6 },
+      { name: 'tags', weight: 0.25 },
+      { name: 'category', weight: 0.1 },
+      { name: 'subtitle', weight: 0.05 }
+    ],
+    includeScore: true,
+    threshold: 0.1,
+    ignoreLocation: true,
+  }), [allVideos]);
 
-  // Filter videos
   const searchResults = useMemo(() => {
     if (!debouncedSearchQuery.trim()) return [];
-    const lowerQ = debouncedSearchQuery.toLowerCase();
-    
-    return allVideos
-      .map(v => ({ video: v, score: getSearchScore(v, lowerQ) }))
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(item => item.video);
-  }, [debouncedSearchQuery, allVideos]);
+    return fuse.search(debouncedSearchQuery).map(res => res.item);
+  }, [debouncedSearchQuery, fuse]);
 
-  // Search suggestions (max 5)
   const suggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
-    const lowerQ = searchQuery.toLowerCase();
-    
-    return allVideos
-      .map(v => ({ video: v, score: getSearchScore(v, lowerQ) }))
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(item => item.video)
-      .slice(0, 5);
-  }, [searchQuery, allVideos]);
+    return fuse.search(searchQuery).slice(0, 5).map(res => res.item);
+  }, [searchQuery, fuse]);
 
   useEffect(() => {
-    // Pick a random video on mount
     const randomVideo = FEATURED_VIDEOS[Math.floor(Math.random() * FEATURED_VIDEOS.length)];
     setHeroVideo(randomVideo);
   }, []);
@@ -362,9 +450,7 @@ const StudOTT: React.FC = () => {
       if (playPromise !== undefined) {
         playPromise.catch(e => {
           if (!isMounted) return;
-          // If browser blocks unmuted autoplay, fallback to muted
           if (e.name === 'NotAllowedError') {
-            console.warn("Autoplay with audio blocked, trying muted...");
             el.muted = true;
             el.play().catch(() => {
               if (isMounted) handleIntroEnd();
@@ -386,7 +472,6 @@ const StudOTT: React.FC = () => {
     }
   };
 
-  // Prevent scroll when modal is open
   useEffect(() => {
     if (activeVideoUrl) {
       document.body.style.overflow = 'hidden';
@@ -396,7 +481,6 @@ const StudOTT: React.FC = () => {
     return () => { document.body.style.overflow = 'unset'; };
   }, [activeVideoUrl]);
 
-  // Load CSV Data
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -434,7 +518,7 @@ const StudOTT: React.FC = () => {
             if (!newCategories[currentKey]) {
               newCategories[currentKey] = { title: line, desc: '', videos: [] };
             } else {
-              newCategories[currentKey].title = line; // Use exactly what is in CSV
+              newCategories[currentKey].title = line;
             }
           }
         }
@@ -450,7 +534,6 @@ const StudOTT: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#030305] text-white font-sans selection:bg-[#6C2BFF]/40 relative overflow-hidden">
       
-      {/* Premium Cinematic Intro Overlay */}
       <AnimatePresence>
         {showIntro && (
           <motion.div 
@@ -483,13 +566,11 @@ const StudOTT: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Background Ambient Mesh */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-[#6C2BFF]/15 rounded-full blur-[150px] mix-blend-screen" />
         <div className="absolute bottom-[20%] right-[-10%] w-[800px] h-[800px] bg-[#EC4899]/10 rounded-full blur-[150px] mix-blend-screen" />
       </div>
 
-      {/* Video Player Modal */}
       <AnimatePresence>
         {activeVideoUrl && (
           <motion.div 
@@ -511,23 +592,29 @@ const StudOTT: React.FC = () => {
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="w-full h-full bg-black relative"
             >
-              <div className="absolute inset-0 flex items-center justify-center z-0">
-                <div className="w-12 h-12 border-4 border-[#6C2BFF]/30 border-t-[#6C2BFF] rounded-full animate-spin" />
-              </div>
-              <iframe
-                className="relative z-10 w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeId(activeVideoUrl)}?autoplay=1&rel=0`}
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              ></iframe>
+                <div className="absolute inset-0 flex items-center justify-center z-0">
+                  <div className="text-white/60 text-center">
+                    <div className="w-12 h-12 border-4 border-[#6C2BFF]/30 border-t-[#6C2BFF] rounded-full animate-spin mx-auto mb-4" />
+                    <p>Loading video...</p>
+                  </div>
+                </div>
+                <iframe
+                  className="relative z-10 w-full h-full"
+                  src={`https://www.youtube.com/embed/${getYouTubeId(activeVideoUrl!)}?autoplay=1&rel=0&modestbranding=1`}
+                  title="Video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  onError={() => {
+                    // This is a basic fallback if iframe loading completely fails
+                    // Cross-origin prevents robust error detection here, but we do our best
+                    console.error("Iframe failed to load.");
+                  }}
+                ></iframe>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Premium Sidebar */}
       <aside className="hidden md:flex flex-col w-20 xl:w-64 h-full border-r border-white/5 bg-[#05050A]/60 backdrop-blur-3xl z-40 pt-[104px] pb-8 shrink-0 transition-all duration-500">
         <div className="px-6 mb-12 flex justify-center xl:justify-start cursor-pointer" onClick={() => navigate('/')}>
           <img src="/images/studott.jpg" alt="STUDOTT" className="h-8 xl:h-9 w-auto object-contain drop-shadow-[0_0_15px_rgba(108,43,255,0.2)] rounded-sm" />
@@ -551,11 +638,8 @@ const StudOTT: React.FC = () => {
             )
           })}
         </nav>
-        
-        {/* Sidebar ends cleanly after nav */}
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 w-full relative z-10 overflow-y-auto h-full custom-scrollbar pt-[88px] sm:pt-[104px] pb-16">
         
         <div className="md:hidden flex items-center justify-between px-6 py-4 sticky top-0 z-40 bg-[#05050A]/80 backdrop-blur-xl border-b border-white/5">
@@ -569,7 +653,6 @@ const StudOTT: React.FC = () => {
 
         {activeMenu === 'home' ? (
           <>
-            {/* Search Bar Container */}
             <div className="px-6 lg:px-12 pt-6 pb-2 relative z-50">
               <div className="relative max-w-2xl mx-auto">
                 <div className="relative group">
@@ -601,7 +684,6 @@ const StudOTT: React.FC = () => {
                   )}
                 </div>
 
-                {/* Suggestions Dropdown */}
                 <AnimatePresence>
                   {showSuggestions && suggestions.length > 0 && (
                     <motion.div
@@ -622,7 +704,9 @@ const StudOTT: React.FC = () => {
                         >
                           <Search className="w-4 h-4 text-gray-500" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-medium truncate">{vid.title}</p>
+                            <span className="text-white font-medium text-sm truncate w-full group-hover:text-[#A88CFF] transition-colors">
+                              <HighlightText text={vid.title || 'Untitled'} highlight={searchQuery} />
+                            </span>
                             {(vid.category || vid.subtitle) && (
                               <p className="text-gray-400 text-xs truncate">{vid.category} {vid.subtitle ? `• ${vid.subtitle}` : ''}</p>
                             )}
@@ -639,11 +723,12 @@ const StudOTT: React.FC = () => {
             {debouncedSearchQuery.trim() !== '' && (
               <div className="relative z-20 pt-8 pb-12 px-6 lg:px-12">
                 <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2 mb-6">
-                  Search Results <span className="text-gray-500 text-lg font-normal">for "{debouncedSearchQuery}"</span>
+                  <Search className="w-6 h-6 text-[#A88CFF]" />
+                  Search Results for "{debouncedSearchQuery}"
                 </h2>
                 {searchResults.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
-                    {searchResults.map((vid, idx) => (
+                    {searchResults.map((vid: VideoItem, idx) => (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -651,27 +736,28 @@ const StudOTT: React.FC = () => {
                         key={vid.id} 
                         className="w-full"
                       >
-                        <VideoCard vid={vid} onPlay={handleVideoOpen} />
+                        <VideoCard vid={vid} onPlay={handleVideoOpen} onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))} highlight={debouncedSearchQuery} />
                       </motion.div>
                     ))}
                   </div>
                 ) : (
                   <div className="w-full bg-[#141414]/50 border border-white/5 rounded-2xl p-12 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                      <Search className="w-8 h-8 text-gray-500" />
+                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
+                      <Search className="w-10 h-10 text-white/20" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">No matching content found</h3>
-                    <p className="text-gray-400">Try searching by mentor, category, or topic</p>
+                    <h3 className="text-2xl font-bold text-white mb-3">No matching content found</h3>
+                    <p className="text-gray-400 max-w-md mx-auto mb-8">We couldn't find anything matching "{debouncedSearchQuery}". Try adjusting your search or check out our popular topics.</p>
+                    <div className="flex gap-4">
+                      <button onClick={() => setSearchQuery('AI')} className="px-6 py-2 bg-[#6C2BFF]/20 text-[#A88CFF] hover:bg-[#6C2BFF]/30 hover:text-white rounded-full text-sm font-semibold transition-all border border-[#6C2BFF]/30">Explore AI</button>
+                      <button onClick={() => setSearchQuery('Startup')} className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-full text-sm font-semibold transition-all border border-white/10">Startup Tips</button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Hero Section */}
             {!debouncedSearchQuery.trim() && (
             <div className="relative pt-8 md:pt-16 lg:pt-20 pb-16 px-6 lg:px-12 flex flex-col-reverse lg:flex-row items-center justify-center gap-10 lg:gap-16 min-h-[60vh] lg:min-h-[75vh]">
-              
-              {/* Left Content */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -714,22 +800,27 @@ const StudOTT: React.FC = () => {
                 </div>
               </motion.div>
 
-              {/* Right Poster */}
               <motion.div 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
                 className="w-full lg:w-[55%] xl:w-[60%] relative z-10"
               >
-                {/* 3D Perspective Container */}
                 <div className="perspective-1000 w-full h-full">
                   <div 
                     className="relative w-full aspect-video sm:aspect-[16/10] lg:aspect-[16/9] rounded-[2rem] overflow-hidden shadow-[0_20px_80px_rgba(108,43,255,0.25)] border border-white/10 group cursor-pointer transform-gpu hover:rotate-y-[-2deg] hover:rotate-x-[2deg] transition-all duration-700 bg-[#0A0A0F]" 
                     onClick={() => handleVideoOpen(heroVideo, heroVideo.title || '', heroVideo.subtitle || '')}
                   >
-                    <img src={heroThumb} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-1000" alt="Hero" />
+                    <img 
+                      src={heroThumb} 
+                      onError={(e) => {
+                        const hqUrl = `https://img.youtube.com/vi/${getYouTubeId(heroVideo.url!)}/hqdefault.jpg`;
+                        if (e.currentTarget.src !== hqUrl) e.currentTarget.src = hqUrl;
+                      }}
+                      className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-105 transition-all duration-1000" 
+                      alt="Hero" 
+                    />
                     
-                    {/* Cinematic Overlays */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-[#05050A] via-[#05050A]/20 to-transparent mix-blend-overlay" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#05050A] via-transparent to-transparent opacity-80" />
                     <div className="absolute inset-0 bg-[#6C2BFF]/20 mix-blend-screen opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
@@ -751,6 +842,56 @@ const StudOTT: React.FC = () => {
               </motion.div>
             </div>
 
+            )}
+
+            {/* Bite-Sized Learning (Shorts) Row */}
+            {!debouncedSearchQuery.trim() && (
+              <div className="relative z-20 pb-16 px-6 lg:px-12 -mt-4">
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ duration: 0.6 }}
+                  className="w-full relative group/row"
+                >
+                  <div className="flex items-center justify-between mb-4 lg:mb-5">
+                    <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight flex items-center gap-2 group-hover/row:text-[#EC4899] transition-colors">
+                      <svg className="w-6 h-6 md:w-7 md:h-7 fill-[#EC4899]" viewBox="0 0 24 24"><path d="M10 14.65v-5.3L15 12l-5 2.65zm7.77-4.27c-.42-.18-.68-.32-.68-.32l1.61-.74c2.25-1.04 3.23-3.7 2.2-5.94-1.04-2.25-3.7-3.23-5.94-2.2l-9.84 4.54c-1.84.85-2.73 2.92-2.12 4.86.37 1.15 1.19 2.05 2.25 2.54.42.18.68.32.68.32l-1.61.74c-2.25 1.04-3.23 3.7-2.2 5.94 1.04 2.25 3.7 3.23 5.94 2.2l9.84-4.54c1.84-.85 2.73-2.92 2.12-4.86-.37-1.15-1.19-2.05-2.25-2.54z"/></svg>
+                      Bite-Sized Learning
+                    </h2>
+                  </div>
+                  <div className="relative group/scroll">
+                    <button 
+                      onClick={() => scrollRow('shorts', 'left')}
+                      className="absolute left-0 sm:-left-2 top-[45%] -translate-y-[50%] z-30 opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none group-hover/scroll:pointer-events-auto"
+                    >
+                      <div className="w-10 h-24 sm:w-12 sm:h-32 bg-[#141414]/95 backdrop-blur-md rounded-xl flex items-center justify-center border border-[#EC4899]/30 hover:bg-[#EC4899]/20 hover:scale-105 transition-all shadow-2xl">
+                        <ChevronRight className="w-8 h-8 text-[#EC4899] rotate-180 opacity-90 hover:opacity-100" />
+                      </div>
+                    </button>
+
+                    <div 
+                      id="row-shorts"
+                      className="flex overflow-x-auto gap-4 md:gap-5 pb-6 pt-2 snap-x snap-mandatory pr-12 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    >
+                      {SHORTS_VIDEOS.map((vid: VideoItem) => (
+                        <div key={vid.id} className="w-[140px] sm:w-[180px] md:w-[200px] lg:w-[220px] xl:w-[240px] snap-center shrink-0">
+                          <ShortCard vid={vid} onPlay={handleVideoOpen} onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))} />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button 
+                      onClick={() => scrollRow('shorts', 'right')}
+                      className="absolute right-0 sm:right-2 top-[45%] -translate-y-[50%] z-30 opacity-0 group-hover/scroll:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none group-hover/scroll:pointer-events-auto"
+                    >
+                      <div className="w-10 h-24 sm:w-12 sm:h-32 bg-[#141414]/95 backdrop-blur-md rounded-xl flex items-center justify-center border border-[#EC4899]/30 hover:bg-[#EC4899]/20 hover:scale-105 transition-all shadow-2xl">
+                        <ChevronRight className="w-8 h-8 text-[#EC4899] opacity-90 hover:opacity-100" />
+                      </div>
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
             )}
 
             {/* Home Rows (Categories) */}
@@ -790,7 +931,7 @@ const StudOTT: React.FC = () => {
                       {row.videos && row.videos.length > 0 ? (
                         row.videos.map((vid: VideoItem) => (
                           <div key={vid.id} className="w-[160px] sm:w-[200px] lg:w-[240px] xl:w-[260px] snap-center shrink-0">
-                            <VideoCard vid={vid} onPlay={handleVideoOpen} />
+                            <VideoCard vid={vid} onPlay={handleVideoOpen} onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))} />
                           </div>
                         ))
                       ) : (
@@ -798,7 +939,8 @@ const StudOTT: React.FC = () => {
                           <div key={`placeholder-${key}-${i}`} className="w-[160px] sm:w-[200px] lg:w-[240px] xl:w-[260px] snap-center shrink-0">
                             <VideoCard 
                               vid={{ id: `placeholder-${key}-${i}`, category: row.title, duration: 'TBA' }} 
-                              onPlay={handleVideoOpen} 
+                              onPlay={handleVideoOpen}
+                              onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))}
                             />
                           </div>
                         ))
@@ -846,9 +988,9 @@ const StudOTT: React.FC = () => {
                       id="row-continue-watching"
                       className="flex overflow-x-auto gap-3 md:gap-4 pb-6 pt-2 snap-x snap-mandatory pr-12 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     >
-                      {continueWatchingVideos.map((vid: VideoItem) => (
+                      {continueWatchingVideos.filter(v => !brokenVideoIds.has(v.id)).map((vid: VideoItem) => (
                         <div key={`cw-${vid.id}-${vid.watchedAt}`} className="w-[160px] sm:w-[200px] lg:w-[240px] xl:w-[260px] snap-center shrink-0">
-                          <VideoCard vid={vid} onPlay={handleVideoOpen} isHistory={true} />
+                          <VideoCard vid={vid} onPlay={handleVideoOpen} isHistory={true} onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))} />
                         </div>
                       ))}
                     </div>

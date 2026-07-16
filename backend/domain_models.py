@@ -611,3 +611,42 @@ class Avatar(BaseModel):
     order: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+# ========== STUD OTT Models ==========
+
+class EducationalVideo(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    title: str
+    description: Optional[str] = None
+    youtubeUrl: str
+    videoId: str
+    thumbnailUrl: Optional[str] = None
+    category: str
+    channelName: Optional[str] = None
+    duration: Optional[str] = None
+    views: int = 0
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+
+class SavedVideo(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    studentId: str
+    videoId: str
+    savedDate: datetime = Field(default_factory=datetime.utcnow)
+
+class WatchHistory(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    studentId: str
+    videoId: str
+    watchProgress: float = 0.0
+    lastWatchedDate: datetime = Field(default_factory=datetime.utcnow)
+
+class EducationalBlog(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    title: str
+    snippet: str
+    content: Optional[str] = None
+    author: str
+    imageUrl: str
+    readTime: str
+    link: Optional[str] = None
+    category: str
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
