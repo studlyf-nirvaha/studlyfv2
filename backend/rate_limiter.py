@@ -41,7 +41,7 @@ else:
 # Rate limit configurations
 RATE_LIMITS = {
     "auth": {
-        "login": "5/minute",      # 5 login attempts per minute
+        "login": "100/minute",    # 100 login attempts per minute
         "register": "3/minute",   # 3 registration attempts per minute
         "reset": "3/hour",        # 3 password reset attempts per hour
     },

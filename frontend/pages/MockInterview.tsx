@@ -46,6 +46,9 @@ interface UserResponse {
     wordCount: number;
     score?: number;
     mistakes?: string;
+    concepts_covered?: string[];
+    missing_concepts?: string[];
+    incorrect_statements?: string[];
 }
 
 interface InterviewReport {
@@ -168,30 +171,9 @@ const QUESTION_BANKS = [DUMMY_QUESTIONS[0], DUMMY_QUESTIONS[1], DUMMY_QUESTIONS[
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-const tokenize = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) || [];
-
 const isSkipText = (text: string) => {
     const t = text.toLowerCase().trim();
     return t === 'skip' || t === 'idont know' || t === 'next question' || t === "i don't know";
-};
-
-const computeAnswerScore = (question: string, answer: string, round: number) => {
-    const cleanAnswer = answer.trim();
-    if (!cleanAnswer || isSkipText(cleanAnswer) || /no response received/i.test(cleanAnswer)) return 0;
-
-    const answerTokens = tokenize(cleanAnswer);
-    const questionTokens = tokenize(question);
-    const answerUnique = new Set(answerTokens);
-    const answerSet = new Set(answerTokens);
-    const overlap = questionTokens.filter(token => answerSet.has(token)).length;
-
-    const lengthScore = clamp((answerTokens.length / 18) * 35, 0, 35);
-    const uniquenessScore = clamp((answerUnique.size / Math.max(answerTokens.length, 1)) * 20, 0, 20);
-    const relevanceScore = clamp((overlap / Math.max(questionTokens.length, 1)) * 30, 0, 30);
-    const structureScore = /[.!?]/.test(cleanAnswer) ? 10 : 0;
-    const roundBias = round === 0 ? 5 : round === 1 ? 3 : 0;
-
-    return clamp(Math.round(lengthScore + uniquenessScore + relevanceScore + structureScore + roundBias), 0, 100);
 };
 
 const roundVerdict = (score: number, answeredCount: number) => {
@@ -221,21 +203,13 @@ const buildHonestReport = (responses: UserResponse[]): InterviewReport => {
         const nonSkipped = roundResponses.filter(response => !isSkipText(response.answer) && response.answer.trim().length > 0);
         const skippedCount = roundResponses.length - nonSkipped.length;
 
-        const qualityScores = roundResponses.map(response =>
-            typeof response.score === 'number'
-                ? response.score
-                : computeAnswerScore(response.question, response.answer, roundIndex)
-        );
+        const qualityScores = roundResponses.map(response => response.score || 0);
 
         const avgQuality = qualityScores.length
             ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length
             : 0;
 
-        const completeness = roundExpectedCounts[roundIndex] > 0
-            ? nonSkipped.length / roundExpectedCounts[roundIndex]
-            : 0;
-
-        const roundScore = Math.round((avgQuality * 0.7) + (completeness * 100 * 0.3));
+        const roundScore = Math.round(avgQuality);
 
         return {
             label,
@@ -282,7 +256,7 @@ const buildHonestReport = (responses: UserResponse[]): InterviewReport => {
 export default function MockInterview() {
     const navigate = useNavigate();
     const [step, setStep] = useState<Step>('INTRO');
-    const [setup, setSetup] = useState({ company: '', role: '', experience: 'FRESHER', domain: '', companyType: COMPANY_TYPE_OPTIONS[2] });
+    const [setup, setSetup] = useState({ company: '', role: '', experience: 'FRESHER', domain: '', companyType: COMPANY_TYPE_OPTIONS[2], interviewType: 'Mixed Interview' });
     const [roundIndex, setRoundIndex] = useState<RoundIndex>(0);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [sessionId, setSessionId] = useState<string | null>(null);
@@ -318,7 +292,7 @@ export default function MockInterview() {
     const [showHint, setShowHint] = useState(false);
     const hintTimerRef = useRef<any>(null);
 
-    const [apiKey, setApiKey] = useState(localStorage.getItem('groq_api_key') || '');
+    const [apiKey, setApiKey] = useState('demo-key');
     const [showingKey, setShowingKey] = useState(false);
     const [isThinking, setIsThinking] = useState(false);
     
@@ -431,7 +405,7 @@ export default function MockInterview() {
     }, [sessionId]);
 
     const startInterview = async () => {
-        if (!setup.company.trim() || !setup.domain.trim()) return;
+        if (!setup.company.trim()) return;
         setLoading(true);
         setError('');
         try {
@@ -441,31 +415,33 @@ export default function MockInterview() {
                     'Content-Type': 'application/json',
                     'X-Groq-API-Key': apiKey
                 },
-                body: JSON.stringify(setup)
+                body: JSON.stringify({ ...setup, role: setup.domain || setup.role, difficulty, interview_type: setup.interviewType })
             });
             const data = await res.json();
             setSessionId(data._id);
             setStep('INTERVIEW');
-            setRoundIndex(0);
+            
+            const startIdx = data.current_round_index !== undefined ? data.current_round_index : (setup.interviewType === 'Behavioral Interview' ? 1 : setup.interviewType === 'HR Interview' ? 2 : 0);
+            setRoundIndex(startIdx as RoundIndex);
             roundQuestionIndexRef.current = { 0: 0, 1: 0, 2: 0 };
 
-            // Always start with the technical round first
-            const intro = `Hello! I'm Alex Chen, Senior Technical Lead at ${setup.company}. I'll be conducting your technical interview today.`;
-            const firstQ = QUESTION_BANKS[0][0];
-            const fullMsg = `${intro} ${firstQ}`;
+            const firstQ = data.first_question || `Hello! I'm conducting your interview today. Let's begin.`;
 
-            setMessages([{ role: 'interviewer', content: fullMsg, timestamp: new Date().toLocaleTimeString() }]);
-            speak(fullMsg, 0);
+            setMessages([{ role: 'interviewer', content: firstQ, timestamp: new Date().toLocaleTimeString() }]);
+            speak(firstQ, startIdx);
         } catch (err) {
             setIsDummyMode(true);
             setStep('INTERVIEW');
-            setRoundIndex(0);
+            
+            const startIdx = setup.interviewType === 'Behavioral Interview' ? 1 : setup.interviewType === 'HR Interview' ? 2 : 0;
+            setRoundIndex(startIdx as RoundIndex);
+            
             roundQuestionIndexRef.current = { 0: 0, 1: 0, 2: 0 };
-            const intro = `Hello! I'm Alex Chen, Senior Technical Lead at ${setup.company}. I'll be conducting your technical interview today.`;
-            const firstQ = QUESTION_BANKS[0][0];
+            const intro = `Hello! I'm conducting your ${setup.interviewType} today.`;
+            const firstQ = QUESTION_BANKS[startIdx][0] || "Let's begin the interview.";
             const fullMsg = `${intro} ${firstQ}`;
             setMessages([{ role: 'interviewer', content: fullMsg, timestamp: new Date().toLocaleTimeString() }]);
-            speak(fullMsg, 0);
+            speak(fullMsg, startIdx);
         } finally { setLoading(false); }
     };
 
@@ -484,56 +460,16 @@ export default function MockInterview() {
 
         const isSkip = checkSkip(turn);
         const actualResponse = normalizeInterviewAnswer(turn);
-        const responseScore = computeAnswerScore(lastQ, actualResponse, roundIndex);
-
-        // NEW: Determine answer quality for celebration
-        let quality: 'excellent' | 'good' | 'fair' | 'poor' = 'poor';
-        if (responseScore >= 80) quality = 'excellent';
-        else if (responseScore >= 65) quality = 'good';
-        else if (responseScore >= 50) quality = 'fair';
-
-        // NEW: Update streak and show celebration
-        if (!isSkip && responseScore >= 65) {
-            setStreakCount(prev => prev + 1);
-            setShowCelebration(true);
-            setShowParticles(true);
-            setTimeout(() => setShowCelebration(false), 1500);
-            setTimeout(() => setShowParticles(false), 2000);
-        } else {
-            setStreakCount(0);
-        }
-
-        setAnswerQuality(quality);
-        setTimeout(() => setAnswerQuality(null), 2000);
-
-        // Track response metadata
-        const newResponse: UserResponse = {
-            round: roundIndex,
-            question: lastQ,
-            answer: actualResponse,
-            wordCount: turn.split(' ').length,
-            score: responseScore,
-            suggestion: roundIndex === 0 ? "Be more specific with technical terminology." : "Use the STAR method for better context.",
-            mistakes: isSkip ? "Skipped question." : (roundIndex === 1 ? "Incomplete STAR methodology." : undefined)
-        };
-        setAllResponses(prev => [...prev, newResponse]);
-
-        // NEW: Update performance metrics
-        const updatedResponses = [...allResponses, newResponse];
-        const avgScore = updatedResponses.length > 0 
-            ? updatedResponses.reduce((sum, r) => sum + (r.score || 0), 0) / updatedResponses.length 
-            : 0;
-        setPerformanceMetrics({
-            avgScore: Math.round(avgScore),
-            answerCount: updatedResponses.length,
-            timeSpent: Math.floor((Date.now() - (sessionId ? parseInt(sessionId.slice(0, 8), 16) : Date.now())) / 1000)
-        });
-
+        
         setUserInput('');
         setIsSending(true);
         setIsThinking(true);
         try {
              if (isDummyMode) {
+                // In dummy mode, randomly assign a score or use a basic fallback logic
+                const dummyScore = isSkip ? 0 : 85;
+                processAnswerResult(actualResponse, lastQ, dummyScore, isSkip, "Improve specificity.", "None.", [], [], []);
+
                 setTimeout(() => {
                     dummyQIdxRef.current++;
                     const bank = QUESTION_BANKS[roundIndex];
@@ -548,6 +484,7 @@ export default function MockInterview() {
                 }, 400); 
                 return;
             }
+
              const res = await fetch(`${API_BASE_URL}/api/interview/chat`, {
                 method: 'POST',
                 headers: { 
@@ -556,7 +493,24 @@ export default function MockInterview() {
                 },
                 body: JSON.stringify({ session_id: sessionId, user_response: actualResponse, round_index: roundIndex })
             });
-            await res.json();
+            const resData = await res.json();
+            
+            // Extract AI evaluation from backend
+            const analysis = resData.answer_analysis || {};
+            const responseScore = analysis.score ?? (isSkip ? 0 : 70);
+            
+            processAnswerResult(
+                actualResponse, 
+                lastQ, 
+                responseScore, 
+                isSkip, 
+                analysis.suggestions || "No specific suggestions.", 
+                (analysis.incorrect_statements && analysis.incorrect_statements.length > 0) ? analysis.incorrect_statements.join(" ") : "",
+                analysis.concepts_covered || [],
+                analysis.missing_concepts || [],
+                analysis.incorrect_statements || []
+            );
+
             setIsThinking(false);
             const bank = QUESTION_BANKS[roundIndex];
             const currentIndex = roundQuestionIndexRef.current[roundIndex];
@@ -568,13 +522,58 @@ export default function MockInterview() {
             }
 
             roundQuestionIndexRef.current[roundIndex] = nextIndex;
-            const nextQuestion = bank[nextIndex];
+            const nextQuestion = resData.interviewer_text || bank[nextIndex];
             setMessages(prev => [...prev, { role: 'interviewer', content: nextQuestion, timestamp: new Date().toLocaleTimeString() }]);
             speak(nextQuestion, roundIndex);
         } catch (err) {
             setIsThinking(false);
             try { console.error("Chat Error:", err instanceof Error ? err.message : String(err)); } catch (_) {}
         } finally { setIsSending(false); }
+    };
+
+    const processAnswerResult = (actualResponse: string, lastQ: string, responseScore: number, isSkip: boolean, suggestion: string, mistakes: string, concepts_covered: string[], missing_concepts: string[], incorrect_statements: string[]) => {
+        let quality: 'excellent' | 'good' | 'fair' | 'poor' = 'poor';
+        if (responseScore >= 80) quality = 'excellent';
+        else if (responseScore >= 65) quality = 'good';
+        else if (responseScore >= 50) quality = 'fair';
+
+        if (!isSkip && responseScore >= 65) {
+            setStreakCount(prev => prev + 1);
+            setShowCelebration(true);
+            setShowParticles(true);
+            setTimeout(() => setShowCelebration(false), 1500);
+            setTimeout(() => setShowParticles(false), 2000);
+        } else {
+            setStreakCount(0);
+        }
+
+        setAnswerQuality(quality);
+        setTimeout(() => setAnswerQuality(null), 2000);
+
+        const newResponse: UserResponse = {
+            round: roundIndex,
+            question: lastQ,
+            answer: actualResponse,
+            wordCount: actualResponse.split(' ').length,
+            score: responseScore,
+            suggestion: suggestion,
+            mistakes: isSkip ? "Skipped question." : mistakes,
+            concepts_covered,
+            missing_concepts,
+            incorrect_statements
+        };
+        setAllResponses(prev => {
+            const updated = [...prev, newResponse];
+            const avgScore = updated.length > 0 
+                ? updated.reduce((sum, r) => sum + (r.score || 0), 0) / updated.length 
+                : 0;
+            setPerformanceMetrics({
+                avgScore: Math.round(avgScore),
+                answerCount: updated.length,
+                timeSpent: Math.floor((Date.now() - (sessionId ? parseInt(sessionId.slice(0, 8), 16) : Date.now())) / 1000)
+            });
+            return updated;
+        });
     };
 
     // Handle quick action buttons (skip / idont know / next question)
@@ -592,9 +591,23 @@ export default function MockInterview() {
             wordCount: 0,
             score: 0,
             suggestion: roundIndex === 0 ? "Be more specific with technical terminology." : "Use the STAR method for better context.",
-            mistakes: "Skipped question."
+            mistakes: "Skipped question.",
+            concepts_covered: [],
+            missing_concepts: [],
+            incorrect_statements: []
         };
-        setAllResponses(prev => [...prev, newResponse]);
+        setAllResponses(prev => {
+            const updated = [...prev, newResponse];
+            const avgScore = updated.length > 0 
+                ? updated.reduce((sum, r) => sum + (r.score || 0), 0) / updated.length 
+                : 0;
+            setPerformanceMetrics({
+                avgScore: Math.round(avgScore),
+                answerCount: updated.length,
+                timeSpent: Math.floor((Date.now() - (sessionId ? parseInt(sessionId.slice(0, 8), 16) : Date.now())) / 1000)
+            });
+            return updated;
+        });
 
         setIsSending(true);
         setIsThinking(true);
@@ -1215,6 +1228,13 @@ export default function MockInterview() {
                                     </select>
                                 </div>
                                 <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-black uppercase tracking-widest ml-4">Target Company</label>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+                                        <input type="text" placeholder="e.g. Google" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-14 py-4 text-sm font-bold focus:ring-4 focus:ring-violet-500/10 placeholder:text-gray-300" value={setup.company} onChange={e => setSetup({ ...setup, company: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
                                     <label className="text-[10px] font-black text-black uppercase tracking-widest ml-4">Company Type</label>
                                     <select value={setup.companyType} onChange={e => setSetup({ ...setup, companyType: e.target.value })} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold">
                                         {COMPANY_TYPE_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1237,7 +1257,7 @@ export default function MockInterview() {
                                             type={showingKey ? "text" : "password"} 
                                             placeholder="Enter API key" 
                                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-14 py-4 text-xs font-bold focus:ring-4 focus:ring-violet-500/10 placeholder:text-gray-300" 
-                                            value={apiKey} 
+                                            value={apiKey || 'demo-key'} 
                                             onChange={e => setApiKey(e.target.value)} 
                                         />
                                         <button 
@@ -1416,10 +1436,19 @@ export default function MockInterview() {
                             </div>
                             <div className="space-y-6 text-left">
                                 <div className="space-y-3">
-                                    <label className="text-[10px] font-black text-black uppercase tracking-widest ml-4">Target Company</label>
+                                    <label className="text-[10px] font-black text-black uppercase tracking-widest ml-4">Interview Type</label>
                                     <div className="relative">
-                                        <Building2 className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
-                                        <input type="text" placeholder="e.g. Google" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-14 py-4 text-sm font-bold focus:ring-4 focus:ring-violet-500/10 placeholder:text-gray-300" value={setup.company} onChange={e => setSetup({ ...setup, company: e.target.value })} />
+                                        <Briefcase className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+                                        <select 
+                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-14 pr-4 py-4 text-sm font-bold focus:ring-4 focus:ring-violet-500/10 text-black appearance-none"
+                                            value={setup.interviewType}
+                                            onChange={e => setSetup({ ...setup, interviewType: e.target.value })}
+                                        >
+                                            <option value="Mixed Interview">Mixed Interview (All Rounds)</option>
+                                            <option value="Technical Interview">Technical Only</option>
+                                            <option value="Behavioral Interview">Behavioral Only</option>
+                                            <option value="HR Interview">HR Only</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
@@ -1472,7 +1501,7 @@ export default function MockInterview() {
                                     </div>
                                 </div>
                                 <div className="pt-3">
-                                    <button onClick={startInterview} disabled={loading || !setup.company || !setup.domain} className={`sp-btn w-full !py-5 !rounded-2xl ${loading || !setup.company || !setup.domain ? '!bg-gray-300 !text-white cursor-not-allowed' : ''}`}>
+                                    <button onClick={startInterview} disabled={loading || !setup.company} className={`sp-btn w-full !py-5 !rounded-2xl ${loading || !setup.company ? '!bg-gray-300 !text-white cursor-not-allowed' : ''}`}>
                                         <span className="sp-orb sp-orb1" />
                                         <span className="sp-orb sp-orb2" />
                                         <span className="sp-orb sp-orb3" />
@@ -1810,13 +1839,37 @@ export default function MockInterview() {
                                                                 <p className="text-[12px] font-bold text-[#7C3AED] leading-relaxed line-clamp-3">"{res.suggestion}"</p>
                                                             </div>
 
-                                                            {res.mistakes && (
+                                                            {res.concepts_covered && res.concepts_covered.length > 0 && (
+                                                                <div className="pt-4 border-t border-violet-100 space-y-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Concepts Covered</span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {res.concepts_covered.map((c, i) => <span key={i} className="text-[9px] font-bold bg-green-100 text-green-800 px-2 py-1 rounded-md">{c}</span>)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {res.missing_concepts && res.missing_concepts.length > 0 && (
+                                                                <div className="pt-4 border-t border-violet-100 space-y-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Missing Concepts</span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {res.missing_concepts.map((c, i) => <span key={i} className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-md">{c}</span>)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {(res.mistakes || (res.incorrect_statements && res.incorrect_statements.length > 0)) && (
                                                                 <div className="pt-4 border-t border-violet-100 space-y-4">
                                                                     <div className="flex items-center gap-3">
                                                                         <AlertCircle className="w-4 h-4 text-red-500" />
-                                                                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Observed Mistake</span>
+                                                                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Observed Mistakes</span>
                                                                     </div>
-                                                                    <p className="text-[11px] font-bold text-red-900/60 leading-relaxed italic">"{res.mistakes}"</p>
+                                                                    <p className="text-[11px] font-bold text-red-900/60 leading-relaxed italic">
+                                                                        "{res.incorrect_statements && res.incorrect_statements.length > 0 ? res.incorrect_statements.join(' ') : res.mistakes}"
+                                                                    </p>
                                                                 </div>
                                                             )}
                                                         </div>

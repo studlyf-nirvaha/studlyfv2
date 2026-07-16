@@ -413,7 +413,7 @@ const App: React.FC = () => {
             <Route path="/job-prep/projects" element={<ProtectedRoute><SystemDeconstructionLab /></ProtectedRoute>} />
             <Route path="/job-prep/projects/create" element={<ProtectedRoute><SDLProjectCreate /></ProtectedRoute>} />
             <Route path="/job-prep/projects/:projectId" element={<ProtectedRoute><SDLProjectDetail /></ProtectedRoute>} />
-            <Route path="/job-prep/mock-interview" element={<ProtectedRoute><MockInterview /></ProtectedRoute>} />
+            <Route path="/job-prep/mock-interview" element={<MockInterview />} />
             <Route path="/skill-assessment" element={<Navigate to="/dashboard" replace />} />
             <Route path="/skill-assessment/history" element={<Navigate to="/dashboard" replace />} />
             <Route path="/job-prep/group-discussion" element={<ProtectedRoute><GroupDiscussion /></ProtectedRoute>} />
