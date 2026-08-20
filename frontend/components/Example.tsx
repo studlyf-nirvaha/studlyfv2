@@ -102,13 +102,13 @@ const Example = () => {
                 {/* Laptop in background */}
                 <div className="relative w-[115%] md:w-[125%] h-[320px] rounded-t-[1.5rem] bg-[#1a1a1a] shadow-2xl p-[8px] pb-0 group-hover:scale-105 transition-transform duration-700 ease-out flex-shrink-0">
                   <div className="relative w-full h-full rounded-t-[1rem] overflow-hidden bg-black">
-                    <img src={card.image} alt={card.title} className="absolute inset-0 w-full h-full object-cover object-top" />
+                    <img src={card.image} alt={card.title} className="absolute inset-0 w-full h-full object-cover object-center" />
                   </div>
                 </div>
                 {/* Phone floating in foreground */}
                 <div className={`absolute bottom-[-30px] ${card.phoneAlign} w-[130px] sm:w-[150px] h-[270px] sm:h-[300px] bg-[#1a1a1a] rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.5)] p-[8px] group-hover:-translate-y-8 group-hover:scale-110 transition-transform duration-700 delay-75 ease-out z-20`}>
                   <div className="relative w-full h-full rounded-[2rem] overflow-hidden bg-black">
-                    <img src={card.image} alt="Mobile View" className={`absolute inset-0 w-full h-full object-cover ${card.objectPosPhone}`} />
+                    <img src={card.image} alt="Mobile View" className={`absolute inset-0 w-full h-full object-cover object-center ${card.objectPosPhone}`} />
                   </div>
                 </div>
               </div>

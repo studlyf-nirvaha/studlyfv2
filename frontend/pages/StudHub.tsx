@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { BrainCircuit, Gift, Landmark, Map, ArrowRight, PlayCircle, Users, CheckCircle, TrendingUp, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import DashboardFooter from '../components/DashboardFooter';
+import DailyQuoteCard from '../components/DailyQuoteCard';
 
 const StudHub: React.FC = () => {
   const navigate = useNavigate();
@@ -120,15 +121,7 @@ const StudHub: React.FC = () => {
               <h3 className="text-xl sm:text-3xl font-black text-[#1A1A1A] tracking-tight mb-2">Keep Learning,<br />Keep Growing.</h3>
               <p className="text-sm text-gray-500 font-medium mb-8">Small progress today creates big success tomorrow.</p>
 
-              <div className="w-full aspect-video bg-[#F8F9FC] rounded-3xl overflow-hidden relative group cursor-pointer border border-gray-100 shadow-inner">
-                {/* Embedded Video Placeholder */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-[#6C2BFF] transition-all duration-300">
-                    <PlayCircle className="w-8 h-8 text-[#6C2BFF] group-hover:text-white transition-colors" />
-                  </div>
-                  <span className="text-xs font-bold text-gray-400 tracking-wider">VIDEO SLOT</span>
-                </div>
-              </div>
+              <DailyQuoteCard />
             </div>
 
             {/* Decoration */}

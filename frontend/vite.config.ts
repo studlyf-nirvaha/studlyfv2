@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy: {
         '^/(api/.*|generate-portfolio(?:/.*)?|generate-resume(?:/.*)?|update-portfolio(?:/.*)?|generate-summary(?:/.*)?)': {
-          target: env.VITE_API_PROXY || 'http://[::1]:8000',
+          target: env.VITE_API_PROXY || 'http://127.0.0.1:8000',
           changeOrigin: true,
           secure: false,
         }

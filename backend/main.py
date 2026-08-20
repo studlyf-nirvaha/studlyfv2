@@ -4564,35 +4564,204 @@ async def get_admin_insights():
         print(f"Insights Error: {e}")
         return []
 
-# --- RESUME BUILDER ENDPOINTS ---
+# --- MULTI-RESUME BUILDER ENDPOINTS ---
+
+@app.get("/api/resumes/{user_id}")
+async def get_all_user_resumes(user_id: str):
+    """Retrieve all saved resumes for a user"""
+    try:
+        cursor = resumes_col.find({
+            "$or": [
+                {"user_id": user_id},
+                {"_id": user_id}
+            ]
+        }).sort("updated_at", -1)
+        resumes = []
+        async for doc in cursor:
+            res_id = str(doc.get("_id"))
+            resumes.append({
+                "id": res_id,
+                "user_id": doc.get("user_id", user_id),
+                "name": doc.get("name", "Untitled Resume"),
+                "config": doc.get("config", {}),
+                "is_public": doc.get("is_public", True),
+                "created_at": doc.get("created_at"),
+                "updated_at": doc.get("updated_at")
+            })
+        return resumes
+    except Exception as e:
+        print(f"Resumes Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user resumes")
+
+
+@app.get("/api/debug/resumes")
+async def debug_list_resumes():
+    """Development-only: list recent resumes for debugging."""
+    if os.getenv("ENVIRONMENT", "development").lower() != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        cursor = resumes_col.find().sort("updated_at", -1).limit(50)
+        items = []
+        async for doc in cursor:
+            items.append({
+                "_id": str(doc.get("_id")),
+                "user_id": doc.get("user_id"),
+                "name": doc.get("name"),
+                "created_at": doc.get("created_at"),
+                "updated_at": doc.get("updated_at"),
+                "config_preview": {"has_personal": bool(doc.get("config", {}).get("personalInfo"))}
+            })
+        return {"count": len(items), "items": items}
+    except Exception as e:
+        print(f"Debug resumes error: {e}")
+        raise HTTPException(status_code=500, detail="Debug failed")
+
+@app.get("/api/resume/public/{share_id}")
+async def get_public_resume(share_id: str):
+    """Retrieve a public resume document by share_id, resume_id, or user_id"""
+    try:
+        resume = await resumes_col.find_one({
+            "$or": [
+                {"_id": share_id},
+                {"share_id": share_id},
+                {"user_id": share_id}
+            ]
+        })
+        if not resume:
+            raise HTTPException(status_code=404, detail="Resume not found.")
+
+        is_public = resume.get("is_public", True)
+        if not is_public:
+            raise HTTPException(status_code=403, detail="This resume is private. Access is restricted by the owner.")
+
+        return {
+            "config": resume.get("config", {}),
+            "name": resume.get("name", "Public Resume"),
+            "is_public": True,
+            "share_id": str(resume.get("_id", share_id)),
+            "updated_at": resume.get("updated_at")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Public Resume Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch public resume")
 
 @app.get("/api/resume/{user_id}")
 async def get_user_resume(user_id: str):
-    """Retrieve saved resume configuration for a user"""
+    """Retrieve primary saved resume for a user"""
     try:
-        resume = await resumes_col.find_one({"_id": user_id})
+        resume = await resumes_col.find_one({
+            "$or": [
+                {"_id": user_id},
+                {"user_id": user_id}
+            ]
+        })
         if resume:
-            return fix_id(resume)
-        # If not found, return an empty template structure to avoid 404 in frontend logs
-        return {"config": {}}
+            doc = fix_id(resume)
+            doc["is_public"] = resume.get("is_public", True)
+            doc["share_id"] = str(resume.get("_id", user_id))
+            return doc
+        return {"config": {}, "is_public": True, "share_id": user_id}
     except Exception as e:
         print(f"Resume Fetch Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch resume")
 
-@app.post("/api/resume/{user_id}")
-async def save_user_resume(user_id: str, data: dict):
-    """Save resume configuration for a user"""
+@app.post("/api/resume")
+async def create_new_resume(payload: dict):
+    """Create a new resume document for a user"""
     try:
-        # We store the entire payload under 'config' to match the frontend expectations
-        await resumes_col.update_one(
-            {"_id": user_id},
-            {"$set": {"config": data, "updated_at": datetime.utcnow().isoformat()}},
-            upsert=True
-        )
-        return {"status": "success"}
+        import uuid
+        resume_id = f"res_{uuid.uuid4().hex[:10]}"
+        user_id = payload.get("user_id", "guest")
+        name = payload.get("name", "Untitled Resume")
+        config = payload.get("config", {})
+        is_public = payload.get("is_public", True)
+        now = datetime.utcnow().isoformat()
+
+        doc = {
+            "_id": resume_id,
+            "user_id": user_id,
+            "name": name,
+            "config": config,
+            "is_public": is_public,
+            "created_at": now,
+            "updated_at": now
+        }
+        await resumes_col.insert_one(doc)
+        return {
+            "status": "success",
+            "id": resume_id,
+            "resume": {
+                "id": resume_id,
+                "user_id": user_id,
+                "name": name,
+                "config": config,
+                "is_public": is_public,
+                "created_at": now,
+                "updated_at": now
+            }
+        }
     except Exception as e:
-        print(f"Resume Save Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save resume")
+        print(f"Create Resume Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create new resume")
+
+@app.put("/api/resume/{resume_id}")
+async def update_existing_resume(resume_id: str, payload: dict):
+    """Update a specific resume by resume_id"""
+    try:
+        update_doc = {
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        if "config" in payload:
+            update_doc["config"] = payload["config"]
+        if "name" in payload:
+            update_doc["name"] = payload["name"]
+        if "is_public" in payload:
+            update_doc["is_public"] = bool(payload["is_public"])
+        if "user_id" in payload:
+            update_doc["user_id"] = payload["user_id"]
+
+        result = await resumes_col.update_one(
+            {"_id": resume_id},
+            {"$set": update_doc},
+            upsert=False
+        )
+        if result.matched_count == 0:
+            # Do not create new resume documents via PUT. Require POST to create.
+            raise HTTPException(status_code=404, detail="Resume not found. Use POST /api/resume to create a new resume.")
+        return {"status": "success", "id": resume_id}
+    except Exception as e:
+        print(f"Update Resume Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update resume")
+
+@app.delete("/api/resume/{resume_id}")
+async def delete_existing_resume(resume_id: str):
+    """Delete a specific resume by resume_id"""
+    try:
+        await resumes_col.delete_one({"_id": resume_id})
+        return {"status": "success", "id": resume_id}
+    except Exception as e:
+        print(f"Delete Resume Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete resume")
+
+@app.post("/api/resume/{resume_id}/privacy")
+async def update_resume_privacy(resume_id: str, payload: dict):
+    """Update privacy for a specific resume by resume_id"""
+    try:
+        is_public = bool(payload.get("is_public", True))
+        await resumes_col.update_one(
+            {"_id": resume_id},
+            {"$set": {
+                "is_public": is_public,
+                "updated_at": datetime.utcnow().isoformat()
+            }}
+        )
+        return {"status": "success", "is_public": is_public, "id": resume_id}
+    except Exception as e:
+        print(f"Resume Privacy Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update resume privacy")
+
 
 @app.get("/api/admin/mentors", dependencies=[Depends(admin_required)])
 async def get_admin_mentors():

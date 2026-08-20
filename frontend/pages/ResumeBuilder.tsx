@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../AuthContext";
 import { API_BASE_URL } from "../apiConfig";
@@ -38,7 +39,9 @@ import {
     X,
     ChevronDown,
     ChevronUp,
-    Upload
+    Upload,
+    Copy,
+    Check
 } from "lucide-react";
 import Navigation from "../components/Navigation";
 import { generatePdfHtml } from "../utils/resumePdf";
@@ -90,7 +93,7 @@ interface ResumeData {
 }
 
 const DEFAULT_RESUME_DATA: ResumeData = {
-    name: "UNTITLED RESUME",
+    name: "",
     personalInfo: {
         firstName: "",
         lastName: "",
@@ -364,10 +367,29 @@ const AccordionItem = ({ title, icon: Icon, children, isOpen, onClick }: any) =>
     </div>
 );
 
+const getResumeDisplayTitle = (data: ResumeData) => {
+    if (data.name && data.name.trim() !== "" && data.name.toUpperCase() !== "UNTITLED RESUME") {
+        return data.name;
+    }
+    const candidateName = `${data.personalInfo?.firstName || ''} ${data.personalInfo?.lastName || ''}`.trim();
+    if (candidateName) {
+        return `${candidateName}'s Resume`;
+    }
+    if (data.personalInfo?.jobTitle) {
+        return `${data.personalInfo.jobTitle} Resume`;
+    }
+    return "My Professional Resume";
+};
+
 export default function ResumeBuilder() {
     const { user } = useAuth();
     const [step, setStep] = useState<'dashboard' | 'create_new' | 'template_selection' | 'editor'>('create_new');
     const [hasExistingData, setHasExistingData] = useState(false);
+    const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+    const [resumesList, setResumesList] = useState<any[]>([]);
+    const selectedResumeIdRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => { selectedResumeIdRef.current = selectedResumeId; }, [selectedResumeId]);
     const [selectedTemplate, setSelectedTemplate] = useState<'classic' | 'modern'>('classic');
     const [resumeData, setResumeData] = useState<ResumeData>(DEFAULT_RESUME_DATA);
     const [isReviewing, setIsReviewing] = useState(false);
@@ -388,6 +410,294 @@ export default function ResumeBuilder() {
     const [showAiPanel, setShowAiPanel] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [publicAccess, setPublicAccess] = useState(true);
+    const [linkCopied, setLinkCopied] = useState(false);
+    const [deleteModalState, setDeleteModalState] = useState<{
+        isOpen: boolean;
+        resumeId: string | null;
+        resumeTitle: string;
+        isDeleting: boolean;
+    }>({
+        isOpen: false,
+        resumeId: null,
+        resumeTitle: '',
+        isDeleting: false
+    });
+
+    const requestDeleteResume = (id?: string | null, title?: string) => {
+        setDeleteModalState({
+            isOpen: true,
+            resumeId: id !== undefined ? id : selectedResumeId,
+            resumeTitle: title || getResumeDisplayTitle(resumeData),
+            isDeleting: false
+        });
+    };
+
+    const confirmDeleteResume = async () => {
+        if (!deleteModalState.isOpen) return;
+        setDeleteModalState(prev => ({ ...prev, isDeleting: true }));
+        try {
+            const targetId = deleteModalState.resumeId;
+            if (targetId) {
+                await fetch(`${API_BASE_URL}/api/resume/${targetId}`, { method: 'DELETE' });
+                setResumesList(prev => prev.filter(x => (x.id || x._id) !== targetId));
+                if (selectedResumeId === targetId) {
+                    setSelectedResumeId(null);
+                    selectedResumeIdRef.current = null;
+                    setResumeData(DEFAULT_RESUME_DATA);
+                    setHasExistingData(false);
+                }
+            } else {
+                localStorage.removeItem('studlyf_saved_resume');
+                setResumeData(DEFAULT_RESUME_DATA);
+                setHasExistingData(false);
+                setStep('create_new');
+            }
+        } catch (e) {
+            console.error('Delete resume failed', e);
+        } finally {
+            setDeleteModalState({ isOpen: false, resumeId: null, resumeTitle: '', isDeleting: false });
+        }
+    };
+
+    const renderDeleteModal = () => {
+        if (!deleteModalState.isOpen || typeof document === 'undefined') return null;
+        return createPortal(
+            <AnimatePresence>
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => !deleteModalState.isDeleting && setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                        className="absolute inset-0 bg-gray-950/60 backdrop-blur-md transition-opacity"
+                    />
+
+                    {/* Modal Dialog */}
+                    <motion.div
+                        initial={{ scale: 0.95, opacity: 0, y: 16 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 16 }}
+                        transition={{ type: "spring", duration: 0.25, bounce: 0.05 }}
+                        className="relative bg-white rounded-3xl w-full max-w-md shadow-2xl border border-red-100 overflow-hidden z-10"
+                    >
+                        {/* Top decorative banner */}
+                        <div className="bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 h-2 w-full" />
+
+                        <div className="p-6 sm:p-7">
+                            <div className="flex items-start gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center shrink-0 shadow-inner">
+                                    <Trash2 size={24} />
+                                </div>
+                                <div className="flex-1 pr-2">
+                                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Delete Resume?</h3>
+                                    <p className="text-xs text-gray-500 font-medium mt-0.5">This action is permanent and cannot be undone.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                                    className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Resume to be deleted</p>
+                                <p className="text-sm font-bold text-gray-900 truncate flex items-center gap-2">
+                                    <FileText size={15} className="text-red-500 shrink-0" />
+                                    <span className="truncate">{deleteModalState.resumeTitle || "Untitled Resume"}</span>
+                                </p>
+                            </div>
+
+                            <p className="mt-4 text-xs leading-relaxed text-gray-500">
+                                Are you sure you want to delete this resume? It will be permanently removed from your cloud workspace and cannot be recovered.
+                            </p>
+
+                            <div className="flex items-center gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                                    className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-700 text-sm font-bold hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={confirmDeleteResume}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-bold transition-all shadow-md shadow-red-200 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                >
+                                    {deleteModalState.isDeleting ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 size={16} />
+                                            <span>Delete Resume</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </AnimatePresence>,
+            document.body
+        );
+    };
+
+    const renderShareModal = () => {
+        if (!isShareModalOpen || typeof document === 'undefined') return null;
+        return createPortal(
+            <AnimatePresence>
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        onClick={() => setIsShareModalOpen(false)}
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        initial={{ scale: 0.97, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.97, opacity: 0, y: 12 }}
+                        transition={{ duration: 0.18 }}
+                        className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden z-10"
+                    >
+                        <div className="px-7 pt-7 pb-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-gray-900">Share Resume</h2>
+                                <button onClick={() => setIsShareModalOpen(false)} className="h-8 w-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="v-label mb-1.5 block">Resume link</label>
+                                    <div className="flex items-center gap-2 v-input !p-0 overflow-hidden border border-gray-200 focus-within:border-violet-600 transition-colors">
+                                        <input
+                                            readOnly
+                                            value={getShareUrl()}
+                                            className="flex-1 px-3.5 py-2.5 text-xs text-gray-700 bg-transparent outline-none font-mono"
+                                        />
+                                        <button
+                                            onClick={handleCopyShareLink}
+                                            className="shrink-0 px-3.5 py-2.5 text-gray-500 hover:text-violet-600 hover:bg-violet-50 border-l border-gray-100 transition-all flex items-center gap-1.5 text-xs font-bold"
+                                        >
+                                            {linkCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                                            <span>{linkCopied ? 'Copied!' : 'Copy'}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Public Access Toggle Box */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div className="flex items-center gap-3 pr-2">
+                                        <div className="h-10 w-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
+                                            <Globe size={18} className={publicAccess ? "text-violet-600" : "text-gray-400"} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold text-gray-900">Public access</p>
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${publicAccess
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                    : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                    }`}>
+                                                    {publicAccess ? 'ON' : 'OFF'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-snug">
+                                                {publicAccess
+                                                    ? 'Anyone with the link (including guests) can view'
+                                                    : 'Restricted — Only you can view this resume'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Perfectly Aligned Toggle Switch */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTogglePublicAccess(!publicAccess)}
+                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${publicAccess ? 'bg-violet-600' : 'bg-gray-300'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${publicAccess ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button onClick={() => setIsShareModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleCopyShareLink();
+                                        setTimeout(() => setIsShareModalOpen(false), 600);
+                                    }}
+                                    className="flex-1 v-btn-primary !py-2.5 !rounded-xl !text-sm justify-center flex items-center gap-1.5"
+                                >
+                                    {linkCopied ? <Check size={16} /> : <Copy size={16} />}
+                                    <span>{linkCopied ? 'Link Copied!' : 'Copy link'}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </AnimatePresence>, document.body)
+    };
+
+    const handleTogglePublicAccess = async (newVal: boolean) => {
+        setPublicAccess(newVal);
+        if (!user?.uid) return;
+        try {
+            // Prefer updating the selected resume; if none exists create one first
+            let targetId = selectedResumeIdRef.current;
+            if (!targetId) {
+                const resp = await fetch(`${API_BASE_URL}/api/resume`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: user.uid, name: resumeData.name || '', config: resumeData, is_public: newVal })
+                });
+                if (resp.ok) {
+                    const pl = await resp.json();
+                    targetId = pl.id;
+                    setSelectedResumeId(targetId);
+                    selectedResumeIdRef.current = targetId;
+                }
+            }
+            if (targetId) {
+                await fetch(`${API_BASE_URL}/api/resume/${targetId}/privacy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_public: newVal })
+                });
+            }
+        } catch (e) {
+            console.error("Failed to update resume privacy:", e);
+        }
+    };
+
+    const getShareUrl = () => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const shareId = selectedResumeIdRef.current || selectedResumeId || user?.uid || (user as any)?.user_id || 'preview';
+        return `${origin}/#/resume/${shareId}`;
+    };
+
+    const handleCopyShareLink = () => {
+        const url = getShareUrl();
+        navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+    };
 
     useEffect(() => {
         // First load from local storage for instant state recovery
@@ -395,7 +705,7 @@ export default function ResumeBuilder() {
             const localSaved = localStorage.getItem('studlyf_saved_resume');
             if (localSaved) {
                 const parsed = JSON.parse(localSaved);
-                if (parsed && typeof parsed === 'object') {
+                if (parsed && typeof parsed === 'object' && (parsed.personalInfo?.firstName || parsed.experience?.length > 0)) {
                     setResumeData(prev => ({
                         ...prev,
                         ...parsed,
@@ -404,6 +714,7 @@ export default function ResumeBuilder() {
                         additional: { ...prev.additional, ...(parsed.additional || {}) }
                     }));
                     setHasExistingData(true);
+                    setStep('dashboard');
                 }
             }
         } catch (e) {
@@ -413,11 +724,22 @@ export default function ResumeBuilder() {
         async function fetchConfig() {
             if (!user?.uid) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/api/resume/${user.uid}`);
+                // Fetch all resumes for the user and pick the most recent as primary
+                const res = await fetch(`${API_BASE_URL}/api/resumes/${user.uid}`);
                 if (res.ok) {
-                    const data = await res.json();
-                    if (data.config) {
-                        const config = data.config;
+                    const list = await res.json();
+                    setResumesList(Array.isArray(list) ? list : []);
+                    let data: any = null;
+                    if (Array.isArray(list) && list.length > 0) {
+                        const primary = list[0];
+                        setSelectedResumeId(primary.id || null);
+                        selectedResumeIdRef.current = primary.id || null;
+                        if (primary.is_public !== undefined) setPublicAccess(primary.is_public);
+                        data = primary.config || {};
+                    }
+                    // fallback to empty config if no remote resumes
+                    if (data && Object.keys(data).length > 0 && (data.personalInfo?.firstName || data.experience?.length > 0 || data.name)) {
+                        const config = data;
                         let migratedData: ResumeData = { ...DEFAULT_RESUME_DATA };
                         if (config.personalInfo) {
                             migratedData = {
@@ -441,6 +763,7 @@ export default function ResumeBuilder() {
                         }
                         setResumeData(migratedData);
                         setHasExistingData(true);
+                        setStep('dashboard');
                         localStorage.setItem('studlyf_saved_resume', JSON.stringify(migratedData));
                     }
                 }
@@ -459,7 +782,7 @@ export default function ResumeBuilder() {
         return () => clearTimeout(timer);
     }, [resumeData]);
 
-    const handleSave = async (silent = false) => {
+    const handleSave = async (silent = false, navigateToDashboard = false) => {
         if (!silent) setIsSaving(true);
         try {
             // Save to localStorage
@@ -468,16 +791,58 @@ export default function ResumeBuilder() {
 
             // Save to backend API if user is logged in
             if (user?.uid) {
-                await fetch(`${API_BASE_URL}/api/resume/${user.uid}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ config: resumeData })
-                });
+                try {
+                    // Read the latest selected id from ref to avoid stale closures
+                    const targetId = selectedResumeIdRef.current;
+                    // If we have a selected resume id, update that specific resume
+                    if (targetId) {
+                        await fetch(`${API_BASE_URL}/api/resume/${targetId}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ config: resumeData, is_public: publicAccess, name: resumeData.name })
+                        });
+                        // update local list entry
+                        setResumesList(prev => prev.map(r => (r.id === targetId || r._id === targetId) ? { ...r, config: resumeData, name: resumeData.name, updated_at: new Date().toISOString() } : r));
+                    } else {
+                        // Create a new resume document
+                        const resp = await fetch(`${API_BASE_URL}/api/resume`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ user_id: user.uid, name: resumeData.name, config: resumeData, is_public: publicAccess })
+                        });
+                        if (resp.ok) {
+                            const payload = await resp.json();
+                            if (payload && payload.id) {
+                                setSelectedResumeId(payload.id);
+                                selectedResumeIdRef.current = payload.id;
+                                // Add new resume to local list
+                                if (payload.resume) {
+                                    setResumesList(prev => [payload.resume, ...prev]);
+                                } else {
+                                    // minimal fallback
+                                    setResumesList(prev => [{ id: payload.id, user_id: user.uid, name: resumeData.name || '', config: resumeData, is_public: publicAccess, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...prev]);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Backend save error:", e);
+                }
             }
-            if (!silent) { setSaveStatus("saved"); setTimeout(() => setSaveStatus("idle"), 2500); }
+            if (!silent) {
+                setSaveStatus("saved");
+                setTimeout(() => setSaveStatus("idle"), 2500);
+                if (navigateToDashboard) {
+                    setStep('dashboard');
+                }
+            }
         } catch (e) {
             console.error("Save error:", e);
         } finally { setIsSaving(false); }
+    };
+
+    const handleDeleteResume = () => {
+        requestDeleteResume(selectedResumeId, getResumeDisplayTitle(resumeData));
     };
 
     const toggleSection = (section: string) => setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -502,70 +867,98 @@ export default function ResumeBuilder() {
     const removeHonor = (index: number) => setResumeData(prev => ({ ...prev, additional: { ...prev.additional, honorsAndAwards: prev.additional.honorsAndAwards.filter((_, i) => i !== index) } }));
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
+    // ─── DASHBOARD ────────────────────────────────────────────────────────────
     if (step === 'dashboard') {
         const displayName = resumeData.personalInfo.firstName || user?.displayName?.split(' ')[0] || "User";
+        const resumeTitle = getResumeDisplayTitle(resumeData);
+        const jobRole = resumeData.personalInfo.jobTitle || "Software Engineer / Candidate";
+
         return (
-            <div className="min-h-screen flex flex-col" style={{ background: '#f9fafb' }}>
+            <div className="min-h-screen flex flex-col bg-[#F8F9FC]" style={{ background: '#f9fafb' }}>
                 <style>{styles}</style>
                 <Navigation />
-                <div className="flex-1 v-scroll overflow-y-auto pt-28 pb-20 px-3 sm:px-6">
+                <div className="flex-1 v-scroll overflow-y-auto pt-28 pb-20 px-4 sm:px-8">
                     <div className="max-w-6xl mx-auto">
-                        <div className="mb-10">
-                            <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">My Workspace</p>
-                            <h1 className="text-2xl font-bold text-gray-900">{displayName}'s Resumes</h1>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-                            {/* Existing resume */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 16 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                whileHover={{ y: -3 }}
-                                onClick={() => setStep('editor')}
-                                className="cursor-pointer group"
-                            >
-                                <div className="aspect-[3/4] bg-white border border-gray-200 rounded-xl overflow-hidden relative shadow-sm hover:shadow-md hover:border-violet-300 transition-all duration-200">
-                                    <div className="absolute inset-0 p-5 space-y-2.5 opacity-40 group-hover:opacity-70 transition-opacity">
-                                        <div className="h-2 w-1/3 bg-gray-200 rounded mx-auto"></div>
-                                        <div className="h-1 w-1/2 bg-gray-100 rounded mx-auto"></div>
-                                        <div className="mt-3 space-y-1.5">
-                                            {[1,0.9,0.75,0.85,0.6].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
-                                        </div>
-                                        <div className="mt-3 pt-2 border-t border-gray-100 space-y-1.5">
-                                            {[1,0.8,0.9].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
-                                        </div>
-                                    </div>
-                                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-violet-50/60 backdrop-blur-[2px]">
-                                        <div className="bg-white rounded-lg px-4 py-2 shadow-sm border border-violet-100 flex items-center gap-2 text-sm font-semibold text-violet-700">
-                                            <Edit3 size={14} /> Edit
-                                        </div>
-                                    </div>
-                                </div>
-                                <p className="mt-2.5 text-xs font-semibold text-gray-600 truncate">{displayName}'s Resume</p>
-                                <p className="text-[11px] text-gray-400 mt-0.5">Updated recently</p>
-                            </motion.div>
 
-                            {/* Create new */}
+                        {/* Header Section */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-200/80">
+                            <div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100 mb-2">
+                                    <Globe size={12} /> Workspace
+                                </div>
+                                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Resumes</h1>
+                                <p className="text-sm text-gray-500 font-medium mt-1">Manage, edit, share, and export your saved resumes anytime.</p>
+                            </div>
+
+                            <button
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setStep('template_selection'); }}
+                                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-violet-200 flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+                            >
+                                <Plus size={16} /> Create New Resume
+                            </button>
+                        </div>
+
+                        {/* Workspace Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                            {/* Render all saved resumes as cards */}
+                            {resumesList.length > 0 ? resumesList.map((r: any) => {
+                                const cfg = r.config || {};
+                                const migrated = migrateConfigToResumeData(cfg);
+                                const title = r.name || getResumeDisplayTitle(migrated);
+                                const email = migrated.personalInfo?.email || '';
+                                const phone = migrated.personalInfo?.phone || '';
+                                return (
+                                    <motion.div key={r.id || r._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 relative group flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <span className="text-[11px] font-bold uppercase tracking-wider text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">{r.template_id || 'Resume'}</span>
+                                                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Saved </span>
+                                            </div>
+                                            <h3 className="text-xl font-bold text-gray-900 group-hover:text-violet-600 transition-colors mb-1">{title}</h3>
+                                            <p className="text-xs font-semibold text-gray-500 mb-4">{migrated.personalInfo.jobTitle || 'Candidate'}</p>
+                                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6 space-y-2 text-xs text-gray-600 font-medium">
+                                                {email && (<div className="flex items-center gap-2 text-gray-700 truncate"><Mail size={13} className="text-gray-400 shrink-0" /><span className="truncate">{email}</span></div>)}
+                                                {phone && (<div className="flex items-center gap-2 text-gray-700"><Phone size={13} className="text-gray-400 shrink-0" /><span>{phone}</span></div>)}
+                                                <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between text-[11px] text-gray-500 font-bold"><span>{migrated.experience.length} Experience</span><span>•</span><span>{migrated.education.length} Education</span><span>•</span><span>{migrated.projects.length} Projects</span></div>
+                                            </div>
+                                        </div>
+                                        <div className="pt-4 border-t border-gray-100 flex items-center gap-2">
+                                            <button onClick={() => { const id = (r.id || r._id); setSelectedResumeId(id); selectedResumeIdRef.current = id; setResumeData(migrated); setHasExistingData(true); setStep('editor'); }} className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"><Edit3 size={14} /> Edit</button>
+                                            <button onClick={() => { const id = (r.id || r._id); setSelectedResumeId(id); selectedResumeIdRef.current = id; setResumeData(migrated); if (r.is_public !== undefined) setPublicAccess(r.is_public); setIsShareModalOpen(true); }} className="p-2.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors cursor-pointer" title="Share Resume"><Share2 size={14} /></button>
+                                            <button onClick={() => requestDeleteResume(r.id || r._id, title)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" title="Delete Resume"><Trash2 size={14} /></button>
+                                        </div>
+                                    </motion.div>
+                                );
+                            }) : (
+                                <div className="col-span-1 text-sm text-gray-500">No saved resumes yet. Create one to get started.</div>
+                            )}
+
+                            {/* Create New Resume Card */}
                             <motion.div
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.05 }}
-                                whileHover={{ y: -3 }}
-                                onClick={() => setStep('template_selection')}
-                                className="cursor-pointer group"
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setStep('template_selection'); }}
+                                className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/20 transition-all duration-300 group min-h-[280px]"
                             >
-                                <div className="aspect-[3/4] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center hover:border-violet-400 hover:bg-violet-50/30 transition-all duration-200">
-                                    <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-violet-500 transition-colors">
-                                        <div className="h-10 w-10 rounded-xl border-2 border-current flex items-center justify-center">
-                                            <Plus size={20} />
-                                        </div>
-                                        <span className="text-xs font-semibold">New Resume</span>
-                                    </div>
+                                <div className="w-14 h-14 rounded-2xl bg-gray-100 group-hover:bg-violet-100 text-gray-400 group-hover:text-violet-600 flex items-center justify-center mb-4 transition-all duration-300">
+                                    <Plus size={28} />
                                 </div>
-                                <p className="mt-2.5 text-xs font-semibold text-gray-400">Create new</p>
+                                <h3 className="text-base font-bold text-gray-800 group-hover:text-violet-600 transition-colors mb-1">
+                                    Create New Resume
+                                </h3>
+                                <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                                    Start with a fresh template or create an additional resume version.
+                                </p>
                             </motion.div>
+
                         </div>
+
                     </div>
                 </div>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
@@ -622,11 +1015,12 @@ export default function ResumeBuilder() {
                                     Get started free
                                     <ChevronRight size={16} />
                                 </button>
-                                {hasExistingData && (
-                                    <button onClick={() => setStep('dashboard')} className="v-btn-ghost !px-6 !py-3 !text-base">
-                                        My dashboard
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => setStep('dashboard')}
+                                    className="px-6 py-3 bg-white hover:bg-violet-50 text-violet-700 font-bold text-base rounded-xl border-2 border-violet-200 hover:border-violet-400 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                                >
+                                    <FileText size={18} /> My Saved Resumes
+                                </button>
                             </motion.div>
 
                             <motion.div
@@ -664,11 +1058,11 @@ export default function ResumeBuilder() {
                                     <div className="h-px bg-gray-100 mb-4"></div>
                                     <div className="space-y-1.5 mb-5">
                                         <div className="h-1.5 w-20 bg-gray-800 rounded"></div>
-                                        {[1,0.85,0.9,0.7].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
+                                        {[1, 0.85, 0.9, 0.7].map((w, i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{ width: `${w * 100}%` }} />)}
                                     </div>
                                     <div className="h-px bg-gray-100 mb-4"></div>
                                     <div className="grid grid-cols-2 gap-1.5">
-                                        {[0.8,0.65,0.75,0.55].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
+                                        {[0.8, 0.65, 0.75, 0.55].map((w, i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{ width: `${w * 100}%` }} />)}
                                     </div>
                                 </div>
 
@@ -918,6 +1312,8 @@ export default function ResumeBuilder() {
                         </motion.div>
                     </div>
                 </section>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
@@ -955,12 +1351,11 @@ export default function ResumeBuilder() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.08 }}
                                 whileHover={{ y: -4 }}
-                                onClick={() => { setSelectedTemplate(id as any); setStep('editor'); }}
-                                className={`flex-1 border-2 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group ${
-                                    selectedTemplate === id
-                                        ? 'border-violet-500 shadow-lg shadow-violet-100'
-                                        : 'border-gray-200 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50'
-                                }`}
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setSelectedTemplate(id as any); setStep('editor'); }}
+                                className={`flex-1 border-2 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group ${selectedTemplate === id
+                                    ? 'border-violet-500 shadow-lg shadow-violet-100'
+                                    : 'border-gray-200 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50'
+                                    }`}
                             >
                                 {/* ── CHANGED: Real template preview image (was: fake skeleton div) ── */}
                                 <div className="aspect-[4/3] overflow-hidden border-b border-gray-100">
@@ -986,6 +1381,8 @@ export default function ResumeBuilder() {
                         ))}
                     </div>
                 </div>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
@@ -1162,40 +1559,39 @@ export default function ResumeBuilder() {
                     {isEditingName ? (
                         <input
                             autoFocus
-                            value={resumeData.name}
+                            value={resumeData.name ? resumeData.name : getResumeDisplayTitle(resumeData)}
                             onBlur={() => setIsEditingName(false)}
                             onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
                             onChange={(e) => setResumeData({ ...resumeData, name: e.target.value })}
-                            className="text-sm font-semibold text-gray-900 outline-none bg-transparent border-b border-violet-400 w-48"
+                            className="text-sm font-semibold text-gray-900 outline-none bg-transparent border-b border-violet-400 w-64"
                         />
                     ) : (
                         <button onClick={() => setIsEditingName(true)} className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 hover:text-violet-600 transition-colors">
-                            {resumeData.name}
+                            {getResumeDisplayTitle(resumeData)}
                             <Edit3 size={13} className="text-gray-400" />
                         </button>
                     )}
-                    <button 
+                    <button
                         onClick={() => setStep('dashboard')}
-                        title="Click to view saved resumes in your cloud workspace"
+                        title="Click to view saved resumes in your Cloud Synced Workspace"
                         className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200 transition-colors cursor-pointer"
                     >
                         <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Saved to Workspace</span>
+                        <span>Saved to Cloud</span>
                     </button>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => handleSave()}
+                        onClick={() => handleSave(false, true)}
                         disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm ${
-                            saveStatus === 'saved'
-                                ? 'bg-emerald-600 text-white shadow-emerald-200'
-                                : 'bg-gray-900 text-white hover:bg-violet-700 shadow-gray-200'
-                        }`}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${saveStatus === 'saved'
+                            ? 'bg-emerald-600 text-white shadow-emerald-200'
+                            : 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-200'
+                            }`}
                     >
                         {isSaving ? <Loader2 size={13} className="animate-spin" /> : saveStatus === 'saved' ? <CheckCircle size={13} /> : <Save size={13} />}
-                        {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : 'Save Resume'}
+                        {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved to Cloud ✓' : 'Save Resume'}
                     </button>
 
                     <button
@@ -1498,11 +1894,10 @@ export default function ResumeBuilder() {
                 <button
                     onClick={() => handleSave()}
                     disabled={isSaving}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold shadow-xl backdrop-blur-md transition-all border border-white/20 ${
-                        saveStatus === 'saved'
-                            ? 'bg-emerald-600 text-white shadow-emerald-200'
-                            : 'bg-gray-900/90 text-white hover:bg-violet-700 shadow-gray-400'
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold shadow-xl backdrop-blur-md transition-all border border-white/20 ${saveStatus === 'saved'
+                        ? 'bg-emerald-600 text-white shadow-emerald-200'
+                        : 'bg-gray-900/90 text-white hover:bg-violet-700 shadow-gray-400'
+                        }`}
                 >
                     {isSaving ? <Loader2 size={14} className="animate-spin" /> : saveStatus === 'saved' ? <CheckCircle size={14} /> : <Save size={14} />}
                     {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved to Cloud ✓' : 'Save Resume'}
@@ -1625,78 +2020,39 @@ export default function ResumeBuilder() {
                 )}
             </AnimatePresence>
 
-            {/* Share Modal */}
-            <AnimatePresence>
-                {isShareModalOpen && (
-                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setIsShareModalOpen(false)}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ scale: 0.97, opacity: 0, y: 12 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.97, opacity: 0, y: 12 }}
-                            transition={{ duration: 0.18 }}
-                            className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
-                        >
-                            <div className="px-7 pt-7 pb-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-gray-900">Share Resume</h2>
-                                    <button onClick={() => setIsShareModalOpen(false)} className="h-8 w-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
-                                        <X size={16} />
-                                    </button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="v-label">Resume link</label>
-                                        <div className="flex items-center gap-2 v-input !p-0 overflow-hidden">
-                                            <input
-                                                readOnly
-                                                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/resume/${Math.random().toString(36).substring(7)}`}
-                                                className="flex-1 px-3 py-2.5 text-sm text-gray-600 bg-transparent outline-none font-mono"
-                                            />
-                                            <button className="shrink-0 px-3 py-2.5 text-gray-400 hover:text-violet-600 border-l border-gray-100 transition-colors">
-                                                <Share2 size={15} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-9 w-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-                                                <Globe size={16} className="text-gray-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-gray-800">Public access</p>
-                                                <p className="text-xs text-gray-400">Anyone with the link can view</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setPublicAccess(!publicAccess)}
-                                            className={`w-12 h-6.5 rounded-full p-0.5 transition-all duration-200 ${publicAccess ? 'bg-violet-600' : 'bg-gray-200'}`}
-                                            style={{ height: '26px' }}
-                                        >
-                                            <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-200 ${publicAccess ? 'translate-x-5.5' : 'translate-x-0'}`} style={{ transform: publicAccess ? 'translateX(22px)' : 'translateX(0)' }} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3 mt-6">
-                                    <button onClick={() => setIsShareModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
-                                        Cancel
-                                    </button>
-                                    <button onClick={() => setIsShareModalOpen(false)} className="flex-1 v-btn-primary !py-2.5 !rounded-xl !text-sm justify-center">
-                                        Copy link
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Modals */}
+            {renderShareModal()}
+            {renderDeleteModal()}
         </div>
     );
 };
+
+const migrateConfigToResumeData = (config: any): ResumeData => {
+    let migratedData: ResumeData = { ...DEFAULT_RESUME_DATA };
+    try {
+        if (!config) return migratedData;
+        if (config.personalInfo) {
+            migratedData = {
+                ...DEFAULT_RESUME_DATA, ...config,
+                personalInfo: { ...DEFAULT_RESUME_DATA.personalInfo, ...(config.personalInfo || {}) },
+                skills: { ...DEFAULT_RESUME_DATA.skills, ...(config.skills || {}) },
+                additional: { ...DEFAULT_RESUME_DATA.additional, ...(config.additional || {}) }
+            };
+        } else if (config.p) {
+            const nameParts = (config.p.name || "").split(" ");
+            migratedData.personalInfo = {
+                firstName: nameParts[0] || "", lastName: nameParts.slice(1).join(" ") || "",
+                email: config.p.email || "", phone: config.p.phone || "",
+                address: config.p.loc || "", jobTitle: "",
+                links: config.p.li ? [{ label: "LinkedIn", url: config.p.li }] : []
+            };
+            if (config.exp) migratedData.experience = config.exp.map((ex: any) => ({ company: ex.org || "", role: ex.role || "", range: ex.range || "", location: ex.loc || "", points: ex.pts || "" }));
+            if (config.edu) migratedData.education = config.edu.map((ed: any) => ({ institution: ed.inst || "", degree: ed.deg || "", year: ed.year || "", gpa: ed.gpa || "" }));
+            if (config.proj) migratedData.projects = config.proj.map((pr: any) => ({ name: pr.name || "", tech: pr.tech || "", desc: pr.desc || "" }));
+            if (config.skills && Array.isArray(config.skills)) migratedData.skills.languages = config.skills;
+        }
+    } catch (e) {
+        console.error('Migration helper error', e);
+    }
+    return migratedData;
+}

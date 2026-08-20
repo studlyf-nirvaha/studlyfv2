@@ -51,6 +51,7 @@ const DashboardHome = lazy(() => import('./pages/DashboardHome'));
 const Blog = lazy(() => import('./pages/Blog'));
 const CompanyModules = lazy(() => import('./pages/CompanyModules'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
+const PublicResumeView = lazy(() => import('./pages/PublicResumeView'));
 const CoursePlayer = lazy(() => import('./pages/CoursePlayer'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
@@ -465,6 +466,7 @@ const App: React.FC = () => {
             <Route path="/student-schemes" element={<StudentSchemes />} />
             <Route path="/scholarships" element={<Scholarships />} />
             <Route path="/verify/:id" element={<CertificateVerification />} />
+            <Route path="/resume/:shareId" element={<PublicResumeView />} />
             <Route path="/fix-role" element={<RoleFixer />} />
             <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
             <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />

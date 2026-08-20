@@ -239,12 +239,12 @@ const CourseCard: React.FC<CardProps> = ({ course, enrolledSeed, onClick }) => {
       className="relative rounded-[1.5rem] overflow-hidden cursor-pointer select-none bg-white"
       style={{ boxShadow: '0 6px 32px -6px rgba(0,0,0,0.14)' }}
     >
-      {/* ── photo area (tall) ── */}
-      <div className="relative h-[260px] overflow-hidden">
+      {/* ── photo area (horizontal banner) ── */}
+      <div className="relative h-40 md:h-44 lg:h-36 overflow-hidden">
         <img
           src={image}
           alt={course.title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          className="w-full h-full object-cover object-center transition-transform duration-700 hover:scale-110"
         />
       </div>
 
