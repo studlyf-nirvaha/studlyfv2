@@ -75,7 +75,7 @@ const FEATURED_VIDEOS: VideoItem[] = [
     id: 'feat-5',
     title: 'Designing Next-Gen User Experiences',
     subtitle: 'Exploring spatial computing, gesture-based interfaces, and how the physical and digital worlds are seamlessly blending together in modern product design.',
-    url: 'https://www.youtube.com/watch?v=P98ib95eCng',
+    url: 'https://www.youtube.com/watch?v=coYw5I4SAlI',
     category: 'Design Systems',
     duration: '24 mins',
     tags: ['UI/UX', 'Product', 'Future']
