@@ -346,12 +346,14 @@ const StudOTT: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [continueWatchingVideos, setContinueWatchingVideos] = useState<VideoItem[]>([]);
+  const [savedVideos, setSavedVideos] = useState<VideoItem[]>([]);
   const [brokenVideoIds, setBrokenVideoIds] = useState<Set<string | number>>(new Set());
   const introVideoRef = useRef<HTMLVideoElement>(null);
   const navigate = useNavigate();
 
   const userId = user?.user_id || user?.uid || user?.email || 'guest';
   const historyKey = `studott_history_${userId}`;
+  const watchlistKey = `studott_watchlist_${userId}`;
 
   useEffect(() => {
     try {
@@ -369,7 +371,18 @@ const StudOTT: React.FC = () => {
     } catch (e) {
       console.error("Failed to parse history", e);
     }
-  }, [historyKey]);
+
+    try {
+      const savedList = localStorage.getItem(watchlistKey);
+      if (savedList) {
+        setSavedVideos(JSON.parse(savedList));
+      } else {
+        setSavedVideos([]);
+      }
+    } catch (e) {
+      console.error("Failed to parse watchlist", e);
+    }
+  }, [historyKey, watchlistKey]);
 
   const handleVideoOpen = (vid: VideoItem, fetchedTitle: string, fetchedSubtitle: string) => {
     setActiveVideoUrl(vid.url || null);
@@ -387,6 +400,24 @@ const StudOTT: React.FC = () => {
       const newHistory = [fullVid, ...filtered].slice(0, 15);
       localStorage.setItem(historyKey, JSON.stringify(newHistory));
       return newHistory;
+    });
+  };
+
+  const handleToggleWatchlist = (vid: VideoItem) => {
+    setSavedVideos(prev => {
+      const exists = prev.some(v => v.url === vid.url);
+      let updated;
+      if (exists) {
+        updated = prev.filter(v => v.url !== vid.url);
+      } else {
+        const fullVid: VideoItem = {
+          ...vid,
+          watchedAt: Date.now()
+        };
+        updated = [fullVid, ...prev];
+      }
+      localStorage.setItem(watchlistKey, JSON.stringify(updated));
+      return updated;
     });
   };
 
@@ -793,9 +824,21 @@ const StudOTT: React.FC = () => {
                     <Play className="w-5 h-5 fill-black" />
                     <span className="tracking-widest text-sm uppercase">Watch Now</span>
                   </button>
-                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-white/5 backdrop-blur-md text-white rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10 hover:border-[#6C2BFF]/50 hover:scale-105 active:scale-95 group">
-                    <Plus className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
-                    <span className="tracking-widest text-sm uppercase text-gray-300 group-hover:text-white transition-colors">Save List</span>
+                  <button 
+                    onClick={() => handleToggleWatchlist(heroVideo)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-white/5 backdrop-blur-md text-white rounded-xl font-bold hover:bg-white/10 transition-all border border-white/10 hover:border-[#6C2BFF]/50 hover:scale-105 active:scale-95 group"
+                  >
+                    {savedVideos.some(v => v.url === heroVideo.url) ? (
+                      <>
+                        <X className="w-5 h-5 text-emerald-400 group-hover:text-emerald-500 transition-colors" />
+                        <span className="tracking-widest text-sm uppercase text-emerald-400 group-hover:text-emerald-500 transition-colors">Saved</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+                        <span className="tracking-widest text-sm uppercase text-gray-300 group-hover:text-white transition-colors">Save List</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </motion.div>
@@ -958,6 +1001,37 @@ const StudOTT: React.FC = () => {
                   </div>
                 </motion.div>
               ))}
+
+              {/* My List Row */}
+              {savedVideos.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ duration: 0.6 }}
+                  className="w-full relative group/row mb-16"
+                >
+                  <div className="flex items-center justify-between mb-4 lg:mb-5">
+                    <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight flex items-center gap-2 group-hover/row:text-[#A88CFF] transition-colors">
+                      <Plus className="w-5 h-5 md:w-6 md:h-6 text-[#A88CFF]" />
+                      My Saved List
+                    </h2>
+                  </div>
+
+                  <div className="relative w-full overflow-visible">
+                    <div 
+                      id="row-saved"
+                      className="flex gap-4 overflow-x-scroll pb-6 pt-4 no-scrollbar scroll-smooth snap-x snap-mandatory"
+                    >
+                      {savedVideos.filter(v => !brokenVideoIds.has(v.id)).map((vid: VideoItem) => (
+                        <div key={vid.id} className="w-[160px] sm:w-[200px] lg:w-[240px] xl:w-[260px] snap-center shrink-0">
+                          <VideoCard vid={vid} onPlay={handleVideoOpen} onVideoError={(id) => setBrokenVideoIds(p => new Set(p).add(id))} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
               {/* Continue Watching Row */}
               {continueWatchingVideos.length > 0 ? (
