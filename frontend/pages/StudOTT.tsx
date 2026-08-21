@@ -75,7 +75,7 @@ const FEATURED_VIDEOS: VideoItem[] = [
     id: 'feat-5',
     title: 'Designing Next-Gen User Experiences',
     subtitle: 'Exploring spatial computing, gesture-based interfaces, and how the physical and digital worlds are seamlessly blending together in modern product design.',
-    url: 'https://www.youtube.com/watch?v=coYw5I4SAlI',
+    url: 'https://www.youtube.com/watch?v=TX9qSaGXFyg',
     category: 'Design Systems',
     duration: '24 mins',
     tags: ['UI/UX', 'Product', 'Future']
@@ -338,7 +338,9 @@ const StudOTT: React.FC = () => {
   const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState('home');
   const [categories, setCategories] = useState<Record<string, CategoryData>>(DEFAULT_CATEGORIES);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => {
+    return sessionStorage.getItem('studott_intro_shown') !== 'true';
+  });
   const [heroVideo, setHeroVideo] = useState(FEATURED_VIDEOS[0]);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -471,6 +473,7 @@ const StudOTT: React.FC = () => {
 
   const handleIntroEnd = () => {
     setShowIntro(false);
+    sessionStorage.setItem('studott_intro_shown', 'true');
   };
 
   useEffect(() => {
@@ -564,6 +567,27 @@ const StudOTT: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#030305] text-white font-sans selection:bg-[#6C2BFF]/40 relative overflow-hidden">
+      {(showIntro || activeVideoUrl) && (
+        <style>{`
+          button[aria-label="Open guide"] {
+            display: none !important;
+          }
+          body, html {
+            overflow: hidden !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          video {
+            image-rendering: -moz-crisp-edges !important;
+            image-rendering: -webkit-crisp-edges !important;
+            image-rendering: pixelated !important;
+            image-rendering: crisp-edges !important;
+            filter: contrast(1.08) brightness(1.02) saturate(1.05) !important;
+          }
+        `}</style>
+      )}
       
       <AnimatePresence>
         {showIntro && (
@@ -582,7 +606,7 @@ const StudOTT: React.FC = () => {
               className="w-full h-full relative overflow-hidden bg-black"
             >
               <video
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain bg-black"
                 src="/videos/studott-intro.mp4"
                 autoPlay
                 muted
