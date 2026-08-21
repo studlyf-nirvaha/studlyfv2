@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { API_BASE_URL, authHeaders } from '../apiConfig';
+import { getCourseImageUrl } from '../utils/assetUtils';
 import {
   Zap,
   ChevronLeft,
@@ -38,8 +39,30 @@ const DashboardHome: React.FC = () => {
   const [isMuted, setIsMuted] = useState(true);
 
   const [courses, setCourses] = useState<any[]>([]);
+  const [activeDot, setActiveDot] = useState(0);
 
   const carouselRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = carouselRef.current || document.getElementById('course-carousel');
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollLeft, clientWidth, scrollWidth } = container;
+      const maxScrollLeft = scrollWidth - clientWidth;
+      if (maxScrollLeft <= 0) {
+        setActiveDot(0);
+        return;
+      }
+      const percentage = scrollLeft / maxScrollLeft;
+      const totalDots = 4;
+      const dotIndex = Math.min(totalDots - 1, Math.round(percentage * (totalDots - 1)));
+      setActiveDot(dotIndex);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [courses]);
   useEffect(() => {
     const fetchCourses = async () => {
       try {
@@ -280,7 +303,7 @@ const DashboardHome: React.FC = () => {
 
       <div className="min-h-screen overflow-x-hidden">
         {/* FIRST SECTION: HERO + TRUST CARD */}
-        <div className="relative overflow-hidden min-h-screen">
+        <div className="relative overflow-x-hidden min-h-screen">
           {/* Confined Video Background */}
           <div className="absolute inset-0 -z-20">
             <video
@@ -397,25 +420,34 @@ const DashboardHome: React.FC = () => {
                   <div
                     key={idx}
                     onClick={() => navigate(`/learn/courses/${createSlug(course.title, course._id)}`)}
-                    className="min-w-[200px] sm:min-w-[260px] lg:min-w-[290px] h-[340px] sm:h-[400px] lg:h-[440px] relative rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden group hover:scale-[1.02] transition-all duration-700 cursor-pointer shadow-lg border border-black/[0.03]"
+                    className="min-w-[200px] sm:min-w-[260px] lg:min-w-[290px] h-[340px] sm:h-[400px] lg:h-[440px] flex flex-col rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden group hover:scale-[1.02] transition-all duration-700 cursor-pointer shadow-lg border border-black/[0.03] bg-white"
                   >
-                    <img
-                      src={course.image || 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&auto=format&fit=crop'}
-                      alt={course.title}
-                      className="h-full w-full object-contain transition-transform duration-1000 group-hover:scale-110 p-4"
-                      style={{ background: '#F8F9FB' }}
-                    />
-                    {/* Bottom Information Block */}
-                    <div className="absolute bottom-4 left-4 right-4 bg-white rounded-[1.2rem] p-4 flex justify-between items-center shadow-xl shadow-black/5">
+                    {/* Top portion: Full-bleed image */}
+                    <div className="h-[50%] sm:h-[58%] w-full overflow-hidden relative">
+                      <img
+                        src={getCourseImageUrl(course.title, course.school || course.role_tag, course.image)}
+                        alt={course.title}
+                        className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                      />
+                    </div>
+                    {/* Bottom portion: Info panel */}
+                    <div className="flex-1 bg-white p-5 flex flex-col justify-between">
                       <div className="flex flex-col">
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-600 mb-1">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#7C3AED] mb-1.5 truncate">
                           SCHOOL OF {course.school || course.role_tag || 'ENGINEERING'}
                         </p>
-                        <h3 className="text-sm font-bold text-[#111827] leading-tight">
+                        <h3 className="text-sm sm:text-base font-extrabold text-[#111827] leading-snug line-clamp-2">
                           {course.title}
                         </h3>
                       </div>
-                      <ChevronRight size={18} className="flex-shrink-0 text-gray-400 group-hover:text-[#7C3AED] transition-colors ml-2" />
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                        <span className="text-[8px] font-black uppercase tracking-[0.15em] text-gray-400">
+                          ELITE TRACK
+                        </span>
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#1a1a2e] flex items-center justify-center group-hover:bg-[#7C3AED] transition-colors duration-300">
+                          <ChevronRight size={18} className="text-white" />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -432,11 +464,29 @@ const DashboardHome: React.FC = () => {
                   <ChevronLeft size={24} className="text-gray-400 group-hover/nav:text-[#7C3AED] transition-colors" />
                 </button>
 
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gray-200" />
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gray-200" />
-                  <div className="w-8 h-2 sm:w-10 sm:h-2.5 rounded-full bg-[#7C3AED] shadow-sm shadow-[#7C3AED]/30" />
-                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gray-200" />
+                 <div className="flex items-center gap-3 sm:gap-4">
+                  {[0, 1, 2, 3].map((dotIdx) => {
+                    const isActive = activeDot === dotIdx;
+                    return (
+                      <div
+                        key={dotIdx}
+                        onClick={() => {
+                          const container = carouselRef.current || document.getElementById('course-carousel');
+                          if (container) {
+                            const { clientWidth, scrollWidth } = container;
+                            const maxScrollLeft = scrollWidth - clientWidth;
+                            const target = (dotIdx / 3) * maxScrollLeft;
+                            container.scrollTo({ left: target, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`h-2 sm:h-2.5 rounded-full transition-all duration-300 cursor-pointer ${
+                          isActive 
+                            ? 'w-8 sm:w-10 bg-[#7C3AED] shadow-sm shadow-[#7C3AED]/30' 
+                            : 'w-2 sm:w-2.5 bg-gray-200 hover:bg-gray-300'
+                        }`}
+                      />
+                    );
+                  })}
                 </div>
 
                 <button

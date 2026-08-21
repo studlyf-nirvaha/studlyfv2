@@ -10,6 +10,7 @@ import {
   Briefcase, GraduationCap, LayoutDashboard, BrainCircuit, Play, Globe, X
 } from 'lucide-react';
 import { getDetailedCurriculum } from '../utils/curriculumUtils';
+import { getCourseImageUrl } from '../utils/assetUtils';
 
 interface Course {
   _id: string;
@@ -254,7 +255,7 @@ const CourseDetail: React.FC = () => {
             <div className="w-full lg:w-[420px] flex-shrink-0">
               <div className="bg-[#0D081E]/80 backdrop-blur-xl border border-white/10 rounded-[2rem] p-6 sticky top-24 shadow-[0_20px_50px_rgba(108,43,255,0.15)]">
                 <div className="relative h-56 rounded-2xl overflow-hidden mb-6 group cursor-pointer border border-white/10">
-                  <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <img src={getCourseImageUrl(course.title, course.school || course.role_tag, course.image)} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/20 transition-colors">
                     <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 transition-transform">
                       <Play className="w-6 h-6 text-white ml-1 fill-white" />

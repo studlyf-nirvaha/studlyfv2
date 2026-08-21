@@ -51,6 +51,7 @@ const DashboardHome = lazy(() => import('./pages/DashboardHome'));
 const Blog = lazy(() => import('./pages/Blog'));
 const CompanyModules = lazy(() => import('./pages/CompanyModules'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
+const PublicResume = lazy(() => import('./pages/PublicResume'));
 const CoursePlayer = lazy(() => import('./pages/CoursePlayer'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
@@ -149,7 +150,7 @@ const App: React.FC = () => {
   const isPlayer = pathname.startsWith('/learn/course-player');
   const isCheckout = pathname === '/learn/checkout';
   const isHome = pathname === '/';
-  const isResume = pathname === '/job-prep/resume-builder';
+  const isResume = pathname.startsWith('/job-prep/resume-builder') || pathname.startsWith('/resume-builder') || pathname.startsWith('/resume');
 
   const isVisualizer =
     pathname.startsWith('/learn/visualizer') ||
@@ -418,7 +419,11 @@ const App: React.FC = () => {
             <Route path="/hash-table" element={<ProtectedRoute><HashTablePage /></ProtectedRoute>} />
 
             {/* Resume + Job Prep */}
+            <Route path="/resume/public/:uid" element={<PublicResume />} />
+            <Route path="/resume/public" element={<PublicResume />} />
             <Route path="/job-prep/resume-builder" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
+            <Route path="/resume-builder" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
+            <Route path="/resume" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
             <Route path="/job-prep/job-simulation" element={<ProtectedRoute><JobSimulation /></ProtectedRoute>} />
             <Route path="/job-prep/portfolio" element={<ProtectedRoute><PortfolioBuilder /></ProtectedRoute>} />
             <Route path="/job-prep/projects" element={<ProtectedRoute><SystemDeconstructionLab /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../apiConfig';
+import { getCourseImageUrl } from '../utils/assetUtils';
 
 /* ─────────────────────── types ─────────────────────── */
 interface Course {
@@ -228,9 +229,7 @@ interface CardProps {
 const CourseCard: React.FC<CardProps> = ({ course, enrolledSeed, onClick }) => {
   const school = (course.school || 'Engineering').toUpperCase();
   const enrolled = course.enrolled_count ?? enrolledSeed;
-  const image =
-    course.image ||
-    'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&auto=format&fit=crop';
+  const image = getCourseImageUrl(course.title, course.school || course.role_tag, course.image);
 
   return (
     <motion.div

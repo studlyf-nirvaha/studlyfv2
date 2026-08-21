@@ -1082,6 +1082,12 @@ export const rolesData: RoleData[] = [
             title: "AI Development Toolkit",
             simpleExplanation: "The modern software tools and IDEs optimized for AI developers.",
             whyItMatters: "Using AI to write AI code speeds up development by 10x.",
+            keyConcepts: [
+              "Cursor IDE & VSC Extensions",
+              "GitHub Copilot",
+              "LangSmith & Tracing",
+              "Prompt Engineering Environments"
+            ],
             resources: [
               { title: "Cursor Editor", url: "https://cursor.sh/", type: "Best Starting Point" },
               { title: "GitHub Copilot", url: "https://github.com/features/copilot", type: "Practice Resource" }

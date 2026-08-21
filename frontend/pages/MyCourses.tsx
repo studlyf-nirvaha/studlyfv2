@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../apiConfig';
 import { BookOpen, Clock, ArrowRight, Plus } from 'lucide-react';
 import WebImage from '../components/WebImage';
 import { useAuth } from '../AuthContext';
+import { getCourseImageUrl } from '../utils/assetUtils';
 
 interface Course {
   _id: string;
@@ -185,7 +186,7 @@ const MyCourses: React.FC = () => {
                   <AnimatePresence>
                     {enrolledCourses.map((course, idx) => {
                       const progress = course.enrollment_details?.progress || 0;
-                      const displayImage = course.image || course.thumbnail_url || 'https://miro.medium.com/max/938/0*lbtSAeYRtmUMAWeY.png';
+                      const displayImage = getCourseImageUrl(course.title, course.school || course.role_tag, course.image || course.thumbnail_url);
 
                       return (
                         <motion.div
@@ -292,7 +293,7 @@ const MyCourses: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   <AnimatePresence>
                     {availableCourses.map((course, idx) => {
-                      const displayImage = course.image || course.thumbnail_url || 'https://miro.medium.com/max/938/0*lbtSAeYRtmUMAWeY.png';
+                      const displayImage = getCourseImageUrl(course.title, course.school || course.role_tag, course.image || course.thumbnail_url);
 
                       return (
                         <motion.div
