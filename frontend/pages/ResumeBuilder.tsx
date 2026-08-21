@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../AuthContext";
 import { API_BASE_URL } from "../apiConfig";
@@ -19,6 +20,7 @@ import {
     Sparkles,
     CheckCircle,
     ChevronRight,
+    Search,
     Share2,
     Edit3,
     FileText,
@@ -39,15 +41,12 @@ import {
     ChevronUp,
     Upload,
     Copy,
-    Check,
-    RefreshCw,
-    BarChart2,
-    Layers
+    Check
 } from "lucide-react";
 import Navigation from "../components/Navigation";
 import { generatePdfHtml } from "../utils/resumePdf";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// --- Types ---
 interface PersonalInfo {
     firstName: string;
     lastName: string;
@@ -91,12 +90,10 @@ interface ResumeData {
     projects: { name: string; tech: string; desc: string; link?: string }[];
     certifications: string[];
     additional: Additional;
-    lastSaved?: number;
-    template?: string;
 }
 
 const DEFAULT_RESUME_DATA: ResumeData = {
-    name: "My Resume",
+    name: "",
     personalInfo: {
         firstName: "",
         lastName: "",
@@ -121,7 +118,7 @@ const DEFAULT_RESUME_DATA: ResumeData = {
     }
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// --- Styles ---
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
 
@@ -307,6 +304,7 @@ const styles = `
 
   /* ── Editor header ── */
   .editor-header {
+    height: 64px;
     border-bottom: 1px solid var(--v-border);
     background: white;
     padding: 0 28px;
@@ -314,11 +312,6 @@ const styles = `
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    min-height: 52px;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-top: 8px;
-    padding-bottom: 8px;
   }
 
   /* ── Landing grid bg ── */
@@ -339,17 +332,10 @@ const styles = `
   .hero-glow {
     background: radial-gradient(ellipse 70% 50% at 50% -5%, rgba(109,40,217,0.12) 0%, transparent 70%);
   }
-
-  /* ── Progress bar ── */
-  .progress-bar-fill {
-    transition: width 0.4s ease;
-    background: linear-gradient(90deg, #7c3aed, #a78bfa);
-    border-radius: 999px;
-  }
 `;
 
-// ─── AccordionItem ─────────────────────────────────────────────────────────────
-const AccordionItem = ({ title, icon: Icon, children, isOpen, onClick, badge }: any) => (
+// ─── AccordionItem ────────────────────────────────────────────────────────────
+const AccordionItem = ({ title, icon: Icon, children, isOpen, onClick }: any) => (
     <div className="border-b border-gray-100 last:border-0">
         <button
             onClick={onClick}
@@ -360,9 +346,6 @@ const AccordionItem = ({ title, icon: Icon, children, isOpen, onClick, badge }: 
                     <Icon size={14} />
                 </div>
                 <span className="text-[13.5px] font-semibold text-gray-700">{title}</span>
-                {badge != null && badge > 0 && (
-                    <span className="text-[10px] font-bold bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full">{badge}</span>
-                )}
             </div>
             <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
                 <ChevronDown size={15} className="text-gray-400" />
@@ -384,82 +367,29 @@ const AccordionItem = ({ title, icon: Icon, children, isOpen, onClick, badge }: 
     </div>
 );
 
-// ─── Skill Chip Row ────────────────────────────────────────────────────────────
-const SkillChipRow = ({ label, items, onAdd, onRemove, placeholder, icon: Icon, color }: any) => {
-    const [inputVal, setInputVal] = useState("");
-    const handleAdd = () => {
-        if (inputVal.trim()) { onAdd(inputVal.trim()); setInputVal(""); }
-    };
-    return (
-        <div className="mb-4 last:mb-0">
-            <div className="flex items-center gap-2 mb-2">
-                <div className={`h-5 w-5 rounded flex items-center justify-center ${color}`}>
-                    <Icon size={11} />
-                </div>
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
-                {items.map((item: string, i: number) => (
-                    <motion.span
-                        key={i}
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.8, opacity: 0 }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-violet-50 border border-violet-200 text-violet-700 rounded-lg text-xs font-medium"
-                    >
-                        {item}
-                        <button onClick={() => onRemove(i)} className="ml-0.5 text-violet-400 hover:text-red-500 transition-colors">
-                            <X size={10} />
-                        </button>
-                    </motion.span>
-                ))}
-                {items.length === 0 && (
-                    <span className="text-[11px] text-gray-300 italic">No {label.toLowerCase()} added yet</span>
-                )}
-            </div>
-            <div className="flex gap-2">
-                <input
-                    className="v-input !py-1.5 !text-xs flex-1"
-                    value={inputVal}
-                    onChange={e => setInputVal(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-                    placeholder={placeholder}
-                />
-                <button
-                    onClick={handleAdd}
-                    className="shrink-0 h-8 w-8 rounded-lg bg-violet-50 border border-violet-200 flex items-center justify-center text-violet-600 hover:bg-violet-100 transition-colors"
-                >
-                    <Plus size={14} />
-                </button>
-            </div>
-        </div>
-    );
+const getResumeDisplayTitle = (data: ResumeData) => {
+    if (data.name && data.name.trim() !== "" && data.name.toUpperCase() !== "UNTITLED RESUME") {
+        return data.name;
+    }
+    const candidateName = `${data.personalInfo?.firstName || ''} ${data.personalInfo?.lastName || ''}`.trim();
+    if (candidateName) {
+        return `${candidateName}'s Resume`;
+    }
+    if (data.personalInfo?.jobTitle) {
+        return `${data.personalInfo.jobTitle} Resume`;
+    }
+    return "My Professional Resume";
 };
 
-// ─── Completeness Calculator ───────────────────────────────────────────────────
-function calcCompleteness(data: ResumeData): number {
-    let score = 0;
-    const p = data.personalInfo;
-    if (p.firstName) score += 10;
-    if (p.lastName) score += 5;
-    if (p.email) score += 10;
-    if (p.phone) score += 5;
-    if (p.address) score += 5;
-    if (p.jobTitle) score += 5;
-    if (p.links.length > 0) score += 5;
-    if (data.education.length > 0) score += 15;
-    if (data.experience.length > 0) score += 15;
-    if (data.skills.languages.length > 0 || data.skills.frameworks.length > 0 || data.skills.tools.length > 0) score += 10;
-    if (data.projects.length > 0) score += 10;
-    if (data.certifications.length > 0) score += 5;
-    return Math.min(score, 100);
-}
-
-// ─── Main Component ────────────────────────────────────────────────────────────
 export default function ResumeBuilder() {
     const { user } = useAuth();
     const [step, setStep] = useState<'dashboard' | 'create_new' | 'template_selection' | 'editor'>('create_new');
     const [hasExistingData, setHasExistingData] = useState(false);
+    const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+    const [resumesList, setResumesList] = useState<any[]>([]);
+    const selectedResumeIdRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => { selectedResumeIdRef.current = selectedResumeId; }, [selectedResumeId]);
     const [selectedTemplate, setSelectedTemplate] = useState<'classic' | 'modern'>('classic');
     const [resumeData, setResumeData] = useState<ResumeData>(DEFAULT_RESUME_DATA);
     const [isReviewing, setIsReviewing] = useState(false);
@@ -475,50 +405,341 @@ export default function ResumeBuilder() {
         additional: false
     });
     const [isSaving, setIsSaving] = useState(false);
-    const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+    const [saveStatus, setSaveStatus] = useState("idle");
     const [isEditingName, setIsEditingName] = useState(false);
     const [showAiPanel, setShowAiPanel] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [publicAccess, setPublicAccess] = useState(true);
     const [linkCopied, setLinkCopied] = useState(false);
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [lastSavedTs, setLastSavedTs] = useState<number | null>(null);
-    const [mobileView, setMobileView] = useState<'form' | 'preview'>('form');
-    const autoSaveTimerRef = useRef<any>(null);
+    const [deleteModalState, setDeleteModalState] = useState<{
+        isOpen: boolean;
+        resumeId: string | null;
+        resumeTitle: string;
+        isDeleting: boolean;
+    }>({
+        isOpen: false,
+        resumeId: null,
+        resumeTitle: '',
+        isDeleting: false
+    });
 
-    // ─── Load Data ────────────────────────────────────────────────────────────
+    const requestDeleteResume = (id?: string | null, title?: string) => {
+        setDeleteModalState({
+            isOpen: true,
+            resumeId: id !== undefined ? id : selectedResumeId,
+            resumeTitle: title || getResumeDisplayTitle(resumeData),
+            isDeleting: false
+        });
+    };
+
+    const confirmDeleteResume = async () => {
+        if (!deleteModalState.isOpen) return;
+        setDeleteModalState(prev => ({ ...prev, isDeleting: true }));
+        try {
+            const targetId = deleteModalState.resumeId;
+            if (targetId) {
+                await fetch(`${API_BASE_URL}/api/resume/${targetId}`, { method: 'DELETE' });
+                setResumesList(prev => prev.filter(x => (x.id || x._id) !== targetId));
+                if (selectedResumeId === targetId) {
+                    setSelectedResumeId(null);
+                    selectedResumeIdRef.current = null;
+                    setResumeData(DEFAULT_RESUME_DATA);
+                    setHasExistingData(false);
+                }
+            } else {
+                localStorage.removeItem('studlyf_saved_resume');
+                setResumeData(DEFAULT_RESUME_DATA);
+                setHasExistingData(false);
+                setStep('create_new');
+            }
+        } catch (e) {
+            console.error('Delete resume failed', e);
+        } finally {
+            setDeleteModalState({ isOpen: false, resumeId: null, resumeTitle: '', isDeleting: false });
+        }
+    };
+
+    const renderDeleteModal = () => {
+        if (!deleteModalState.isOpen || typeof document === 'undefined') return null;
+        return createPortal(
+            <AnimatePresence>
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => !deleteModalState.isDeleting && setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                        className="absolute inset-0 bg-gray-950/60 backdrop-blur-md transition-opacity"
+                    />
+
+                    {/* Modal Dialog */}
+                    <motion.div
+                        initial={{ scale: 0.95, opacity: 0, y: 16 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 16 }}
+                        transition={{ type: "spring", duration: 0.25, bounce: 0.05 }}
+                        className="relative bg-white rounded-3xl w-full max-w-md shadow-2xl border border-red-100 overflow-hidden z-10"
+                    >
+                        {/* Top decorative banner */}
+                        <div className="bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 h-2 w-full" />
+
+                        <div className="p-6 sm:p-7">
+                            <div className="flex items-start gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center shrink-0 shadow-inner">
+                                    <Trash2 size={24} />
+                                </div>
+                                <div className="flex-1 pr-2">
+                                    <h3 className="text-xl font-extrabold text-gray-900 tracking-tight">Delete Resume?</h3>
+                                    <p className="text-xs text-gray-500 font-medium mt-0.5">This action is permanent and cannot be undone.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                                    className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 cursor-pointer"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="mt-5 p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-1">Resume to be deleted</p>
+                                <p className="text-sm font-bold text-gray-900 truncate flex items-center gap-2">
+                                    <FileText size={15} className="text-red-500 shrink-0" />
+                                    <span className="truncate">{deleteModalState.resumeTitle || "Untitled Resume"}</span>
+                                </p>
+                            </div>
+
+                            <p className="mt-4 text-xs leading-relaxed text-gray-500">
+                                Are you sure you want to delete this resume? It will be permanently removed from your cloud workspace and cannot be recovered.
+                            </p>
+
+                            <div className="flex items-center gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={() => setDeleteModalState(prev => ({ ...prev, isOpen: false }))}
+                                    className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-700 text-sm font-bold hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={deleteModalState.isDeleting}
+                                    onClick={confirmDeleteResume}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-bold transition-all shadow-md shadow-red-200 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                                >
+                                    {deleteModalState.isDeleting ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Deleting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 size={16} />
+                                            <span>Delete Resume</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </AnimatePresence>,
+            document.body
+        );
+    };
+
+    const renderShareModal = () => {
+        if (!isShareModalOpen || typeof document === 'undefined') return null;
+        return createPortal(
+            <AnimatePresence>
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        onClick={() => setIsShareModalOpen(false)}
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        initial={{ scale: 0.97, opacity: 0, y: 12 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.97, opacity: 0, y: 12 }}
+                        transition={{ duration: 0.18 }}
+                        className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden z-10"
+                    >
+                        <div className="px-7 pt-7 pb-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-gray-900">Share Resume</h2>
+                                <button onClick={() => setIsShareModalOpen(false)} className="h-8 w-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="v-label mb-1.5 block">Resume link</label>
+                                    <div className="flex items-center gap-2 v-input !p-0 overflow-hidden border border-gray-200 focus-within:border-violet-600 transition-colors">
+                                        <input
+                                            readOnly
+                                            value={getShareUrl()}
+                                            className="flex-1 px-3.5 py-2.5 text-xs text-gray-700 bg-transparent outline-none font-mono"
+                                        />
+                                        <button
+                                            onClick={handleCopyShareLink}
+                                            className="shrink-0 px-3.5 py-2.5 text-gray-500 hover:text-violet-600 hover:bg-violet-50 border-l border-gray-100 transition-all flex items-center gap-1.5 text-xs font-bold"
+                                        >
+                                            {linkCopied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                                            <span>{linkCopied ? 'Copied!' : 'Copy'}</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Public Access Toggle Box */}
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div className="flex items-center gap-3 pr-2">
+                                        <div className="h-10 w-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
+                                            <Globe size={18} className={publicAccess ? "text-violet-600" : "text-gray-400"} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-bold text-gray-900">Public access</p>
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${publicAccess
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                    : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                    }`}>
+                                                    {publicAccess ? 'ON' : 'OFF'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-0.5 leading-snug">
+                                                {publicAccess
+                                                    ? 'Anyone with the link (including guests) can view'
+                                                    : 'Restricted — Only you can view this resume'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Perfectly Aligned Toggle Switch */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTogglePublicAccess(!publicAccess)}
+                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${publicAccess ? 'bg-violet-600' : 'bg-gray-300'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${publicAccess ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button onClick={() => setIsShareModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        handleCopyShareLink();
+                                        setTimeout(() => setIsShareModalOpen(false), 600);
+                                    }}
+                                    className="flex-1 v-btn-primary !py-2.5 !rounded-xl !text-sm justify-center flex items-center gap-1.5"
+                                >
+                                    {linkCopied ? <Check size={16} /> : <Copy size={16} />}
+                                    <span>{linkCopied ? 'Link Copied!' : 'Copy link'}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            </AnimatePresence>, document.body)
+    };
+
+    const handleTogglePublicAccess = async (newVal: boolean) => {
+        setPublicAccess(newVal);
+        if (!user?.uid) return;
+        try {
+            // Prefer updating the selected resume; if none exists create one first
+            let targetId = selectedResumeIdRef.current;
+            if (!targetId) {
+                const resp = await fetch(`${API_BASE_URL}/api/resume`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: user.uid, name: resumeData.name || '', config: resumeData, is_public: newVal })
+                });
+                if (resp.ok) {
+                    const pl = await resp.json();
+                    targetId = pl.id;
+                    setSelectedResumeId(targetId);
+                    selectedResumeIdRef.current = targetId;
+                }
+            }
+            if (targetId) {
+                await fetch(`${API_BASE_URL}/api/resume/${targetId}/privacy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_public: newVal })
+                });
+            }
+        } catch (e) {
+            console.error("Failed to update resume privacy:", e);
+        }
+    };
+
+    const getShareUrl = () => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const shareId = selectedResumeIdRef.current || selectedResumeId || user?.uid || (user as any)?.user_id || 'preview';
+        return `${origin}/#/resume/${shareId}`;
+    };
+
+    const handleCopyShareLink = () => {
+        const url = getShareUrl();
+        navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+    };
+
     useEffect(() => {
-        // Load from localStorage first (instant recovery)
+        // First load from local storage for instant state recovery
         try {
             const localSaved = localStorage.getItem('studlyf_saved_resume');
             if (localSaved) {
                 const parsed = JSON.parse(localSaved);
-                if (parsed && typeof parsed === 'object' && parsed.personalInfo) {
+                if (parsed && typeof parsed === 'object' && (parsed.personalInfo?.firstName || parsed.experience?.length > 0)) {
                     setResumeData(prev => ({
-                        ...DEFAULT_RESUME_DATA,
+                        ...prev,
                         ...parsed,
-                        personalInfo: { ...DEFAULT_RESUME_DATA.personalInfo, ...(parsed.personalInfo || {}) },
-                        skills: { ...DEFAULT_RESUME_DATA.skills, ...(parsed.skills || {}) },
-                        additional: { ...DEFAULT_RESUME_DATA.additional, ...(parsed.additional || {}) }
+                        personalInfo: { ...prev.personalInfo, ...(parsed.personalInfo || {}) },
+                        skills: { ...prev.skills, ...(parsed.skills || {}) },
+                        additional: { ...prev.additional, ...(parsed.additional || {}) }
                     }));
                     setHasExistingData(true);
-                    setLastSavedTs(parsed.lastSaved || null);
-                    if (parsed.template) setSelectedTemplate(parsed.template as any);
+                    setStep('dashboard');
                 }
             }
         } catch (e) {
             console.error("LocalStorage read error:", e);
         }
 
-        // Then fetch from cloud
         async function fetchConfig() {
             if (!user?.uid) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/api/resume/${user.uid}`);
+                // Fetch all resumes for the user and pick the most recent as primary
+                const res = await fetch(`${API_BASE_URL}/api/resumes/${user.uid}`);
                 if (res.ok) {
-                    const data = await res.json();
-                    if (data.config) {
-                        const config = data.config;
+                    const list = await res.json();
+                    setResumesList(Array.isArray(list) ? list : []);
+                    let data: any = null;
+                    if (Array.isArray(list) && list.length > 0) {
+                        const primary = list[0];
+                        setSelectedResumeId(primary.id || null);
+                        selectedResumeIdRef.current = primary.id || null;
+                        if (primary.is_public !== undefined) setPublicAccess(primary.is_public);
+                        data = primary.config || {};
+                    }
+                    // fallback to empty config if no remote resumes
+                    if (data && Object.keys(data).length > 0 && (data.personalInfo?.firstName || data.experience?.length > 0 || data.name)) {
+                        const config = data;
                         let migratedData: ResumeData = { ...DEFAULT_RESUME_DATA };
                         if (config.personalInfo) {
                             migratedData = {
@@ -542,94 +763,88 @@ export default function ResumeBuilder() {
                         }
                         setResumeData(migratedData);
                         setHasExistingData(true);
-                        setLastSavedTs(migratedData.lastSaved || null);
-                        if (migratedData.template) setSelectedTemplate(migratedData.template as any);
+                        setStep('dashboard');
                         localStorage.setItem('studlyf_saved_resume', JSON.stringify(migratedData));
                     }
                 }
-            } catch (err) { console.error("Cloud fetch error:", err); }
+            } catch (err) { console.error("Migration error:", err); }
         }
         fetchConfig();
     }, [user?.uid]);
 
-    // ─── Debounced Auto-Save ───────────────────────────────────────────────────
+    // Auto-save debounced whenever resumeData changes
     useEffect(() => {
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-        const hasContent = resumeData.personalInfo.firstName || resumeData.personalInfo.email || resumeData.experience.length > 0 || resumeData.education.length > 0;
-        if (hasContent) {
-            autoSaveTimerRef.current = setTimeout(() => { performSave(true); }, 2000);
-        }
-        return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+        const timer = setTimeout(() => {
+            if (resumeData && (resumeData.personalInfo.firstName || resumeData.personalInfo.email || resumeData.experience.length > 0)) {
+                handleSave(true);
+            }
+        }, 1500);
+        return () => clearTimeout(timer);
     }, [resumeData]);
 
-    // ─── Save ─────────────────────────────────────────────────────────────────
-    const performSave = async (silent = false) => {
+    const handleSave = async (silent = false, navigateToDashboard = false) => {
         if (!silent) setIsSaving(true);
         try {
-            const now = Date.now();
-            const dataToSave = { ...resumeData, lastSaved: now, template: selectedTemplate };
-            localStorage.setItem('studlyf_saved_resume', JSON.stringify(dataToSave));
+            // Save to localStorage
+            localStorage.setItem('studlyf_saved_resume', JSON.stringify(resumeData));
             setHasExistingData(true);
-            setLastSavedTs(now);
 
+            // Save to backend API if user is logged in
             if (user?.uid) {
-                await fetch(`${API_BASE_URL}/api/resume/${user.uid}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ config: dataToSave })
-                });
+                try {
+                    // Read the latest selected id from ref to avoid stale closures
+                    const targetId = selectedResumeIdRef.current;
+                    // If we have a selected resume id, update that specific resume
+                    if (targetId) {
+                        await fetch(`${API_BASE_URL}/api/resume/${targetId}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ config: resumeData, is_public: publicAccess, name: resumeData.name })
+                        });
+                        // update local list entry
+                        setResumesList(prev => prev.map(r => (r.id === targetId || r._id === targetId) ? { ...r, config: resumeData, name: resumeData.name, updated_at: new Date().toISOString() } : r));
+                    } else {
+                        // Create a new resume document
+                        const resp = await fetch(`${API_BASE_URL}/api/resume`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ user_id: user.uid, name: resumeData.name, config: resumeData, is_public: publicAccess })
+                        });
+                        if (resp.ok) {
+                            const payload = await resp.json();
+                            if (payload && payload.id) {
+                                setSelectedResumeId(payload.id);
+                                selectedResumeIdRef.current = payload.id;
+                                // Add new resume to local list
+                                if (payload.resume) {
+                                    setResumesList(prev => [payload.resume, ...prev]);
+                                } else {
+                                    // minimal fallback
+                                    setResumesList(prev => [{ id: payload.id, user_id: user.uid, name: resumeData.name || '', config: resumeData, is_public: publicAccess, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...prev]);
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Backend save error:", e);
+                }
             }
-            if (!silent) { setSaveStatus("saved"); setTimeout(() => setSaveStatus("idle"), 3000); }
+            if (!silent) {
+                setSaveStatus("saved");
+                setTimeout(() => setSaveStatus("idle"), 2500);
+                if (navigateToDashboard) {
+                    setStep('dashboard');
+                }
+            }
         } catch (e) {
             console.error("Save error:", e);
-            if (!silent) setSaveStatus("error");
-        } finally {
-            if (!silent) setIsSaving(false);
-        }
+        } finally { setIsSaving(false); }
     };
 
-    // ─── Download PDF ─────────────────────────────────────────────────────────
-    const handleDownload = () => {
-        setIsDownloading(true);
-        try {
-            const html = generatePdfHtml(resumeData, selectedTemplate);
-            const win = window.open('', '_blank');
-            if (win) {
-                win.document.write(html);
-                win.document.close();
-                setTimeout(() => {
-                    win.focus();
-                    win.print();
-                }, 800);
-            }
-        } catch (e) {
-            console.error("PDF generation error:", e);
-        } finally {
-            setTimeout(() => setIsDownloading(false), 1200);
-        }
+    const handleDeleteResume = () => {
+        requestDeleteResume(selectedResumeId, getResumeDisplayTitle(resumeData));
     };
 
-    // ─── Share Link ───────────────────────────────────────────────────────────
-    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/resume/public/${user?.uid || 'preview'}`;
-    const handleCopyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2500);
-        } catch {
-            // Fallback
-            const el = document.createElement('input');
-            el.value = shareUrl;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2500);
-        }
-    };
-
-    // ─── Data Handlers ────────────────────────────────────────────────────────
     const toggleSection = (section: string) => setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
     const updatePersonalInfo = (field: string, value: string) => setResumeData(prev => ({ ...prev, personalInfo: { ...prev.personalInfo, [field]: value } }));
     const addLink = () => setResumeData(prev => ({ ...prev, personalInfo: { ...prev.personalInfo, links: [...prev.personalInfo.links, { label: "", url: "" }] } }));
@@ -651,163 +866,104 @@ export default function ResumeBuilder() {
     const addHonor = (val: string) => { if (!val.trim()) return; setResumeData(prev => ({ ...prev, additional: { ...prev.additional, honorsAndAwards: [...prev.additional.honorsAndAwards, val] } })); };
     const removeHonor = (index: number) => setResumeData(prev => ({ ...prev, additional: { ...prev.additional, honorsAndAwards: prev.additional.honorsAndAwards.filter((_, i) => i !== index) } }));
 
-    // ─── Completeness ─────────────────────────────────────────────────────────
-    const completeness = calcCompleteness(resumeData);
-
-    // ─── Helper: format timestamp ─────────────────────────────────────────────
-    const formatSavedTime = (ts: number | null): string => {
-        if (!ts) return "Never";
-        const diff = Date.now() - ts;
-        if (diff < 60000) return "Just now";
-        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-        return new Date(ts).toLocaleDateString();
-    };
-
+    // ─── DASHBOARD ────────────────────────────────────────────────────────────
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
     if (step === 'dashboard') {
         const displayName = resumeData.personalInfo.firstName || user?.displayName?.split(' ')[0] || "User";
-        const fullName = [resumeData.personalInfo.firstName, resumeData.personalInfo.lastName].filter(Boolean).join(' ') || "My Resume";
+        const resumeTitle = getResumeDisplayTitle(resumeData);
+        const jobRole = resumeData.personalInfo.jobTitle || "Software Engineer / Candidate";
+
         return (
-            <div className="min-h-screen flex flex-col" style={{ background: '#f9fafb' }}>
+            <div className="min-h-screen flex flex-col bg-[#F8F9FC]" style={{ background: '#f9fafb' }}>
                 <style>{styles}</style>
                 <Navigation />
-                <div className="flex-1 v-scroll overflow-y-auto pt-28 pb-20 px-3 sm:px-6">
+                <div className="flex-1 v-scroll overflow-y-auto pt-28 pb-20 px-4 sm:px-8">
                     <div className="max-w-6xl mx-auto">
-                        <div className="mb-10 flex items-end justify-between flex-wrap gap-4">
+
+                        {/* Header Section */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-200/80">
                             <div>
-                                <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-1">My Workspace</p>
-                                <h1 className="text-2xl font-bold text-gray-900">{displayName}'s Resumes</h1>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100 mb-2">
+                                    <Globe size={12} /> Workspace
+                                </div>
+                                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Resumes</h1>
+                                <p className="text-sm text-gray-500 font-medium mt-1">Manage, edit, share, and export your saved resumes anytime.</p>
                             </div>
+
                             <button
-                                onClick={() => setStep('template_selection')}
-                                className="v-btn-primary !px-5 !py-2.5 !text-sm"
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setStep('template_selection'); }}
+                                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-violet-200 flex items-center gap-2 self-start sm:self-auto cursor-pointer"
                             >
-                                <Plus size={15} /> New Resume
+                                <Plus size={16} /> Create New Resume
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
-                            {/* Existing resume card */}
-                            {hasExistingData && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 16 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    whileHover={{ y: -3 }}
-                                    className="cursor-pointer group"
-                                >
-                                    <div
-                                        className="aspect-[3/4] bg-white border border-gray-200 rounded-xl overflow-hidden relative shadow-sm hover:shadow-md hover:border-violet-300 transition-all duration-200"
-                                        onClick={() => setStep('editor')}
-                                    >
-                                        {/* Mini resume preview */}
-                                        <div className="absolute inset-0 p-4 overflow-hidden">
-                                            <div className="text-center mb-2">
-                                                <div className="h-2 bg-gray-800 rounded-full mx-auto mb-1" style={{ width: '60%' }} />
-                                                <div className="h-1 bg-gray-200 rounded-full mx-auto" style={{ width: '80%' }} />
+                        {/* Workspace Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                            {/* Render all saved resumes as cards */}
+                            {resumesList.length > 0 ? resumesList.map((r: any) => {
+                                const cfg = r.config || {};
+                                const migrated = migrateConfigToResumeData(cfg);
+                                const title = r.name || getResumeDisplayTitle(migrated);
+                                const email = migrated.personalInfo?.email || '';
+                                const phone = migrated.personalInfo?.phone || '';
+                                return (
+                                    <motion.div key={r.id || r._id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 relative group flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-4">
+                                                <span className="text-[11px] font-bold uppercase tracking-wider text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">{r.template_id || 'Resume'}</span>
+                                                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Saved </span>
                                             </div>
-                                            <div className="border-t border-gray-200 my-2 pt-2">
-                                                <div className="h-1 bg-gray-600 rounded-full mb-1.5" style={{ width: '40%' }} />
-                                                {[1, 0.9, 0.75].map((w, i) => <div key={i} className="h-0.5 bg-gray-100 rounded-full mb-1" style={{ width: `${w * 100}%` }} />)}
-                                            </div>
-                                            <div className="border-t border-gray-200 my-2 pt-2">
-                                                <div className="h-1 bg-gray-600 rounded-full mb-1.5" style={{ width: '50%' }} />
-                                                {[0.85, 0.9, 0.8, 0.7].map((w, i) => <div key={i} className="h-0.5 bg-gray-100 rounded-full mb-1" style={{ width: `${w * 100}%` }} />)}
-                                            </div>
-                                            <div className="border-t border-gray-200 my-2 pt-2">
-                                                <div className="h-1 bg-gray-600 rounded-full mb-1.5" style={{ width: '30%' }} />
-                                                <div className="flex flex-wrap gap-1">
-                                                    {[...resumeData.skills.languages.slice(0, 3), ...resumeData.skills.frameworks.slice(0, 2)].map((s, i) => (
-                                                        <div key={i} className="h-2 bg-violet-100 rounded" style={{ width: `${Math.max(20, s.length * 4)}px` }} />
-                                                    ))}
-                                                </div>
+                                            <h3 className="text-xl font-bold text-gray-900 group-hover:text-violet-600 transition-colors mb-1">{title}</h3>
+                                            <p className="text-xs font-semibold text-gray-500 mb-4">{migrated.personalInfo.jobTitle || 'Candidate'}</p>
+                                            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 mb-6 space-y-2 text-xs text-gray-600 font-medium">
+                                                {email && (<div className="flex items-center gap-2 text-gray-700 truncate"><Mail size={13} className="text-gray-400 shrink-0" /><span className="truncate">{email}</span></div>)}
+                                                {phone && (<div className="flex items-center gap-2 text-gray-700"><Phone size={13} className="text-gray-400 shrink-0" /><span>{phone}</span></div>)}
+                                                <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between text-[11px] text-gray-500 font-bold"><span>{migrated.experience.length} Experience</span><span>•</span><span>{migrated.education.length} Education</span><span>•</span><span>{migrated.projects.length} Projects</span></div>
                                             </div>
                                         </div>
-                                        {/* Hover overlay */}
-                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-violet-50/80 backdrop-blur-[2px]">
-                                            <div className="bg-white rounded-lg px-4 py-2 shadow-sm border border-violet-100 flex items-center gap-2 text-sm font-semibold text-violet-700">
-                                                <Edit3 size={14} /> Edit Resume
-                                            </div>
+                                        <div className="pt-4 border-t border-gray-100 flex items-center gap-2">
+                                            <button onClick={() => { const id = (r.id || r._id); setSelectedResumeId(id); selectedResumeIdRef.current = id; setResumeData(migrated); setHasExistingData(true); setStep('editor'); }} className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"><Edit3 size={14} /> Edit</button>
+                                            <button onClick={() => { const id = (r.id || r._id); setSelectedResumeId(id); selectedResumeIdRef.current = id; setResumeData(migrated); if (r.is_public !== undefined) setPublicAccess(r.is_public); setIsShareModalOpen(true); }} className="p-2.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors cursor-pointer" title="Share Resume"><Share2 size={14} /></button>
+                                            <button onClick={() => requestDeleteResume(r.id || r._id, title)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" title="Delete Resume"><Trash2 size={14} /></button>
                                         </div>
-                                        {/* Template badge */}
-                                        <div className="absolute top-2 right-2">
-                                            <span className="text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-                                                {selectedTemplate}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <p className="mt-2.5 text-xs font-semibold text-gray-700 truncate">{fullName}</p>
-                                    <div className="flex items-center justify-between mt-0.5">
-                                        <p className="text-[11px] text-gray-400">Saved {formatSavedTime(lastSavedTs)}</p>
-                                        <div className="flex items-center gap-1">
-                                            <div className="h-1 bg-gray-100 rounded-full w-12 overflow-hidden">
-                                                <div className="h-full bg-violet-400 rounded-full" style={{ width: `${completeness}%` }} />
-                                            </div>
-                                            <span className="text-[10px] text-gray-400">{completeness}%</span>
-                                        </div>
-                                    </div>
-                                    {/* Action buttons */}
-                                    <div className="flex gap-1.5 mt-2">
-                                        <button
-                                            onClick={() => setStep('editor')}
-                                            className="flex-1 py-1.5 text-[11px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                        >
-                                            <Edit3 size={11} /> Edit
-                                        </button>
-                                        <button
-                                            onClick={handleDownload}
-                                            className="flex-1 py-1.5 text-[11px] font-semibold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors flex items-center justify-center gap-1"
-                                        >
-                                            <Download size={11} /> PDF
-                                        </button>
-                                    </div>
-                                </motion.div>
+                                    </motion.div>
+                                );
+                            }) : (
+                                <div className="col-span-1 text-sm text-gray-500">No saved resumes yet. Create one to get started.</div>
                             )}
 
-                            {/* Create new card */}
+                            {/* Create New Resume Card */}
                             <motion.div
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: hasExistingData ? 0.05 : 0 }}
-                                whileHover={{ y: -3 }}
-                                onClick={() => setStep('template_selection')}
-                                className="cursor-pointer group"
+                                transition={{ delay: 0.05 }}
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setStep('template_selection'); }}
+                                className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/20 transition-all duration-300 group min-h-[280px]"
                             >
-                                <div className="aspect-[3/4] border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center hover:border-violet-400 hover:bg-violet-50/30 transition-all duration-200">
-                                    <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-violet-500 transition-colors">
-                                        <div className="h-10 w-10 rounded-xl border-2 border-current flex items-center justify-center">
-                                            <Plus size={20} />
-                                        </div>
-                                        <span className="text-xs font-semibold">New Resume</span>
-                                    </div>
+                                <div className="w-14 h-14 rounded-2xl bg-gray-100 group-hover:bg-violet-100 text-gray-400 group-hover:text-violet-600 flex items-center justify-center mb-4 transition-all duration-300">
+                                    <Plus size={28} />
                                 </div>
-                                <p className="mt-2.5 text-xs font-semibold text-gray-400">Create new</p>
+                                <h3 className="text-base font-bold text-gray-800 group-hover:text-violet-600 transition-colors mb-1">
+                                    Create New Resume
+                                </h3>
+                                <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
+                                    Start with a fresh template or create an additional resume version.
+                                </p>
                             </motion.div>
+
                         </div>
 
-                        {/* Stats row */}
-                        {hasExistingData && (
-                            <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                {[
-                                    { label: 'Completeness', value: `${completeness}%`, sub: completeness >= 80 ? 'Great job!' : 'Keep filling sections', color: completeness >= 80 ? 'text-emerald-600' : 'text-amber-600' },
-                                    { label: 'Sections Filled', value: `${[resumeData.education.length > 0, resumeData.experience.length > 0, resumeData.skills.languages.length > 0 || resumeData.skills.frameworks.length > 0, resumeData.projects.length > 0, resumeData.certifications.length > 0].filter(Boolean).length}/5`, sub: 'Content sections', color: 'text-violet-600' },
-                                    { label: 'Last Saved', value: formatSavedTime(lastSavedTs), sub: 'Auto-saved to cloud', color: 'text-gray-700' },
-                                ].map(({ label, value, sub, color }) => (
-                                    <div key={label} className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
-                                        <p className="text-xs text-gray-400 font-medium mb-1">{label}</p>
-                                        <p className={`text-2xl font-bold ${color}`}>{value}</p>
-                                        <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
 
-    // ─── LANDING (create_new) ──────────────────────────────────────────────────
+    // ─── LANDING (create_new) ─────────────────────────────────────────────────
     if (step === 'create_new') {
         const fadeUp = {
             hidden: { opacity: 0, y: 24 },
@@ -859,11 +1015,12 @@ export default function ResumeBuilder() {
                                     Get started free
                                     <ChevronRight size={16} />
                                 </button>
-                                {hasExistingData && (
-                                    <button onClick={() => setStep('dashboard')} className="v-btn-ghost !px-6 !py-3 !text-base">
-                                        My dashboard
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => setStep('dashboard')}
+                                    className="px-6 py-3 bg-white hover:bg-violet-50 text-violet-700 font-bold text-base rounded-xl border-2 border-violet-200 hover:border-violet-400 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+                                >
+                                    <FileText size={18} /> My Saved Resumes
+                                </button>
                             </motion.div>
 
                             <motion.div
@@ -901,11 +1058,11 @@ export default function ResumeBuilder() {
                                     <div className="h-px bg-gray-100 mb-4"></div>
                                     <div className="space-y-1.5 mb-5">
                                         <div className="h-1.5 w-20 bg-gray-800 rounded"></div>
-                                        {[1,0.85,0.9,0.7].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
+                                        {[1, 0.85, 0.9, 0.7].map((w, i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{ width: `${w * 100}%` }} />)}
                                     </div>
                                     <div className="h-px bg-gray-100 mb-4"></div>
                                     <div className="grid grid-cols-2 gap-1.5">
-                                        {[0.8,0.65,0.75,0.55].map((w,i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{width:`${w*100}%`}} />)}
+                                        {[0.8, 0.65, 0.75, 0.55].map((w, i) => <div key={i} className="h-1 bg-gray-100 rounded" style={{ width: `${w * 100}%` }} />)}
                                     </div>
                                 </div>
 
@@ -977,8 +1134,14 @@ export default function ResumeBuilder() {
                 <section className="py-16 sm:py-24 bg-white">
                     <div className="max-w-5xl mx-auto px-3 sm:px-6">
                         <div className="text-center mb-10 sm:mb-16">
-                            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3">Features</motion.p>
-                            <motion.h2 initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight">Everything you need to land the job</motion.h2>
+                            <motion.p
+                                initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+                                className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3"
+                            >Features</motion.p>
+                            <motion.h2
+                                initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                                className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight"
+                            >Everything you need to land the job</motion.h2>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
@@ -1014,12 +1177,20 @@ export default function ResumeBuilder() {
                 <section className="py-16 sm:py-24 bg-gray-50 border-y border-gray-100">
                     <div className="max-w-3xl mx-auto px-3 sm:px-6">
                         <div className="text-center mb-10 sm:mb-16">
-                            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3">How it works</motion.p>
-                            <motion.h2 initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight">Three steps to your dream role</motion.h2>
+                            <motion.p
+                                initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+                                className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3"
+                            >How it works</motion.p>
+                            <motion.h2
+                                initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                                className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight"
+                            >Three steps to your dream role</motion.h2>
                         </div>
 
                         <div className="relative">
+                            {/* vertical line */}
                             <div className="absolute left-5 top-6 bottom-6 w-px bg-gray-200" />
+
                             <div className="space-y-10">
                                 {[
                                     { n: '1', title: 'Pick a template', desc: 'Choose Classic or Modern — both are ATS-friendly and recruiter-approved.' },
@@ -1049,11 +1220,22 @@ export default function ResumeBuilder() {
                 </section>
 
                 {/* ── TEMPLATE SHOWCASE ── */}
+                {/*
+                    CHANGED: Replaced placeholder skeleton markup with actual template preview images.
+                    Images are sourced from /template-previews/{id}-resume.png.
+                    Fallback handled via onError → /template-previews/fallback.png.
+                */}
                 <section className="py-16 sm:py-24 bg-white">
                     <div className="max-w-5xl mx-auto px-3 sm:px-6">
                         <div className="text-center mb-10 sm:mb-16">
-                            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3">Templates</motion.p>
-                            <motion.h2 initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight">Two templates, endless possibilities</motion.h2>
+                            <motion.p
+                                initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+                                className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3"
+                            >Templates</motion.p>
+                            <motion.h2
+                                initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+                                className="text-2xl sm:text-4xl font-bold text-gray-950 tracking-tight"
+                            >Two templates, endless possibilities</motion.h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1071,24 +1253,18 @@ export default function ResumeBuilder() {
                                     className="group border border-gray-200 rounded-2xl overflow-hidden hover:border-violet-300 hover:shadow-lg hover:shadow-violet-50 transition-all duration-300 cursor-pointer bg-white"
                                     onClick={() => { setSelectedTemplate(id as any); setStep('editor'); }}
                                 >
-                                    <div className="aspect-[4/3] overflow-hidden border-b border-gray-100 bg-gray-50">
+                                    {/* ── CHANGED: Real template preview image (was: fake skeleton div) ── */}
+                                    <div className="aspect-[4/3] overflow-hidden border-b border-gray-100">
                                         <img
                                             src={`/template-previews/${id}-resume.png`}
                                             alt={`${name} Resume Template`}
                                             className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
                                             onError={(e) => {
-                                                // Render a simple placeholder instead
-                                                e.currentTarget.style.display = 'none';
-                                                const parent = e.currentTarget.parentElement;
-                                                if (parent && !parent.querySelector('.template-placeholder')) {
-                                                    const el = document.createElement('div');
-                                                    el.className = 'template-placeholder w-full h-full flex items-center justify-center';
-                                                    el.innerHTML = `<div style="background:white;width:80%;height:90%;border-radius:8px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1)"><div style="height:12px;width:50%;background:#111;border-radius:4px;margin:0 auto 8px"></div><div style="height:6px;width:70%;background:#ddd;border-radius:4px;margin:0 auto 16px"></div><div style="height:1px;background:#eee;margin-bottom:10px"></div>${['40%','90%','75%','85%'].map(w => `<div style="height:5px;width:${w};background:#f0f0f0;border-radius:4px;margin-bottom:5px"></div>`).join('')}</div>`;
-                                                    parent.appendChild(el);
-                                                }
+                                                e.currentTarget.src = "/template-previews/fallback.png";
                                             }}
                                         />
                                     </div>
+
                                     <div className="p-6">
                                         <div className="flex items-center justify-between mb-1">
                                             <h3 className="font-semibold text-gray-900">{name}</h3>
@@ -1136,11 +1312,18 @@ export default function ResumeBuilder() {
                         </motion.div>
                     </div>
                 </section>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
 
-    // ─── TEMPLATE SELECTION ────────────────────────────────────────────────────
+    // ─── TEMPLATE SELECTION ───────────────────────────────────────────────────
+    /*
+        CHANGED: Replaced placeholder skeleton markup with actual template preview images.
+        Images are sourced from /template-previews/{id}-resume.png.
+        Fallback handled via onError → /template-previews/fallback.png.
+    */
     if (step === 'template_selection') {
         return (
             <div className="min-h-screen flex flex-col bg-white">
@@ -1152,16 +1335,6 @@ export default function ResumeBuilder() {
                         animate={{ opacity: 1, y: 0 }}
                         className="text-center mb-10 sm:mb-14"
                     >
-                        <div className="flex items-center justify-center gap-2 mb-4">
-                            {hasExistingData && (
-                                <button
-                                    onClick={() => setStep('dashboard')}
-                                    className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-violet-600 transition-colors"
-                                >
-                                    <ChevronLeft size={16} /> Back to my resumes
-                                </button>
-                            )}
-                        </div>
                         <p className="text-xs font-semibold tracking-widest text-violet-600 uppercase mb-3">Step 1 of 1</p>
                         <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-950 tracking-tight mb-3">Choose your template</h1>
                         <p className="text-gray-500 text-lg max-w-md mx-auto">Both templates are ATS-optimized. You can switch anytime from the editor.</p>
@@ -1169,58 +1342,57 @@ export default function ResumeBuilder() {
 
                     <div className="flex flex-col md:flex-row gap-4 sm:gap-6 w-full max-w-3xl">
                         {[
-                            { id: 'classic', name: 'Classic', sub: 'Clean & Professional', tag: 'Most popular', desc: 'Traditional layout with clear sections and strong typography. Best for finance, law, and corporate roles.' },
-                            { id: 'modern', name: 'Modern', sub: 'Structured & Visual', tag: 'Trending', desc: 'Contemporary design with a professional feel. Ideal for tech, design, and startup roles.' }
-                        ].map(({ id, name, sub, tag, desc }, i) => (
+                            { id: 'classic', name: 'Classic', sub: 'Clean & Professional', tag: 'Most popular' },
+                            { id: 'modern', name: 'Modern', sub: 'Structured & Visual', tag: 'Trending' }
+                        ].map(({ id, name, sub, tag }, i) => (
                             <motion.div
                                 key={id}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.08 }}
                                 whileHover={{ y: -4 }}
-                                onClick={() => { setSelectedTemplate(id as any); setStep('editor'); }}
-                                className={`flex-1 border-2 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group ${
-                                    selectedTemplate === id
-                                        ? 'border-violet-500 shadow-lg shadow-violet-100'
-                                        : 'border-gray-200 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50'
-                                }`}
+                                onClick={() => { setSelectedResumeId(null); selectedResumeIdRef.current = null; setResumeData(DEFAULT_RESUME_DATA); setSelectedTemplate(id as any); setStep('editor'); }}
+                                className={`flex-1 border-2 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 group ${selectedTemplate === id
+                                    ? 'border-violet-500 shadow-lg shadow-violet-100'
+                                    : 'border-gray-200 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50'
+                                    }`}
                             >
-                                <div className="aspect-[4/3] overflow-hidden border-b border-gray-100 bg-gray-50">
+                                {/* ── CHANGED: Real template preview image (was: fake skeleton div) ── */}
+                                <div className="aspect-[4/3] overflow-hidden border-b border-gray-100">
                                     <img
                                         src={`/template-previews/${id}-resume.png`}
                                         alt={`${name} Resume Template`}
                                         className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                        onError={(e) => {
+                                            e.currentTarget.src = "/template-previews/fallback.png";
+                                        }}
                                     />
                                 </div>
+
+                                {/* Label */}
                                 <div className="p-5 bg-white">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h3 className="font-bold text-gray-900 text-lg">{name}</h3>
+                                    <div className="flex items-center justify-between mb-0.5">
+                                        <h3 className="font-semibold text-gray-900">{name}</h3>
                                         <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{tag}</span>
                                     </div>
-                                    <p className="text-sm font-medium text-violet-600 mb-2">{sub}</p>
-                                    <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
-                                    <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-violet-700">
-                                        <span>Use this template</span>
-                                        <ChevronRight size={15} className="group-hover:translate-x-1 transition-transform" />
-                                    </div>
+                                    <p className="text-sm text-gray-500">{sub}</p>
                                 </div>
                             </motion.div>
                         ))}
                     </div>
                 </div>
+                {renderShareModal()}
+                {renderDeleteModal()}
             </div>
         );
     }
 
     // ─── EDITOR ───────────────────────────────────────────────────────────────
-
     const renderClassicPreview = () => {
         const { personalInfo: p, education: edu, experience: exp, skills, projects: projs, certifications, additional } = resumeData;
         return (
             <div className="classic-resume">
-                <h1>{(p.firstName + " " + p.lastName).trim().toUpperCase() || "YOUR NAME"}</h1>
-                {p.jobTitle && <div className="contact" style={{ fontStyle: 'italic', marginBottom: '4pt' }}>{p.jobTitle}</div>}
+                <h1>{(p.firstName + " " + p.lastName).toUpperCase() || "YOUR NAME"}</h1>
                 <div className="contact">
                     {p.email && <span>{p.email}</span>}
                     {p.phone && <span> | {p.phone}</span>}
@@ -1282,38 +1454,32 @@ export default function ResumeBuilder() {
     };
 
     const renderModernPreview = () => {
-        const { personalInfo: p, education: edu, experience: exp, skills, projects: projs, certifications, additional } = resumeData;
+        const { personalInfo: p, education: edu, experience: exp, skills } = resumeData;
         return (
-            <div className="w-full" style={{ fontFamily: "'Poppins', sans-serif", color: '#1e293b' }}>
+            <div className="modern-resume w-full">
                 <style>{`
-                    .modern-header { text-align: center; margin-bottom: 24px; }
-                    .modern-name { font-family: 'Poppins', sans-serif; font-size: 28pt; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; color: #1e293b; }
+                    .modern-resume { font-family: 'Poppins', sans-serif; color: #1e293b; }
+                    .modern-header { text-align: center; margin-bottom: 30px; }
+                    .modern-name { font-family: 'Poppins', sans-serif; font-size: 32pt; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #1e293b; }
                     .modern-name span { font-weight: 600; }
-                    .modern-jobtitle { font-size: 11pt; color: #7c3aed; letter-spacing: 1px; font-weight: 500; margin-bottom: 6px; }
-                    .modern-contact { font-size: 9.5pt; color: #64748b; letter-spacing: 0.5px; }
-                    .modern-divider { border-bottom: 1px solid #e2e8f0; width: 100%; margin: 16px 0; }
-                    .modern-section { margin-bottom: 20px; }
-                    .modern-section-title { display: flex; align-items: center; margin-bottom: 10px; }
-                    .modern-section-title h2 { font-family: 'Poppins', sans-serif; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #0f172a; margin-right: 12px; white-space: nowrap; }
+                    .modern-contact { font-size: 10pt; color: #64748b; letter-spacing: 1px; margin-bottom: 20px; }
+                    .modern-divider { border-bottom: 1px solid #e2e8f0; width: 100%; margin-bottom: 30px; }
+                    .modern-section { margin-bottom: 25px; }
+                    .modern-section-title { display: flex; align-items: center; margin-bottom: 12px; }
+                    .modern-section-title h2 { font-family: 'Poppins', sans-serif; font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #0f172a; margin-right: 15px; white-space: nowrap; }
                     .modern-section-line { height: 1px; background: #f1f5f9; flex-grow: 1; }
                     .modern-entry { margin-bottom: 12px; }
-                    .modern-entry-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 10.5pt; color: #1e293b; }
-                    .modern-entry-sub { display: flex; justify-content: space-between; font-size: 9.5pt; color: #475569; margin-top: 2px; font-weight: 500; }
-                    .modern-bullets { padding-left: 14px; margin-top: 5px; }
-                    .modern-bullets li { font-size: 9pt; color: #334155; margin-bottom: 3px; line-height: 1.5; }
-                    .modern-skills-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-                    .modern-skill-item { font-size: 9pt; color: #334155; }
+                    .modern-entry-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 11pt; color: #1e293b; }
+                    .modern-entry-sub { display: flex; justify-content: space-between; font-size: 10pt; color: #475569; margin-top: 2px; font-weight: 500; }
+                    .modern-bullets { padding-left: 14px; margin-top: 6px; }
+                    .modern-bullets li { font-size: 9.5pt; color: #334155; margin-bottom: 4px; line-height: 1.5; }
+                    .modern-skills-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                    .modern-skill-item { font-size: 9.5pt; color: #334155; }
                     .modern-skill-label { font-weight: 700; color: #1e293b; }
                 `}</style>
                 <div className="modern-header">
                     <h1 className="modern-name">{p?.firstName || "FIRST"} <span>{p?.lastName || "LAST"}</span></h1>
-                    {p?.jobTitle && <div className="modern-jobtitle">{p.jobTitle}</div>}
-                    <div className="modern-contact">
-                        {p?.email || "email@example.com"}
-                        {p?.phone && <span> • {p.phone}</span>}
-                        {p?.address && <span> • {p.address}</span>}
-                        {p?.links?.map((l, i) => <span key={i}> • {l.label}: {l.url}</span>)}
-                    </div>
+                    <div className="modern-contact">{p?.email || "email@example.com"}{p?.phone && <span> • {p.phone}</span>}{p?.address && <span> • {p.address}</span>}</div>
                     <div className="modern-divider" />
                 </div>
                 {edu.length > 0 && (
@@ -1321,8 +1487,8 @@ export default function ResumeBuilder() {
                         <div className="modern-section-title"><h2>Education</h2><div className="modern-section-line" /></div>
                         {edu.map((e, i) => (
                             <div key={i} className="modern-entry">
-                                <div className="modern-entry-header"><span>{e.institution}</span><span style={{ color: '#94a3b8', fontWeight: 500 }}>{e.year}</span></div>
-                                <div className="modern-entry-sub"><span>{e.degree}</span><span style={{ color: '#7c3aed', fontWeight: 700 }}>{e.gpa ? `GPA: ${e.gpa}` : ""}</span></div>
+                                <div className="modern-entry-header"><span>{e.institution}</span><span className="text-slate-400 font-medium">{e.year}</span></div>
+                                <div className="modern-entry-sub"><span>{e.degree}</span><span className="text-purple-600 font-bold">{e.gpa ? `GPA: ${e.gpa}` : ""}</span></div>
                             </div>
                         ))}
                     </div>
@@ -1332,8 +1498,8 @@ export default function ResumeBuilder() {
                         <div className="modern-section-title"><h2>Experience</h2><div className="modern-section-line" /></div>
                         {exp.map((ex, i) => (
                             <div key={i} className="modern-entry">
-                                <div className="modern-entry-header"><span>{ex.company}</span><span style={{ color: '#94a3b8', fontWeight: 500 }}>{ex.range}</span></div>
-                                <div className="modern-entry-sub"><span>{ex.role}</span><span style={{ color: '#94a3b8' }}>{ex.location}</span></div>
+                                <div className="modern-entry-header"><span>{ex.company}</span><span className="text-slate-400 font-medium">{ex.range}</span></div>
+                                <div className="modern-entry-sub"><span>{ex.role}</span><span className="text-slate-400">{ex.location}</span></div>
                                 <ul className="modern-bullets">{ex.points?.split('\n').filter(pt => pt.trim()).map((pt, k) => <li key={k}>{pt}</li>)}</ul>
                             </div>
                         ))}
@@ -1350,214 +1516,100 @@ export default function ResumeBuilder() {
                         </div>
                     </div>
                 ) : null}
-                {projs.length > 0 && (
-                    <div className="modern-section">
-                        <div className="modern-section-title"><h2>Projects</h2><div className="modern-section-line" /></div>
-                        {projs.map((pr, i) => (
-                            <div key={i} className="modern-entry">
-                                <div className="modern-entry-header">
-                                    <span>{pr.name} {pr.link && <span style={{ fontWeight: 400, fontSize: '9pt', color: '#7c3aed' }}>— {pr.link}</span>}</span>
-                                    <span style={{ fontWeight: 400, fontStyle: 'italic', fontSize: '9pt', color: '#64748b' }}>{pr.tech}</span>
-                                </div>
-                                <div style={{ fontSize: '9pt', color: '#475569', marginTop: '3px', lineHeight: 1.5 }}>{pr.desc}</div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {certifications.length > 0 && (
-                    <div className="modern-section">
-                        <div className="modern-section-title"><h2>Certifications</h2><div className="modern-section-line" /></div>
-                        <ul className="modern-bullets">{certifications.map((c, i) => <li key={i}>{c}</li>)}</ul>
-                    </div>
-                )}
-                {additional.honorsAndAwards.length > 0 && (
-                    <div className="modern-section">
-                        <div className="modern-section-title"><h2>Honors & Awards</h2><div className="modern-section-line" /></div>
-                        <ul className="modern-bullets">{additional.honorsAndAwards.map((h, i) => <li key={i}>{h}</li>)}</ul>
-                    </div>
-                )}
             </div>
         );
     };
 
-    // ─── EDITOR RENDER ────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#f9fafb' }}>
             <style>{styles}</style>
 
             {/* ── Editor top bar ── */}
-            <nav className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 shrink-0">
-                <div className="flex items-center gap-4">
+            <nav className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-8 shrink-0">
+                <div className="flex items-center gap-6">
                     <div className="flex items-center cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setStep(hasExistingData ? 'dashboard' : 'create_new')}>
-                        <img src="/images/studlyf_secondary.png" alt="STUDLYF Logo" className="h-7 w-auto object-contain" />
+                        <img src="/images/studlyf_secondary.png" alt="STUDLYF Logo" className="h-7 sm:h-8 w-auto object-contain" />
                     </div>
-                    <div className="h-4 border-l border-slate-200" />
-                    <button onClick={() => setStep(hasExistingData ? 'dashboard' : 'create_new')} className="text-slate-500 font-semibold text-sm hover:text-slate-900 transition-colors flex items-center gap-1">
-                        <ChevronLeft size={14} /> My Resumes
+                    <div className="h-4 border-l border-slate-200 mx-2"></div>
+                    <button onClick={() => setStep(hasExistingData ? 'dashboard' : 'create_new')} className="text-slate-500 font-bold text-sm hover:text-slate-900 transition-colors">
+                        Home
                     </button>
                 </div>
-
-                <div className="flex items-center gap-2 sm:gap-3">
-                    {/* Template switcher */}
-                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
-                        {(['classic', 'modern'] as const).map(t => (
-                            <button
-                                key={t}
-                                onClick={() => setSelectedTemplate(t)}
-                                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${selectedTemplate === t ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                {t.charAt(0).toUpperCase() + t.slice(1)}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Download button */}
-                    <button
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-all shadow-sm"
-                    >
-                        {isDownloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                        <span className="hidden sm:inline">{isDownloading ? 'Preparing…' : 'Download PDF'}</span>
+                <div className="flex items-center gap-4">
+                    <button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-sm">
+                        <Share2 size={16} />
+                        Share
                     </button>
-
-                    {/* Share button */}
-                    <button
-                        onClick={() => setIsShareModalOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold transition-all shadow-sm"
-                    >
-                        <Share2 size={13} />
-                        <span className="hidden sm:inline">Share</span>
-                    </button>
-
-                    <div className="h-7 w-7 rounded-full bg-violet-50 flex items-center justify-center text-violet-600 border border-violet-200 text-xs font-bold">
-                        {(user?.displayName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                    <div className="h-9 w-9 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-200">
+                        <User size={18} />
                     </div>
                 </div>
             </nav>
 
             {/* ── Editor sub-header ── */}
             <header className="editor-header bg-white">
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
                     {/* Breadcrumb */}
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400 mr-2">
                         <button onClick={() => setStep(hasExistingData ? 'dashboard' : 'create_new')} className="hover:text-violet-600 transition-colors font-medium">Home</button>
                         <ChevronRight size={11} />
-                        <span className="text-gray-600 font-medium">Editor</span>
+                        <span className="text-gray-500 font-medium">Editor</span>
                     </div>
                     <div className="h-4 w-px bg-gray-200" />
-                    {/* Resume name editable */}
                     {isEditingName ? (
                         <input
                             autoFocus
-                            value={resumeData.name}
+                            value={resumeData.name ? resumeData.name : getResumeDisplayTitle(resumeData)}
                             onBlur={() => setIsEditingName(false)}
                             onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
                             onChange={(e) => setResumeData({ ...resumeData, name: e.target.value })}
-                            className="text-sm font-semibold text-gray-900 outline-none bg-transparent border-b border-violet-400 w-40"
+                            className="text-sm font-semibold text-gray-900 outline-none bg-transparent border-b border-violet-400 w-64"
                         />
                     ) : (
                         <button onClick={() => setIsEditingName(true)} className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 hover:text-violet-600 transition-colors">
-                            {resumeData.name}
-                            <Edit3 size={12} className="text-gray-400" />
+                            {getResumeDisplayTitle(resumeData)}
+                            <Edit3 size={13} className="text-gray-400" />
                         </button>
                     )}
-                    {/* Save status badge — only shows after save */}
-                    {hasExistingData && (
-                        <button
-                            onClick={() => setStep('dashboard')}
-                            title="Click to view your saved resumes"
-                            className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200 transition-colors"
-                        >
-                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Saved to Cloud
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setStep('dashboard')}
+                        title="Click to view saved resumes in your Cloud Synced Workspace"
+                        className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-200 transition-colors cursor-pointer"
+                    >
+                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Saved to Cloud</span>
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {/* Completeness badge */}
-                    <div className="hidden sm:flex items-center gap-2 mr-2">
-                        <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="progress-bar-fill h-full" style={{ width: `${completeness}%` }} />
-                        </div>
-                        <span className="text-[11px] font-semibold text-gray-500">{completeness}%</span>
-                    </div>
-
-                    {/* Save button */}
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => performSave()}
+                        onClick={() => handleSave(false, true)}
                         disabled={isSaving}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-                            saveStatus === 'saved'
-                                ? 'bg-emerald-600 text-white'
-                                : saveStatus === 'error'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-gray-900 text-white hover:bg-violet-700'
-                        }`}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer ${saveStatus === 'saved'
+                            ? 'bg-emerald-600 text-white shadow-emerald-200'
+                            : 'bg-violet-600 text-white hover:bg-violet-700 shadow-violet-200'
+                            }`}
                     >
-                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : saveStatus === 'saved' ? <CheckCircle size={12} /> : <Save size={12} />}
-                        {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
+                        {isSaving ? <Loader2 size={13} className="animate-spin" /> : saveStatus === 'saved' ? <CheckCircle size={13} /> : <Save size={13} />}
+                        {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved to Cloud ✓' : 'Save Resume'}
                     </button>
 
-                    {/* AI Review */}
                     <button
                         onClick={() => setShowAiPanel(true)}
-                        className="v-btn-primary !py-1.5 !px-3 !text-xs !rounded-lg"
+                        className="v-btn-primary !py-2 !px-4 !text-xs"
                     >
-                        <Sparkles size={12} />
+                        <Sparkles size={13} />
                         AI Review
                     </button>
                 </div>
             </header>
 
-            {/* ── Mobile Tab Switcher (< md screens) ── */}
-            <div className="md:hidden flex border-b border-gray-200 bg-white shrink-0">
-                <button
-                    onClick={() => setMobileView('form')}
-                    className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                        mobileView === 'form'
-                            ? 'border-violet-600 text-violet-600 bg-violet-50/50'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                    <Edit3 size={13} />
-                    Edit Details
-                </button>
-                <button
-                    onClick={() => setMobileView('preview')}
-                    className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
-                        mobileView === 'preview'
-                            ? 'border-violet-600 text-violet-600 bg-violet-50/50'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                >
-                    <Eye size={13} />
-                    Paper Preview
-                </button>
-            </div>
-
             {/* ── Main editor layout ── */}
             <main className="flex-1 flex overflow-hidden">
 
                 {/* Left panel */}
-                <div className={`w-full md:w-[360px] shrink-0 bg-white border-r border-gray-100 flex-col overflow-hidden ${mobileView === 'form' ? 'flex' : 'hidden md:flex'}`}>
-                    {/* Completeness bar */}
-                    <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[11px] font-semibold text-gray-500">Resume Completeness</span>
-                            <span className={`text-[11px] font-bold ${completeness >= 80 ? 'text-emerald-600' : completeness >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{completeness}%</span>
-                        </div>
-                        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div className="progress-bar-fill h-full" style={{ width: `${completeness}%` }} />
-                        </div>
-                        <p className="text-[10px] text-gray-400 mt-1">
-                            {completeness < 50 ? 'Add more sections to improve your resume' : completeness < 80 ? 'Good progress! Add skills & projects' : 'Excellent! Your resume is comprehensive'}
-                        </p>
-                    </div>
-
+                <div className="w-[380px] shrink-0 bg-white border-r border-gray-100 flex flex-col overflow-hidden shadow-[1px_0_0_0_#f0f0f0]">
                     <div className="flex-1 overflow-y-auto v-scroll">
-                        {/* Personal Information */}
                         <AccordionItem title="Personal Information" icon={User} isOpen={openSections.personalInfo} onClick={() => toggleSection('personalInfo')}>
                             <div className="space-y-3">
                                 <div className="grid grid-cols-2 gap-3">
@@ -1571,7 +1623,7 @@ export default function ResumeBuilder() {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="v-label">Job title / Target role</label>
+                                    <label className="v-label">Job title</label>
                                     <input className="v-input" value={resumeData.personalInfo.jobTitle} onChange={(e) => updatePersonalInfo('jobTitle', e.target.value)} placeholder="Software Engineer" />
                                 </div>
                                 <div>
@@ -1598,43 +1650,41 @@ export default function ResumeBuilder() {
                                     <div className="space-y-2">
                                         {resumeData.personalInfo.links.map((link, i) => (
                                             <div key={i} className="flex gap-2 items-center">
-                                                <input className="v-input !text-xs w-24 shrink-0" value={link.label} onChange={(e) => updateLink(i, 'label', e.target.value)} placeholder="LinkedIn" />
-                                                <input className="v-input !text-xs flex-1" value={link.url} onChange={(e) => updateLink(i, 'url', e.target.value)} placeholder="https://..." />
-                                                <button onClick={() => removeLink(i)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0"><Trash2 size={13} /></button>
+                                                <input placeholder="Label" className="v-input !w-28 !shrink-0 !text-xs" value={link.label} onChange={(e) => updateLink(i, 'label', e.target.value)} />
+                                                <input placeholder="https://..." className="v-input flex-1 !text-xs" value={link.url} onChange={(e) => updateLink(i, 'url', e.target.value)} />
+                                                <button onClick={() => removeLink(i)} className="text-gray-300 hover:text-red-400 transition-colors shrink-0"><Trash2 size={14} /></button>
                                             </div>
                                         ))}
-                                        {resumeData.personalInfo.links.length === 0 && (
-                                            <p className="text-xs text-gray-400 italic">No links added — add LinkedIn, GitHub, portfolio etc.</p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
                         </AccordionItem>
 
-                        {/* Education */}
-                        <AccordionItem title="Education" icon={GraduationCap} isOpen={openSections.education} onClick={() => toggleSection('education')} badge={resumeData.education.length}>
+                        <AccordionItem title="Education" icon={GraduationCap} isOpen={openSections.education} onClick={() => toggleSection('education')}>
                             <div className="space-y-3">
-                                {resumeData.education.map((e, i) => (
-                                    <div key={i} className="v-entry-card">
-                                        <button onClick={() => removeEducation(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
-                                        <div className="space-y-2 pr-6">
+                                {resumeData.education.map((edu, i) => (
+                                    <div key={i} className="v-entry-card group">
+                                        <button onClick={() => removeEducation(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                                            <Trash2 size={13} />
+                                        </button>
+                                        <div className="space-y-2.5">
                                             <div>
                                                 <label className="v-label">Institution</label>
-                                                <input className="v-input !text-sm" value={e.institution} onChange={(ev) => updateEducation(i, 'institution', ev.target.value)} placeholder="MIT, Stanford, IIT..." />
-                                            </div>
-                                            <div>
-                                                <label className="v-label">Degree</label>
-                                                <input className="v-input !text-sm" value={e.degree} onChange={(ev) => updateEducation(i, 'degree', ev.target.value)} placeholder="B.Tech Computer Science" />
+                                                <input className="v-input" value={edu.institution} onChange={(e) => updateEducation(i, 'institution', e.target.value)} placeholder="University of California" />
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div>
-                                                    <label className="v-label">Year / Duration</label>
-                                                    <input className="v-input !text-sm" value={e.year} onChange={(ev) => updateEducation(i, 'year', ev.target.value)} placeholder="2020 – 2024" />
+                                                    <label className="v-label">Degree</label>
+                                                    <input className="v-input" value={edu.degree} onChange={(e) => updateEducation(i, 'degree', e.target.value)} placeholder="B.S. Computer Science" />
                                                 </div>
                                                 <div>
-                                                    <label className="v-label">GPA (optional)</label>
-                                                    <input className="v-input !text-sm" value={e.gpa} onChange={(ev) => updateEducation(i, 'gpa', ev.target.value)} placeholder="9.2/10" />
+                                                    <label className="v-label">Year</label>
+                                                    <input className="v-input" value={edu.year} onChange={(e) => updateEducation(i, 'year', e.target.value)} placeholder="2020 – 2024" />
                                                 </div>
+                                            </div>
+                                            <div>
+                                                <label className="v-label">GPA (optional)</label>
+                                                <input className="v-input" value={edu.gpa} onChange={(e) => updateEducation(i, 'gpa', e.target.value)} placeholder="3.8" />
                                             </div>
                                         </div>
                                     </div>
@@ -1645,40 +1695,40 @@ export default function ResumeBuilder() {
                             </div>
                         </AccordionItem>
 
-                        {/* Experience */}
-                        <AccordionItem title="Work Experience" icon={Briefcase} isOpen={openSections.experience} onClick={() => toggleSection('experience')} badge={resumeData.experience.length}>
+                        <AccordionItem title="Experience" icon={Briefcase} isOpen={openSections.experience} onClick={() => toggleSection('experience')}>
                             <div className="space-y-3">
-                                {resumeData.experience.map((ex, i) => (
-                                    <div key={i} className="v-entry-card">
-                                        <button onClick={() => removeExperience(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
-                                        <div className="space-y-2 pr-6">
+                                {resumeData.experience.map((exp, i) => (
+                                    <div key={i} className="v-entry-card group">
+                                        <button onClick={() => removeExperience(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                                            <Trash2 size={13} />
+                                        </button>
+                                        <div className="space-y-2.5">
                                             <div>
                                                 <label className="v-label">Company</label>
-                                                <input className="v-input !text-sm" value={ex.company} onChange={(e) => updateExperience(i, 'company', e.target.value)} placeholder="Google, Infosys, Startup..." />
-                                            </div>
-                                            <div>
-                                                <label className="v-label">Role / Title</label>
-                                                <input className="v-input !text-sm" value={ex.role} onChange={(e) => updateExperience(i, 'role', e.target.value)} placeholder="Software Engineer Intern" />
+                                                <input className="v-input" value={exp.company} onChange={(e) => updateExperience(i, 'company', e.target.value)} placeholder="Acme Corp" />
                                             </div>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div>
-                                                    <label className="v-label">Duration</label>
-                                                    <input className="v-input !text-sm" value={ex.range} onChange={(e) => updateExperience(i, 'range', e.target.value)} placeholder="Jun 2023 – Aug 2023" />
+                                                    <label className="v-label">Role</label>
+                                                    <input className="v-input" value={exp.role} onChange={(e) => updateExperience(i, 'role', e.target.value)} placeholder="Software Engineer" />
                                                 </div>
                                                 <div>
-                                                    <label className="v-label">Location</label>
-                                                    <input className="v-input !text-sm" value={ex.location} onChange={(e) => updateExperience(i, 'location', e.target.value)} placeholder="Remote / Bangalore" />
+                                                    <label className="v-label">Date range</label>
+                                                    <input className="v-input" value={exp.range} onChange={(e) => updateExperience(i, 'range', e.target.value)} placeholder="Jan 2022 – Present" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="v-label">Key achievements (one per line)</label>
+                                                <label className="v-label">Location</label>
+                                                <input className="v-input" value={exp.location} onChange={(e) => updateExperience(i, 'location', e.target.value)} placeholder="Remote" />
+                                            </div>
+                                            <div>
+                                                <label className="v-label">Achievements (one per line)</label>
                                                 <textarea
-                                                    className="v-input !text-xs min-h-[90px] resize-none leading-relaxed"
-                                                    value={ex.points}
+                                                    className="v-input min-h-[90px] resize-none"
+                                                    value={exp.points}
                                                     onChange={(e) => updateExperience(i, 'points', e.target.value)}
-                                                    placeholder={"Built REST APIs serving 100k+ req/day\nReduced load time by 40% through caching\nCollaborated with cross-functional team of 8"}
+                                                    placeholder="• Built a feature that reduced latency by 40%&#10;• Mentored 2 junior engineers"
                                                 />
-                                                <p className="text-[10px] text-gray-400 mt-1">💡 Tip: Start with action verbs (Built, Improved, Led, Reduced…)</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1689,166 +1739,172 @@ export default function ResumeBuilder() {
                             </div>
                         </AccordionItem>
 
-                        {/* Skills */}
-                        <AccordionItem title="Skills" icon={Code2} isOpen={openSections.skills} onClick={() => toggleSection('skills')} badge={resumeData.skills.languages.length + resumeData.skills.frameworks.length + resumeData.skills.tools.length + resumeData.skills.databases.length || undefined}>
-                            <div>
-                                <SkillChipRow
-                                    label="Programming Languages"
-                                    items={resumeData.skills.languages}
-                                    onAdd={(v: string) => addSkill('languages', v)}
-                                    onRemove={(i: number) => removeSkill('languages', i)}
-                                    placeholder="Python, JavaScript, Java…"
-                                    icon={Terminal}
-                                    color="bg-blue-50 text-blue-600"
-                                />
-                                <SkillChipRow
-                                    label="Libraries / Frameworks"
-                                    items={resumeData.skills.frameworks}
-                                    onAdd={(v: string) => addSkill('frameworks', v)}
-                                    onRemove={(i: number) => removeSkill('frameworks', i)}
-                                    placeholder="React, FastAPI, Spring Boot…"
-                                    icon={Layers}
-                                    color="bg-violet-50 text-violet-600"
-                                />
-                                <SkillChipRow
-                                    label="Tools & Platforms"
-                                    items={resumeData.skills.tools}
-                                    onAdd={(v: string) => addSkill('tools', v)}
-                                    onRemove={(i: number) => removeSkill('tools', i)}
-                                    placeholder="Docker, Git, AWS, Figma…"
-                                    icon={Cpu}
-                                    color="bg-amber-50 text-amber-600"
-                                />
-                                <SkillChipRow
-                                    label="Databases"
-                                    items={resumeData.skills.databases}
-                                    onAdd={(v: string) => addSkill('databases', v)}
-                                    onRemove={(i: number) => removeSkill('databases', i)}
-                                    placeholder="PostgreSQL, MongoDB, Redis…"
-                                    icon={Database}
-                                    color="bg-emerald-50 text-emerald-600"
-                                />
+                        <AccordionItem title="Skillsets" icon={Code2} isOpen={openSections.skills} onClick={() => toggleSection('skills')}>
+                            <div className="space-y-5">
+                                {[
+                                    { key: 'languages', label: 'Programming Languages', placeholder: 'Python, TypeScript' },
+                                    { key: 'frameworks', label: 'Libraries / Frameworks', placeholder: 'React, FastAPI' },
+                                    { key: 'tools', label: 'Tools & Platforms', placeholder: 'Git, Docker' },
+                                    { key: 'databases', label: 'Databases', placeholder: 'PostgreSQL, Redis' },
+                                ].map((group) => (
+                                    <div key={group.key}>
+                                        <label className="v-label">{group.label}</label>
+                                        <div className="flex gap-2 mb-2">
+                                            <input
+                                                id={`input-${group.key}`}
+                                                className="v-input"
+                                                placeholder={group.placeholder}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        addSkill(group.key as any, (e.target as HTMLInputElement).value);
+                                                        (e.target as HTMLInputElement).value = '';
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    const el = document.getElementById(`input-${group.key}`) as HTMLInputElement;
+                                                    addSkill(group.key as any, el.value);
+                                                    el.value = '';
+                                                }}
+                                                className="shrink-0 h-9 w-9 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all"
+                                            >
+                                                <Plus size={15} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {resumeData.skills[group.key as keyof ResumeData['skills']].map((s, i) => (
+                                                <div key={i} className="v-chip">
+                                                    {s}
+                                                    <button onClick={() => removeSkill(group.key as any, i)}><X size={12} /></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </AccordionItem>
 
-                        {/* Projects */}
-                        <AccordionItem title="Projects" icon={FileText} isOpen={openSections.projects} onClick={() => toggleSection('projects')} badge={resumeData.projects.length}>
+                        <AccordionItem title="Projects" icon={FileText} isOpen={openSections.projects} onClick={() => toggleSection('projects')}>
                             <div className="space-y-3">
                                 {resumeData.projects.map((p, i) => (
-                                    <div key={i} className="v-entry-card">
-                                        <button onClick={() => removeProject(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
-                                        <div className="space-y-2 pr-6">
+                                    <div key={i} className="v-entry-card group">
+                                        <button onClick={() => removeProject(i)} className="absolute top-3 right-3 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                                            <Trash2 size={13} />
+                                        </button>
+                                        <div className="space-y-2.5">
                                             <div>
-                                                <label className="v-label">Project Name</label>
-                                                <input className="v-input !text-sm" value={p.name} onChange={(e) => updateProject(i, 'name', e.target.value)} placeholder="StudyBot — AI Learning Assistant" />
+                                                <label className="v-label">Project name</label>
+                                                <input className="v-input" value={p.name} onChange={(e) => updateProject(i, 'name', e.target.value)} placeholder="MyProject" />
                                             </div>
                                             <div>
-                                                <label className="v-label">Tech Stack</label>
-                                                <input className="v-input !text-sm" value={p.tech} onChange={(e) => updateProject(i, 'tech', e.target.value)} placeholder="React, Node.js, PostgreSQL" />
+                                                <label className="v-label">Technologies</label>
+                                                <input className="v-input" value={p.tech} onChange={(e) => updateProject(i, 'tech', e.target.value)} placeholder="React, Node.js, PostgreSQL" />
                                             </div>
                                             <div>
                                                 <label className="v-label">Description</label>
-                                                <textarea className="v-input !text-xs min-h-[72px] resize-none" value={p.desc} onChange={(e) => updateProject(i, 'desc', e.target.value)} placeholder="Brief impact-focused description of what it does and the results it achieved..." />
+                                                <textarea className="v-input min-h-[72px] resize-none" value={p.desc} onChange={(e) => updateProject(i, 'desc', e.target.value)} placeholder="Brief impact-focused description..." />
                                             </div>
                                             <div>
-                                                <label className="v-label">GitHub / Live Link (optional)</label>
-                                                <input className="v-input !text-sm" value={p.link || ""} onChange={(e) => updateProject(i, 'link', e.target.value)} placeholder="https://github.com/..." />
+                                                <label className="v-label">Link (optional)</label>
+                                                <input className="v-input" value={p.link} onChange={(e) => updateProject(i, 'link', e.target.value)} placeholder="https://github.com/..." />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
-                                <button onClick={addProject} className="w-full py-2.5 border border-dashed border-gray-200 rounded-lg text-xs font-semibold text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50/30 transition-all flex items-center justify-center gap-1.5">
-                                    <Plus size={14} /> Add Project
+                                <div className="flex gap-2">
+                                    <button onClick={addProject} className="flex-1 py-2.5 border border-dashed border-gray-200 rounded-lg text-xs font-semibold text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50/30 transition-all flex items-center justify-center gap-1.5">
+                                        <Plus size={14} /> Add Project
+                                    </button>
+                                    <button className="px-4 py-2.5 border border-gray-200 rounded-lg text-xs font-semibold text-gray-500 hover:border-gray-300 hover:bg-gray-50 transition-all flex items-center gap-1.5">
+                                        <Github size={13} /> Import
+                                    </button>
+                                </div>
+                            </div>
+                        </AccordionItem>
+
+                        <AccordionItem title="Certifications" icon={CertificationIcon} isOpen={openSections.certifications} onClick={() => toggleSection('certifications')}>
+                            <div className="flex gap-2 mb-3">
+                                <input
+                                    id="input-cert"
+                                    className="v-input"
+                                    placeholder="AWS Certified Developer..."
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            addCertification((e.target as HTMLInputElement).value);
+                                            (e.target as HTMLInputElement).value = '';
+                                        }
+                                    }}
+                                />
+                                <button onClick={() => { const el = document.getElementById('input-cert') as HTMLInputElement; addCertification(el.value); el.value = ''; }}
+                                    className="shrink-0 h-9 w-9 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all">
+                                    <Plus size={15} />
                                 </button>
                             </div>
-                        </AccordionItem>
-
-                        {/* Certifications */}
-                        <AccordionItem title="Certifications" icon={CertificationIcon} isOpen={openSections.certifications} onClick={() => toggleSection('certifications')} badge={resumeData.certifications.length}>
-                            <div>
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        id="input-cert"
-                                        className="v-input !text-sm"
-                                        placeholder="AWS Certified Solutions Architect..."
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                addCertification((e.target as HTMLInputElement).value);
-                                                (e.target as HTMLInputElement).value = '';
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const el = document.getElementById('input-cert') as HTMLInputElement;
-                                            addCertification(el.value);
-                                            el.value = '';
-                                        }}
-                                        className="shrink-0 h-9 w-9 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all"
-                                    >
-                                        <Plus size={15} />
-                                    </button>
-                                </div>
-                                <p className="text-[10px] text-gray-400 mb-3">Press Enter or click + to add</p>
-                                <div className="space-y-1.5">
-                                    {resumeData.certifications.map((c, i) => (
-                                        <div key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700">
-                                            <span>{c}</span>
-                                            <button onClick={() => removeCertification(i)} className="text-gray-300 hover:text-red-400 transition-colors ml-2"><Trash2 size={13} /></button>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div className="space-y-1.5">
+                                {resumeData.certifications.map((c, i) => (
+                                    <div key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700">
+                                        <span>{c}</span>
+                                        <button onClick={() => removeCertification(i)} className="text-gray-300 hover:text-red-400 transition-colors ml-2"><Trash2 size={13} /></button>
+                                    </div>
+                                ))}
                             </div>
                         </AccordionItem>
 
-                        {/* Honors & Awards */}
-                        <AccordionItem title="Honors & Awards" icon={Award} isOpen={openSections.additional} onClick={() => toggleSection('additional')} badge={resumeData.additional.honorsAndAwards.length}>
-                            <div>
-                                <div className="flex gap-2 mb-3">
-                                    <input
-                                        id="input-honor"
-                                        className="v-input !text-sm"
-                                        placeholder="Dean's List 2023..."
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                addHonor((e.target as HTMLInputElement).value);
-                                                (e.target as HTMLInputElement).value = '';
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const el = document.getElementById('input-honor') as HTMLInputElement;
-                                            addHonor(el.value);
-                                            el.value = '';
-                                        }}
-                                        className="shrink-0 h-9 w-9 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all"
-                                    >
-                                        <Plus size={15} />
-                                    </button>
-                                </div>
-                                <div className="space-y-1.5">
-                                    {resumeData.additional.honorsAndAwards.map((h, i) => (
-                                        <div key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700">
-                                            <span>{h}</span>
-                                            <button onClick={() => removeHonor(i)} className="text-gray-300 hover:text-red-400 transition-colors ml-2"><Trash2 size={13} /></button>
-                                        </div>
-                                    ))}
-                                </div>
+                        <AccordionItem title="Honors & Awards" icon={Award} isOpen={openSections.additional} onClick={() => toggleSection('additional')}>
+                            <div className="flex gap-2 mb-3">
+                                <input
+                                    id="input-honor"
+                                    className="v-input"
+                                    placeholder="Dean's List 2023..."
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            addHonor((e.target as HTMLInputElement).value);
+                                            (e.target as HTMLInputElement).value = '';
+                                        }
+                                    }}
+                                />
+                                <button onClick={() => { const el = document.getElementById('input-honor') as HTMLInputElement; addHonor(el.value); el.value = ''; }}
+                                    className="shrink-0 h-9 w-9 border border-gray-200 rounded-lg flex items-center justify-center text-gray-500 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all">
+                                    <Plus size={15} />
+                                </button>
+                            </div>
+                            <div className="space-y-1.5">
+                                {resumeData.additional.honorsAndAwards.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-700">
+                                        <span>{h}</span>
+                                        <button onClick={() => removeHonor(i)} className="text-gray-300 hover:text-red-400 transition-colors ml-2"><Trash2 size={13} /></button>
+                                    </div>
+                                ))}
                             </div>
                         </AccordionItem>
                     </div>
                 </div>
 
                 {/* Right preview panel */}
-                <div className={`flex-1 overflow-y-auto v-scroll flex-col items-center p-2 sm:p-4 overflow-x-auto ${mobileView === 'preview' ? 'flex' : 'hidden md:flex'}`} style={{ background: '#f1f3f5' }}>
-                    <div className="resume-paper transform origin-top scale-[0.65] xs:scale-[0.75] sm:scale-90 md:scale-100 my-2 md:my-8 shrink-0">
+                <div className="flex-1 overflow-y-auto v-scroll flex flex-col items-center" style={{ background: '#f1f3f5' }}>
+                    <div className="resume-paper">
                         {selectedTemplate === 'classic' ? renderClassicPreview() : renderModernPreview()}
                     </div>
                 </div>
             </main>
 
-            {/* ── AI Review Panel ── */}
+            {/* Floating Save Quick Action (Positioned away from GUIDE pill) */}
+            <div className="fixed bottom-6 right-24 z-40">
+                <button
+                    onClick={() => handleSave()}
+                    disabled={isSaving}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold shadow-xl backdrop-blur-md transition-all border border-white/20 ${saveStatus === 'saved'
+                        ? 'bg-emerald-600 text-white shadow-emerald-200'
+                        : 'bg-gray-900/90 text-white hover:bg-violet-700 shadow-gray-400'
+                        }`}
+                >
+                    {isSaving ? <Loader2 size={14} className="animate-spin" /> : saveStatus === 'saved' ? <CheckCircle size={14} /> : <Save size={14} />}
+                    {isSaving ? 'Saving…' : saveStatus === 'saved' ? 'Saved to Cloud ✓' : 'Save Resume'}
+                </button>
+            </div>
+
+            {/* AI Review Panel */}
             <AnimatePresence>
                 {showAiPanel && (
                     <div className="fixed inset-0 z-[1000] flex items-center justify-end">
@@ -1862,6 +1918,7 @@ export default function ResumeBuilder() {
                             transition={{ type: 'spring', damping: 28, stiffness: 220 }}
                             className="relative w-full max-w-[400px] h-full bg-white shadow-2xl flex flex-col border-l border-gray-100"
                         >
+                            {/* Header */}
                             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="h-8 w-8 rounded-lg bg-violet-600 flex items-center justify-center">
@@ -1869,7 +1926,7 @@ export default function ResumeBuilder() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold text-gray-900">AI Resume Review</p>
-                                        <p className="text-xs text-gray-400">Instant feedback powered by AI</p>
+                                        <p className="text-xs text-gray-400">Instant feedback</p>
                                     </div>
                                 </div>
                                 <button onClick={() => setShowAiPanel(false)} className="h-8 w-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
@@ -1878,25 +1935,11 @@ export default function ResumeBuilder() {
                             </div>
 
                             <div className="flex-1 overflow-y-auto v-scroll p-6">
-                                {/* Live completeness within AI panel */}
-                                <div className="mb-6 p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl border border-violet-100">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-sm font-semibold text-violet-800">Resume Score</p>
-                                        <span className={`text-xl font-bold ${completeness >= 80 ? 'text-emerald-600' : completeness >= 50 ? 'text-amber-600' : 'text-red-500'}`}>{completeness}/100</span>
-                                    </div>
-                                    <div className="h-2 bg-violet-100 rounded-full overflow-hidden mb-2">
-                                        <div className="progress-bar-fill h-full" style={{ width: `${completeness}%` }} />
-                                    </div>
-                                    <p className="text-xs text-violet-600">
-                                        {completeness < 50 ? '🔴 Needs more content to be competitive' : completeness < 80 ? '🟡 Good start — add more details' : '🟢 Strong resume! AI review recommended'}
-                                    </p>
-                                </div>
-
                                 {reviewResult ? (
                                     <div>
                                         <div className="flex items-center gap-2 mb-5">
                                             <CheckCircle2 size={16} className="text-emerald-500" />
-                                            <p className="text-sm font-semibold text-gray-800">AI Suggestions ({reviewResult.length})</p>
+                                            <p className="text-sm font-semibold text-gray-800">AI Suggestions</p>
                                         </div>
                                         <div className="space-y-3">
                                             {Array.isArray(reviewResult) ? reviewResult.map((res, i) => (
@@ -1906,15 +1949,28 @@ export default function ResumeBuilder() {
                                                 </div>
                                             )) : <p className="text-sm text-gray-600">{String(reviewResult)}</p>}
                                         </div>
-                                        <button onClick={() => setReviewResult(null)} className="mt-6 w-full py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
-                                            <RefreshCw size={14} /> Run again
+                                        <button onClick={() => setReviewResult(null)} className="mt-6 w-full py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all">
+                                            Run again
                                         </button>
                                     </div>
                                 ) : (
                                     <div>
+                                        {/* Visual */}
+                                        <div className="aspect-video bg-gray-50 rounded-xl mb-6 flex items-center justify-center border border-gray-100 relative overflow-hidden">
+                                            <div className="absolute inset-0 grid-bg opacity-50" />
+                                            <div className="relative flex flex-col items-center gap-2">
+                                                <div className="h-12 w-10 bg-white rounded-lg shadow-sm border border-gray-200" />
+                                                <div className="h-1.5 w-20 bg-gray-200 rounded-full" />
+                                                <div className="h-1 w-14 bg-gray-100 rounded-full" />
+                                            </div>
+                                            <div className="absolute top-3 right-3 h-6 w-6 bg-violet-100 rounded-lg flex items-center justify-center">
+                                                <Sparkles size={12} className="text-violet-600" />
+                                            </div>
+                                        </div>
+
                                         <h3 className="text-base font-semibold text-gray-900 mb-2">Instant resume analysis</h3>
                                         <div className="space-y-3 mb-8">
-                                            {['ATS keyword optimization tips', 'Content and formatting improvements', 'Role-specific recommendations', 'Missing sections detection'].map(item => (
+                                            {['ATS keyword optimization tips', 'Content and formatting improvements', 'Role-specific recommendations'].map(item => (
                                                 <div key={item} className="flex items-center gap-2.5 text-sm text-gray-500">
                                                     <CheckCircle2 size={14} className="text-violet-500 shrink-0" />
                                                     {item}
@@ -1940,21 +1996,14 @@ export default function ResumeBuilder() {
                                                     } else if (Array.isArray(data)) {
                                                         setReviewResult(data);
                                                     } else {
-                                                        // Fallback with realistic suggestions based on resume content
-                                                        const suggestions = [];
-                                                        if (!resumeData.personalInfo.jobTitle) suggestions.push("Add a target job title to your profile — recruiters scan for role alignment in the first 6 seconds.");
-                                                        if (resumeData.experience.length === 0) suggestions.push("Add at least one work experience entry. Even internships or part-time roles significantly improve your ATS score.");
-                                                        if (resumeData.skills.languages.length === 0) suggestions.push("Add your programming languages and technical skills — these are the #1 ATS filter for tech roles.");
-                                                        if (resumeData.projects.length === 0) suggestions.push("Add 2-3 projects with tech stack and measurable outcomes to show practical experience.");
-                                                        if (!resumeData.personalInfo.links.some(l => l.label.toLowerCase().includes('linkedin'))) suggestions.push("Include your LinkedIn profile URL — 87% of recruiters use LinkedIn for candidate research.");
-                                                        if (resumeData.experience.some(e => e.points.split('\n').filter(p => p.trim()).length < 2)) suggestions.push("Expand your experience bullet points — aim for 3-5 achievement-focused bullets per role.");
-                                                        if (suggestions.length === 0) suggestions.push("Your resume structure looks great! Consider quantifying your achievements with numbers and percentages.", "Tailor keywords to match the specific job description you're applying to.", "Ensure your resume is saved as a PDF before submitting to maintain formatting.");
-                                                        setReviewResult(suggestions);
+                                                        setReviewResult([
+                                                            "Consider adding more technical keywords to your skills section.",
+                                                            "Ensure your contact information is up to date.",
+                                                            "Review the layout for better readability."
+                                                        ]);
                                                     }
                                                 } catch (err) {
-                                                    // Smart offline suggestions
-                                                    const suggestions = ["Ensure your contact information is complete and professional.", "Use strong action verbs (Built, Designed, Optimized, Led) to start each bullet point.", "Quantify your achievements with metrics (e.g., 'Reduced load time by 40%')."];
-                                                    setReviewResult(suggestions);
+                                                    setReviewResult(["Connection error: Ensure the Python server is running."]);
                                                 } finally {
                                                     setIsReviewing(false);
                                                 }
@@ -1971,90 +2020,39 @@ export default function ResumeBuilder() {
                 )}
             </AnimatePresence>
 
-            {/* ── Share Modal ── */}
-            <AnimatePresence>
-                {isShareModalOpen && (
-                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setIsShareModalOpen(false)}
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ scale: 0.97, opacity: 0, y: 12 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.97, opacity: 0, y: 12 }}
-                            transition={{ duration: 0.18 }}
-                            className="relative bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
-                        >
-                            <div className="px-7 pt-7 pb-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-gray-900">Share Resume</h2>
-                                    <button onClick={() => setIsShareModalOpen(false)} className="h-8 w-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors">
-                                        <X size={16} />
-                                    </button>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="v-label">Your resume link</label>
-                                        <div className="flex items-center gap-2 border border-gray-200 rounded-lg overflow-hidden">
-                                            <input
-                                                readOnly
-                                                value={shareUrl}
-                                                className="flex-1 px-3 py-2.5 text-sm text-gray-600 bg-transparent outline-none font-mono truncate"
-                                            />
-                                            <button
-                                                onClick={handleCopyLink}
-                                                className={`shrink-0 px-3 py-2.5 border-l border-gray-200 transition-all flex items-center gap-1.5 text-xs font-semibold ${linkCopied ? 'text-emerald-600 bg-emerald-50' : 'text-gray-500 hover:text-violet-600 hover:bg-violet-50'}`}
-                                            >
-                                                {linkCopied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy</>}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-9 w-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center">
-                                                <Globe size={16} className="text-gray-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-gray-800">Public access</p>
-                                                <p className="text-xs text-gray-400">Anyone with the link can view</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => setPublicAccess(!publicAccess)}
-                                            className={`w-11 rounded-full p-0.5 transition-all duration-200 ${publicAccess ? 'bg-violet-600' : 'bg-gray-200'}`}
-                                            style={{ height: '24px' }}
-                                        >
-                                            <div className={`h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-200`} style={{ transform: publicAccess ? 'translateX(19px)' : 'translateX(0)' }} />
-                                        </button>
-                                    </div>
-
-                                    {/* Download in modal too */}
-                                    <button
-                                        onClick={() => { setIsShareModalOpen(false); handleDownload(); }}
-                                        className="w-full flex items-center justify-center gap-2 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                                    >
-                                        <Download size={15} />
-                                        Download as PDF instead
-                                    </button>
-
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setIsShareModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
-                                            Cancel
-                                        </button>
-                                        <button onClick={handleCopyLink} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${linkCopied ? 'bg-emerald-600 text-white' : 'v-btn-primary'}`}>
-                                            {linkCopied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Link</>}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Modals */}
+            {renderShareModal()}
+            {renderDeleteModal()}
         </div>
     );
+};
+
+const migrateConfigToResumeData = (config: any): ResumeData => {
+    let migratedData: ResumeData = { ...DEFAULT_RESUME_DATA };
+    try {
+        if (!config) return migratedData;
+        if (config.personalInfo) {
+            migratedData = {
+                ...DEFAULT_RESUME_DATA, ...config,
+                personalInfo: { ...DEFAULT_RESUME_DATA.personalInfo, ...(config.personalInfo || {}) },
+                skills: { ...DEFAULT_RESUME_DATA.skills, ...(config.skills || {}) },
+                additional: { ...DEFAULT_RESUME_DATA.additional, ...(config.additional || {}) }
+            };
+        } else if (config.p) {
+            const nameParts = (config.p.name || "").split(" ");
+            migratedData.personalInfo = {
+                firstName: nameParts[0] || "", lastName: nameParts.slice(1).join(" ") || "",
+                email: config.p.email || "", phone: config.p.phone || "",
+                address: config.p.loc || "", jobTitle: "",
+                links: config.p.li ? [{ label: "LinkedIn", url: config.p.li }] : []
+            };
+            if (config.exp) migratedData.experience = config.exp.map((ex: any) => ({ company: ex.org || "", role: ex.role || "", range: ex.range || "", location: ex.loc || "", points: ex.pts || "" }));
+            if (config.edu) migratedData.education = config.edu.map((ed: any) => ({ institution: ed.inst || "", degree: ed.deg || "", year: ed.year || "", gpa: ed.gpa || "" }));
+            if (config.proj) migratedData.projects = config.proj.map((pr: any) => ({ name: pr.name || "", tech: pr.tech || "", desc: pr.desc || "" }));
+            if (config.skills && Array.isArray(config.skills)) migratedData.skills.languages = config.skills;
+        }
+    } catch (e) {
+        console.error('Migration helper error', e);
+    }
+    return migratedData;
 }

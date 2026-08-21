@@ -415,12 +415,17 @@ const LearnerDashboard: React.FC = () => {
                   onClick={async () => {
                     if (!user?.user_id) return alert('Kindly login first');
                     try {
-                      const res = await fetch(`${API_BASE_URL}/api/resume/${user.user_id}`);
+                      const res = await fetch(`${API_BASE_URL}/api/resumes/${user.user_id}`);
                       if (!res.ok) {
                         alert("No saved resume found. Please create one first.");
                         return;
                       }
-                      const data = await res.json();
+                      const list = await res.json();
+                      if (!Array.isArray(list) || list.length === 0) {
+                        alert("No saved resume found. Please create one first.");
+                        return;
+                      }
+                      const data = list[0];
                       const config = data.config;
                       const html = generatePdfHtml(config, config.tpl);
 
