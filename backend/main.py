@@ -6488,6 +6488,8 @@ async def update_profile(user_id: str, data: dict = Body(...)):
             core_update["graduation_year"] = data["graduation_year"]
         elif data.get("education", {}).get("endYear"):
             core_update["graduation_year"] = data["education"]["endYear"]
+        if "email" in data and data["email"]:
+            core_update["email"] = data["email"]
 
         if core_update:
             await users_col.update_one(
@@ -6510,7 +6512,7 @@ async def update_profile(user_id: str, data: dict = Body(...)):
 
         # Copy all allowed fields from payload
         allowed_fields = [
-            "firstName", "lastName", "username", "phone", "gender", "dob",
+            "firstName", "lastName", "username", "email", "phone", "gender", "dob",
             "userType", "domain", "location", "preferredWork",
             "bio", "careerGoal", "interests", "profilePhoto",
             "skills", "education", "educationList",

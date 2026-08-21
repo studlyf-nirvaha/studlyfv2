@@ -26,6 +26,7 @@ const MyProfile: React.FC = () => {
     firstName: '',
     lastName: '',
     username: '',
+    email: '',
     phone: '',
     gender: '',
     dob: '',
@@ -131,6 +132,7 @@ const MyProfile: React.FC = () => {
             firstName: data.firstName || (data.full_name ? data.full_name.split(' ')[0] : prev.firstName),
             lastName: data.lastName || (data.full_name ? data.full_name.split(' ').slice(1).join(' ') : prev.lastName),
             username: data.username || prev.username,
+            email: data.email || user.email || prev.email,
             phone: data.phone || prev.phone,
             gender: data.gender || prev.gender,
             dob: data.dob || prev.dob,
@@ -171,6 +173,7 @@ const MyProfile: React.FC = () => {
             ...prev,
             firstName: names[0] || '',
             lastName: names.slice(1).join(' ') || '',
+            email: user.email || '',
           }));
         }
       } catch (err) {
@@ -180,6 +183,7 @@ const MyProfile: React.FC = () => {
           ...prev,
           firstName: names[0] || '',
           lastName: names.slice(1).join(' ') || '',
+          email: user.email || '',
         }));
       } finally {
         setProfileLoading(false);
@@ -1754,8 +1758,14 @@ const publicProfileUrl = user?.user_id && typeof window !== 'undefined'
                </div>
 
                <div className="md:col-span-2 space-y-2 group relative">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-[#7C3AED] transition-colors">Email Address *</label>
-                  <input type="email" value={user?.email || ''} disabled className="w-full px-6 py-4 bg-gray-100 border border-transparent rounded-2xl text-sm font-bold text-gray-400 cursor-not-allowed" />
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1 group-focus-within:text-[#7C3AED] transition-colors">Email Address *</label>
+                 <input 
+                   type="email" 
+                   value={formData.email} 
+                   onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                   className="w-full px-6 py-4 bg-gray-50 border border-transparent rounded-2xl text-sm font-bold text-gray-900 focus:outline-none focus:bg-white focus:ring-4 focus:ring-[#7C3AED]/5 focus:border-[#7C3AED]/30 transition-all" 
+                   placeholder="Enter email address"
+                 />
                </div>
 
                <div className="space-y-2 group">
