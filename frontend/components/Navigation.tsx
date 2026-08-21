@@ -45,7 +45,7 @@ const LearnDropdown = ({ onItemClick }: { onItemClick: () => void }) => (
       <img src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=400" className="absolute bottom-0 right-0 w-full h-1/2 object-cover opacity-100 transition-all duration-700 rounded-b-[1.5rem]" alt="Career Roadmaps" />
     </BentoCard>
     <BentoCard onClick={onItemClick} to="/learn/courses-overview" title="Courses" desc="Role-focused tracks for elite engineering readiness." className="lg:col-span-1 lg:row-span-2 min-h-[160px] lg:min-h-[180px]">
-      <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600" className="absolute bottom-0 right-0 w-1/2 h-full object-cover opacity-100 transition-all duration-700" alt="Courses" />
+      <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=600" className="absolute bottom-0 right-0 w-full h-1/2 object-cover opacity-100 transition-all duration-700 rounded-b-[1.5rem]" alt="Courses" />
     </BentoCard>
     <BentoCard onClick={onItemClick} to="/learn/company-modules" title="Company Learning Modules" desc="Institutional training for corporate internal teams." className="lg:col-span-1 lg:row-span-2 min-h-[160px] lg:min-h-[180px]">
       <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=400" className="absolute bottom-0 right-0 w-full h-1/2 object-cover opacity-100 transition-all duration-700 rounded-b-[1.5rem]" alt="Corporate" />
