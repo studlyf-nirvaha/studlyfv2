@@ -808,8 +808,147 @@ export const rolesData: RoleData[] = [
     timeline: "10–12 Months",
     difficulty: "Intermediate",
     iconName: "Layers",
-    chapters: generateChapters("fullstack")
-  },
+    chapters: [
+      {
+        id: "chapter-fs-01",
+        title: "Frontend Basics (HTML, CSS & JavaScript)",
+        nodes: [
+          {
+            id: "node-fs-01-web-basics",
+            title: "Semantic HTML & Responsive CSS",
+            simpleExplanation: "HTML structures web content, while CSS styles it. Semantic HTML uses tags that explain their meaning to both browsers and developers. Responsive CSS ensures layouts adapt to mobile, tablet, and desktop screens using Flexbox, CSS Grid, and media queries.",
+            whyItMatters: "Every web page starts with HTML and CSS. Using semantic tags improves accessibility (SEO) and maintainability, while responsive styling is required for modern multi-device compatibility.",
+            keyConcepts: ["Semantic tags (<header>, <article>, etc.)", "CSS Box Model & Positioning", "Flexbox and CSS Grid layouts", "Mobile-First Design & Media Queries"],
+            resources: [
+              { title: "MDN HTML Basics", url: "https://developer.mozilla.org/en-US/docs/Learn/Getting_started_with_the_web/HTML_basics", type: "Best Starting Point" },
+              { title: "CSS Tricks Guide to Flexbox", url: "https://css-tricks.com/snippets/css/a-guide-to-flexbox/", type: "Practice Resource" }
+            ]
+          },
+          {
+            id: "node-fs-01-js-core",
+            title: "Advanced JavaScript & DOM Manipulation",
+            simpleExplanation: "JavaScript brings web pages to life. You need to master core concepts like scope, closures, promises, async/await, fetching data from APIs, and manipulating the Document Object Model (DOM).",
+            whyItMatters: "Frontend frameworks like React are built on top of JavaScript. You cannot master React without a strong command of JavaScript fundamentals.",
+            keyConcepts: ["Prototypal Inheritance & ES6+", "Asynchronous JS (Promises & Async/Await)", "API Fetching (Fetch API / Axios)", "DOM Event Delegation"],
+            resources: [
+              { title: "javascript.info - Modern JS", url: "https://javascript.info/", type: "Best Starting Point" },
+              { title: "Eloquent JavaScript", url: "https://eloquentjavascript.net/", type: "Advanced Reading" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "chapter-fs-02",
+        title: "Frontend Frameworks (React & Next.js)",
+        nodes: [
+          {
+            id: "node-fs-02-react",
+            title: "React.js Fundamentals",
+            simpleExplanation: "React is a component-based UI library. You learn how to split interfaces into reusable pieces, manage data flow using State and Props, and hook into lifecycle events using React Hooks (useState, useEffect, useMemo).",
+            whyItMatters: "React is the most popular frontend library in the industry. It powers highly interactive web interfaces and dynamic user experiences.",
+            keyConcepts: ["Component Lifecycle & JSX", "Props vs State", "React Hooks (useState, useEffect, useContext)", "Form handling & dynamic lists"],
+            resources: [
+              { title: "Official React Documentation", url: "https://react.dev/", type: "Official Docs" },
+              { title: "React Tutorial by Scrimba", url: "https://scrimba.com/learn/learnreact", type: "Beginner Friendly" }
+            ]
+          },
+          {
+            id: "node-fs-02-nextjs",
+            title: "Next.js App Router & Server-Side Rendering (SSR)",
+            simpleExplanation: "Next.js is a production framework built on top of React. It handles routing, server-side rendering (SSR), static site generation (SSG), and API routes, giving you a full-stack capability on the frontend.",
+            whyItMatters: "Standard React is client-side rendered, which hurts SEO and load times. Next.js solves this by rendering components on the server before serving them to the client.",
+            keyConcepts: ["Next.js App Router (Layouts & Pages)", "Server Components vs Client Components", "Static Site Generation (SSG) & SSR", "Optimized Image and Font Loading"],
+            resources: [
+              { title: "Next.js Learn Course", url: "https://nextjs.org/learn", type: "Best Starting Point" },
+              { title: "Next.js Documentation", url: "https://nextjs.org/docs", type: "Official Docs" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "chapter-fs-03",
+        title: "Backend Services & Database Design",
+        nodes: [
+          {
+            id: "node-fs-03-nodejs",
+            title: "Node.js & Express.js APIs",
+            simpleExplanation: "Node.js lets you run JavaScript on the server. Express is a lightweight framework to create routing logic, handle middleware, parse incoming requests, and build RESTful API endpoints.",
+            whyItMatters: "A full-stack developer must be able to design, write, and secure the server logic that interfaces between the database and the frontend app.",
+            keyConcepts: ["Node.js event loop & file system", "Creating Express servers & routers", "REST API design patterns", "Express Middleware (CORS, body parser)"],
+            resources: [
+              { title: "Node.js Introduction by MDN", url: "https://developer.mozilla.org/en-US/docs/Learn/Server-side/Express_Nodejs", type: "Best Starting Point" },
+              { title: "Express.js Official Guide", url: "https://expressjs.com/", type: "Official Docs" }
+            ]
+          },
+          {
+            id: "node-fs-03-databases",
+            title: "Relational (PostgreSQL) & Document (MongoDB) Databases",
+            simpleExplanation: "Databases store application data. Relational databases (like PostgreSQL) store data in structured tables using SQL, enforcing relations. NoSQL databases (like MongoDB) store data in flexible, JSON-like document models.",
+            whyItMatters: "Choosing the correct data model and optimizing queries prevents data corruption and keeps your application fast under heavy loads.",
+            keyConcepts: ["SQL Schemas, Joins, and Foreign Keys", "NoSQL Document Structure", "Database Indexing & Query Optimization", "Object-Relational Mapping (ORM) (Prisma/Mongoose)"],
+            resources: [
+              { title: "PostgreSQL Tutorial", url: "https://www.postgresqltutorial.com/", type: "Best Starting Point" },
+              { title: "MongoDB University Basics", url: "https://learn.mongodb.com/", type: "Beginner Friendly" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "chapter-fs-04",
+        title: "Security, Auth & Real-Time Sync",
+        nodes: [
+          {
+            id: "node-fs-04-auth",
+            title: "Authentication & Authorization (JWT & OAuth)",
+            simpleExplanation: "Authentication verifies who a user is (e.g. login with password or Google), while authorization verifies what they are allowed to do (e.g. edit a profile vs view as guest). JWT (JSON Web Tokens) are used to securely transmit user identity information.",
+            whyItMatters: "Security is a core requirement of all software projects. You must secure user passwords, authenticate API endpoints, and protect sensitive database tables.",
+            keyConcepts: ["Password hashing with bcrypt", "JWT Sign/Verify flow", "OAuth 2.0 (Login with Google/GitHub)", "Role-Based Access Control (RBAC)"],
+            resources: [
+              { title: "Web Security 101 by Auth0", url: "https://auth0.com/docs/secure", type: "Best Starting Point" },
+              { title: "OWASP Top Ten Security Risks", url: "https://owasp.org/www-project-top-ten/", type: "Advanced Reading" }
+            ]
+          },
+          {
+            id: "node-fs-04-realtime",
+            title: "WebSockets & Real-Time Communication",
+            simpleExplanation: "WebSockets establish a persistent, bi-directional communication channel between client and server, enabling instant updates without refresh (e.g. chat apps, live notifications).",
+            whyItMatters: "Standard HTTP requests are client-initiated and short-lived. Real-time apps need the server to push events directly to the client instantly.",
+            keyConcepts: ["WebSocket protocol vs HTTP", "Socket.io implementation", "Event broadcasting & rooms", "Scaling WebSockets (Redis Adapter)"],
+            resources: [
+              { title: "Socket.io Get Started Guide", url: "https://socket.io/get-started/chat", type: "Best Starting Point" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "chapter-fs-05",
+        title: "Containers, Testing & Deployment",
+        nodes: [
+          {
+            id: "node-fs-05-docker",
+            title: "Docker Containerization",
+            simpleExplanation: "Docker packages your code, runtime, system libraries, and settings into a single container. This ensures that your application runs exactly the same way in local development as it does in production cloud environments.",
+            whyItMatters: "Docker solves the 'it works on my machine' problem, simplifies team setups, and is the standard for modern cloud deployment models.",
+            keyConcepts: ["Writing Dockerfiles", "Container vs Image", "Docker Compose for multi-container apps", "Volume mounting & environment variables"],
+            resources: [
+              { title: "Docker Getting Started Guide", url: "https://docs.docker.com/get-started/", type: "Official Docs" },
+              { title: "Docker for Beginners", url: "https://docker-curriculum.com/", type: "Beginner Friendly" }
+            ]
+          },
+          {
+            id: "node-fs-05-deploy",
+            title: "CI/CD Pipelines & Cloud Hosting",
+            simpleExplanation: "CI/CD (Continuous Integration / Continuous Deployment) automates building, testing, and deploying your code every time you push to GitHub. You deploy frontends to Vercel/Netlify, databases to AWS RDS/Supabase, and backends to Render/AWS EC2.",
+            whyItMatters: "Manual deployments are slow, error-prone, and risky. Automating deployments ensures high availability and lets teams ship features faster.",
+            keyConcepts: ["GitHub Actions workflow pipelines", "Deploying static websites (Vercel/Render)", "Environment configuration in production", "Monitoring, SSL certificates, & domain setups"],
+            resources: [
+              { title: "GitHub Actions Introduction", url: "https://docs.github.com/en/actions", type: "Best Starting Point" },
+              { title: "Deploying Fullstack Apps on Render", url: "https://render.com/docs", type: "Official Docs" }
+            ]
+          }
+        ]
+      }
+    ],
   {
     id: "ai-ml-engineer",
     title: "AI/ML Engineer",

@@ -181,11 +181,7 @@ const RoadmapClone: React.FC = () => {
                 onClick={() => {
                   const el = document.getElementById('roles-section');
                   if (el) {
-                    const y = el.getBoundingClientRect().top + window.pageYOffset - 80;
-                    window.scrollTo({ top: y, behavior: 'smooth' });
-                  } else {
-                    const fallback = document.querySelector('#roles-section');
-                    if (fallback) fallback.scrollIntoView({ behavior: 'smooth' });
+                    el.scrollIntoView({ behavior: 'smooth' });
                   }
                 }}
                 className="w-full sm:w-auto px-8 py-4 bg-white text-[#1A1A1A] border border-gray-200 rounded-xl font-bold text-sm hover:border-gray-300 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer"
@@ -241,7 +237,7 @@ const RoadmapClone: React.FC = () => {
         </section>
 
         {/* SECTION 2: CHOOSE YOUR PATH (ROLE CARDS) */}
-        <section id="roles-section" className="py-20 bg-white border-y border-gray-100 px-6">
+        <section id="roles-section" style={{ scrollMarginTop: '100px' }} className="py-20 bg-white border-y border-gray-100 px-6">
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-black text-[#1A1A1A] tracking-tight mb-4">Choose Your Track</h2>
