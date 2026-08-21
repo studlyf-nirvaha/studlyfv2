@@ -948,7 +948,8 @@ export const rolesData: RoleData[] = [
           }
         ]
       }
-    ],
+    ]
+  },
   {
     id: "ai-ml-engineer",
     title: "AI/ML Engineer",
