@@ -30,7 +30,7 @@ const HighlightText = ({ text, highlight }: { text: string, highlight: string })
 
 const getYouTubeThumbnail = (url: string) => {
   const id = getYouTubeId(url);
-  return id ? `https://img.youtube.com/vi/${id}/maxresdefault.jpg` : '';
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : '';
 };
 
 const SIDEBAR_ITEMS = [
