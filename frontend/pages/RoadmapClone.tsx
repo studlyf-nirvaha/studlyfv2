@@ -5,10 +5,11 @@ import { rolesData, getFlatNodes, RoadmapNodeData, RoleData } from '../data/road
 import ProgressHeader from '../components/roadmap/ProgressHeader';
 import ChapterAccordion from '../components/roadmap/ChapterAccordion';
 import FocusPanel from '../components/roadmap/FocusPanel';
+import { VisualRoadmap } from '../components/roadmap/VisualRoadmap';
 import { 
   MonitorSmartphone, Database, Layers, BrainCircuit, Target, 
   PenTool, BarChart3, CloudCog, ShieldCheck, Terminal, 
-  ArrowLeft, CheckCircle2, ListOrdered, GraduationCap, Clock, Share2, Check, Bookmark 
+  ArrowLeft, CheckCircle2, ListOrdered, GraduationCap, Clock, Share2, Check, Bookmark, LayoutGrid, List
 } from 'lucide-react';
 
 // Icon Map
@@ -34,6 +35,7 @@ const RoadmapClone: React.FC = () => {
   const [copiedRoleId, setCopiedRoleId] = useState<string | null>(null);
   const [bookmarkedRoleIds, setBookmarkedRoleIds] = useState<string[]>([]);
   const [filterTab, setFilterTab] = useState<'all' | 'bookmarked'>('all');
+  const [viewMode, setViewMode] = useState<'visual' | 'list'>('visual');
 
   useEffect(() => {
     const saved = localStorage.getItem('studlyf_bookmarked_roadmaps');
@@ -498,6 +500,35 @@ const RoadmapClone: React.FC = () => {
           </div>
         </div>
 
+        {/* View Mode Toggle */}
+        <div className="flex justify-center md:justify-end items-center gap-3 mb-6 relative z-20 mt-8">
+          <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest">View Format:</span>
+          <div className="flex bg-white border border-gray-200 p-1 rounded-2xl shadow-sm">
+            <button
+              onClick={() => setViewMode('visual')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                viewMode === 'visual'
+                  ? 'bg-[#6C2BFF] text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Interactive Graph</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                viewMode === 'list'
+                  ? 'bg-[#6C2BFF] text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Accordion List</span>
+            </button>
+          </div>
+        </div>
+
         {/* Sticky Progress Header */}
         <ProgressHeader 
           completedNodes={completedNodes}
@@ -506,27 +537,36 @@ const RoadmapClone: React.FC = () => {
           activeNode={isPanelOpen ? activePanelNode : null}
         />
 
-        {/* Chapters */}
-        <div className="space-y-6">
-          {selectedRole.chapters.map((chapter, index) => {
-            const isPast = index < activeChapterIndex;
-            const isActive = index === activeChapterIndex;
-            const isFuture = index > activeChapterIndex;
+        {/* Roadmap Content */}
+        {viewMode === 'visual' ? (
+          <VisualRoadmap
+            role={selectedRole}
+            completedNodes={completedNodes}
+            activeChapterIndex={activeChapterIndex}
+            onNodeClick={handleNodeClick}
+          />
+        ) : (
+          <div className="space-y-6">
+            {selectedRole.chapters.map((chapter, index) => {
+              const isPast = index < activeChapterIndex;
+              const isActive = index === activeChapterIndex;
+              const isFuture = index > activeChapterIndex;
 
-            return (
-              <ChapterAccordion 
-                key={chapter.id}
-                chapter={chapter}
-                chapterIndex={index}
-                isActive={isActive}
-                isPast={isPast}
-                isFuture={isFuture}
-                completedNodes={completedNodes}
-                onNodeClick={handleNodeClick}
-              />
-            );
-          })}
-        </div>
+              return (
+                <ChapterAccordion 
+                  key={chapter.id}
+                  chapter={chapter}
+                  chapterIndex={index}
+                  isActive={isActive}
+                  isPast={isPast}
+                  isFuture={isFuture}
+                  completedNodes={completedNodes}
+                  onNodeClick={handleNodeClick}
+                />
+              );
+            })}
+          </div>
+        )}
 
       </main>
 
