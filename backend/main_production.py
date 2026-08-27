@@ -31,16 +31,13 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import database
-from db import db, ensure_indexes
+from db import db
 
 # Setup logging FIRST (no data leaks)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/var/log/app.log'),
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
@@ -820,7 +817,7 @@ async def startup_event():
     logger.info("Starting application...")
     
     # Create indexes
-    await ensure_indexes()
+    await db.ensure_indexes()
     
     logger.info(f"Application started. Environment: {ENVIRONMENT}")
 

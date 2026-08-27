@@ -51,7 +51,7 @@ const DashboardHome = lazy(() => import('./pages/DashboardHome'));
 const Blog = lazy(() => import('./pages/Blog'));
 const CompanyModules = lazy(() => import('./pages/CompanyModules'));
 const ResumeBuilder = lazy(() => import('./pages/ResumeBuilder'));
-const PublicResume = lazy(() => import('./pages/PublicResume'));
+const PublicResume = lazy(() => import('./pages/PublicResumeView'));
 const PublicResumeView = lazy(() => import('./pages/PublicResumeView'));
 const CoursePlayer = lazy(() => import('./pages/CoursePlayer'));
 const Cart = lazy(() => import('./pages/Cart'));
@@ -420,7 +420,7 @@ const App: React.FC = () => {
             <Route path="/hash-table" element={<ProtectedRoute><HashTablePage /></ProtectedRoute>} />
 
             {/* Resume + Job Prep */}
-            <Route path="/resume/public/:uid" element={<PublicResume />} />
+            <Route path="/resume/public/:shareId" element={<PublicResume />} />
             <Route path="/resume/public" element={<PublicResume />} />
             <Route path="/job-prep/resume-builder" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />
             <Route path="/resume-builder" element={<ProtectedRoute><ResumeBuilder /></ProtectedRoute>} />

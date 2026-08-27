@@ -16,8 +16,12 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("email_service")
 
+def _smtp_port_from_env() -> int:
+    value = os.getenv("SMTP_PORT", "465").strip()
+    return int(value) if value else 465
+
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
+SMTP_PORT = _smtp_port_from_env()
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Studlyf Notifications")
@@ -48,7 +52,7 @@ async def send_notification_email(to_email: str, subject: str, body_html: str):
     load_dotenv(root_env, override=True)
 
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 465))
+    smtp_port = _smtp_port_from_env()
     smtp_user = os.getenv("SMTP_USER", "").strip().replace('"', '').replace("'", "")
     smtp_pass = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "").replace('"', '').replace("'", "")
     

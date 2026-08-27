@@ -18,7 +18,7 @@ if (import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.ho
 }
 
 // Request deduplication cache
-const inFlightRequests: Record<string, Promise<Response>> = {};
+const inFlightRequests: Partial<Record<string, Promise<Response>>> = {};
 
 export const deduplicatedFetch = async (url: string, options: RequestInit = {}) => {
     const key = `${options.method || 'GET'}:${url}`;
